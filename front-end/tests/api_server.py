@@ -16,6 +16,7 @@ import uvicorn
 from app.config import Settings
 from app.main import create_app
 from app.repositories.user_repository import InMemoryUserRepository
+from app.repositories.document_repository import InMemoryDocumentRepository, SubjectRecord, TopicRecord
 from app.utils.password import hash_password
 
 
@@ -25,10 +26,19 @@ def fast_hasher(password: str) -> str:
 
 def create_browser_app():
     repository = InMemoryUserRepository()
+    documents = InMemoryDocumentRepository(
+        subjects=[SubjectRecord(id=1, name="Toán học", grade_level="THPT")],
+        topics=[
+            TopicRecord(id=1, subject_id=1, name="Hàm số bậc hai", chapter_name="Hàm số"),
+            TopicRecord(id=2, subject_id=1, name="Phương trình bậc hai", chapter_name="Đại số"),
+        ],
+    )
     app = create_app(
         user_repository=repository,
         password_hasher=fast_hasher,
         settings=Settings(jwt_secret=os.environ["JWT_SECRET"]),
+        document_repository=documents,
+        upload_dir=Path(os.environ["BROWSER_UPLOAD_DIR"]),
     )
     original_lifespan = app.router.lifespan_context
 

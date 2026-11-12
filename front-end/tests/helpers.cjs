@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const net = require('node:net');
+const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { chromium } = require('playwright');
@@ -56,11 +57,13 @@ async function withApplication(run) {
   let frontend;
   let browser;
   let output = '';
+  let uploadDirectory;
   try {
+    uploadDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'gia-su-ai-browser-uploads-'));
     const backendUrl = `http://127.0.0.1:${await unusedPort()}`;
     backend = spawn(python, ['-B', path.join(__dirname, 'api_server.py'), '--port', new URL(backendUrl).port], {
       cwd: projectRoot, windowsHide: true,
-      env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONIOENCODING: 'utf-8', PYTHON_DOTENV_DISABLED: '1' },
+      env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONIOENCODING: 'utf-8', PYTHON_DOTENV_DISABLED: '1', BROWSER_UPLOAD_DIR: uploadDirectory },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     backend.stdout.on('data', chunk => { output = (output + chunk).slice(-12000); });
@@ -81,6 +84,16 @@ async function withApplication(run) {
       await new Promise(resolve => frontend.close(resolve));
     }
     await stopChild(backend);
+    if (uploadDirectory) {
+      const resolved = path.resolve(uploadDirectory);
+      if (path.dirname(resolved) !== path.resolve(os.tmpdir()) || !path.basename(resolved).startsWith('gia-su-ai-browser-uploads-')) throw new Error('Unexpected browser upload directory.');
+      // Chỉ xóa các file trong thư mục tạm riêng vừa tạo cho lần test này.
+      for (const entry of fs.readdirSync(resolved, { withFileTypes: true })) {
+        if (!entry.isFile()) throw new Error('Unexpected upload test entry.');
+        fs.unlinkSync(path.join(resolved, entry.name));
+      }
+      fs.rmdirSync(resolved);
+    }
   }
 }
 

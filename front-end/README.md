@@ -33,13 +33,14 @@ Nếu dùng Live Server thay cho `serve.cjs`, đặt meta `api-base` trong `inde
 - Đăng nhập gọi `POST /api/auth/login`; thành công lưu token vào `sessionStorage` và mở trang chủ.
 - Trang chủ yêu cầu đăng nhập. Khi tải lại trang, frontend gọi `GET /api/auth/me` trước khi hiển thị các trang cần tài khoản.
 - Menu hiển thị tên người dùng, hồ sơ và đăng xuất. LEARNER không có mục quản trị; trang quản trị còn kiểm tra `/api/admin/access` ở backend.
-- Hồ sơ hiển thị thông tin tài khoản đang đăng nhập. Form chỉnh sửa hồ sơ hiện chỉ kiểm tra dữ liệu tại trình duyệt, chưa có API lưu thay đổi.
+- Hồ sơ gọi `GET /api/profile`, lưu họ tên/năm sinh bằng `PATCH /api/profile`; thay đổi giữ được sau khi tải lại trang. Email và vai trò chỉ hiển thị, không cho sửa.
+- ADMIN mở Tài liệu nguồn để tải PDF/TXT qua `POST /api/admin/documents`; form lấy môn/chủ đề thật từ `/api/admin/documents/options`, danh sách lấy từ `/api/admin/documents`. File và metadata được lưu ở backend/MySQL.
 - Đăng xuất hoặc token hết hạn xóa phiên phía trình duyệt. Sai thông tin đăng nhập không tạo phiên. Không lưu mật khẩu vào storage.
 - Lỗi mạng, backend ngừng chạy và lỗi server có thông báo; form chống gửi nhiều lần khi đang xử lý.
 
 API kiểm tra MySQL: http://127.0.0.1:8000/api/database. Swagger: http://127.0.0.1:8000/docs.
 
-Các trang học, chat, luyện tập và quản trị nội dung hiện vẫn có dữ liệu mẫu; phần này chưa có các API nghiệp vụ để lưu nội dung hoặc gọi AI. Phân quyền phía frontend phục vụ điều hướng; backend xác thực token và quyền trước khi cho phép API bảo vệ.
+Các trang học, chat, luyện tập và CRUD danh mục hiện vẫn có dữ liệu mẫu; phần này chưa có API nghiệp vụ tương ứng. Hồ sơ và upload/danh sách tài liệu đã kết nối backend. Phân quyền phía frontend phục vụ điều hướng; backend xác thực token và quyền trước khi cho phép API bảo vệ.
 
 ## Cấu trúc
 
@@ -84,7 +85,7 @@ Form tài khoản dùng `src/js/pages/auth-screen.js`, `auth-templates.js` và `
 
 ADMIN vào `#admin?tab=subjects` sau khi đăng nhập. Sidebar và menu mobile có ba mục Môn học, Chủ đề, Tài liệu nguồn, tương ứng với `#admin?tab=subjects`, `#admin?tab=topics`, `#admin?tab=documents`. Hồ sơ quản trị hiển thị thông tin tài khoản từ server. CSS quản trị nằm trong `admin-shell.css` và `admin.css`.
 
-Các thao tác danh mục và tài liệu hiện chỉ cập nhật dữ liệu minh họa trong bộ nhớ; tải lại trang hoặc đăng xuất đặt lại dữ liệu. API `/api/admin/access` kiểm tra quyền quản trị; chưa có API lưu các thay đổi này.
+Thêm, sửa, bật/tắt môn/chủ đề vẫn chỉ cập nhật danh mục minh họa trong bộ nhớ. Riêng tab tài liệu của ADMIN đăng nhập thật dùng MySQL và file đã tải qua API; tải lại trang vẫn có tài liệu. File mới ở trạng thái chờ xử lý, chưa bật làm nguồn. Nút bật/tắt và thử xử lý không giả lập thay đổi trên dữ liệu thật; cần API xử lý nội dung ở bước tiếp theo.
 
 Trên localhost/127.0.0.1, trang đăng nhập có nút xem thử giao diện LEARNER và ADMIN. Chế độ này có banner nhận diện, dùng dữ liệu mẫu và không tạo token API. Đăng xuất xóa chế độ xem thử; hostname khác không bật các nút này.
 

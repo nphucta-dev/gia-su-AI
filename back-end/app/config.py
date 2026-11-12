@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 # Front-end dev server (front-end/serve.cjs) chạy ở cổng 4173.
 DEFAULT_CORS_ORIGINS = ("http://127.0.0.1:4173", "http://localhost:4173")
 DEFAULT_MAX_BODY_BYTES = 10 * 1024
+DEFAULT_UPLOAD_BODY_BYTES = 10 * 1024 * 1024 + 64 * 1024
+DEFAULT_UPLOAD_DIR = BACKEND_DIR / "storage" / "documents"
 DEFAULT_ACCESS_TOKEN_MINUTES = 30
 DEFAULT_DATABASE_URL = (
     "mysql+pymysql://gia_su_ai:gia_su_ai_dev@localhost:3306/gia_su_ai?charset=utf8mb4"
@@ -40,6 +42,7 @@ class Settings:
     jwt_issuer: str = "gia-su-ai"
     access_token_minutes: int = DEFAULT_ACCESS_TOKEN_MINUTES
     database_url: str = field(default=DEFAULT_DATABASE_URL, repr=False)
+    upload_dir: Path = DEFAULT_UPLOAD_DIR
 
 
 def _load_jwt_secret() -> str:
@@ -101,9 +104,13 @@ def load_database_url() -> str:
 def load_settings() -> Settings:
     raw = os.environ.get("CORS_ORIGIN", "")
     origins = tuple(item.strip() for item in raw.split(",") if item.strip())
+    upload_dir = Path(os.environ.get("UPLOAD_DIR", "").strip() or DEFAULT_UPLOAD_DIR).expanduser()
+    if not upload_dir.is_absolute():
+        upload_dir = BACKEND_DIR / upload_dir
     return Settings(
         cors_origins=origins or DEFAULT_CORS_ORIGINS,
         jwt_secret=_load_jwt_secret(),
         access_token_minutes=_load_access_token_minutes(),
         database_url=load_database_url(),
+        upload_dir=upload_dir,
     )

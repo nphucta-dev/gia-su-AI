@@ -69,6 +69,77 @@ def make_catalog(db):
     return user, subject, topic
 
 
+@pytest.mark.anyio
+async def test_profile_api_persists_in_mysql_and_preserves_credentials(database):
+    _, sessions = database
+    with sessions.begin() as db:
+        user, _, _ = make_catalog(db)
+        user_id, email, password_hash = user.id, user.email, user.password_hash
+    app = create_app(
+        session_factory=sessions,
+        settings=Settings(jwt_secret="mysql-profile-integration-" + "x" * 40),
+    )
+    token = app.state.token_service.create_access_token(user_id).access_token
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
+    ) as client:
+        response = await client.patch(
+            "/api/profile",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"name": "Hồ sơ MySQL", "birthYear": 2000},
+        )
+        assert response.status_code == 200
+        restored = await client.get("/api/profile", headers={"Authorization": f"Bearer {token}"})
+        assert restored.json()["user"]["birthYear"] == 2000
+    with sessions() as db:
+        stored = db.get(User, user_id)
+        assert stored.full_name == "Hồ sơ MySQL" and stored.birth_year == 2000
+        assert stored.email == email and stored.password_hash == password_hash
+        assert stored.role == "LEARNER"
+
+
+@pytest.mark.anyio
+async def test_admin_upload_persists_file_and_document_in_mysql(database, tmp_path):
+    _, sessions = database
+    with sessions.begin() as db:
+        admin, _, topic = make_catalog(db)
+        admin.role = "ADMIN"
+        admin_id, topic_id = admin.id, topic.id
+    upload_dir = tmp_path / "documents"
+    app = create_app(
+        session_factory=sessions,
+        upload_dir=upload_dir,
+        settings=Settings(jwt_secret="mysql-upload-integration-" + "x" * 40),
+    )
+    token = app.state.token_service.create_access_token(admin_id).access_token
+    headers = {"Authorization": f"Bearer {token}"}
+    content = "Nội dung tài liệu MySQL thực.".encode("utf-8")
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
+    ) as client:
+        options = await client.get("/api/admin/documents/options", headers=headers)
+        assert options.status_code == 200
+        response = await client.post(
+            "/api/admin/documents", headers=headers,
+            data={"topic_id": str(topic_id), "title": "Tài liệu MySQL"},
+            files={"file": ("source.txt", content, "text/plain")},
+        )
+        assert response.status_code == 201
+        saved = response.json()["document"]
+        assert isinstance(saved["id"], int) and saved["topicId"] == topic_id
+        assert saved["status"] == "pending" and saved["isActive"] is False
+        listing = await client.get("/api/admin/documents", headers=headers)
+        assert any(row["id"] == saved["id"] for row in listing.json()["documents"])
+    with sessions() as db:
+        stored = db.get(Document, saved["id"])
+        assert stored.title == "Tài liệu MySQL" and stored.topic_id == topic_id
+        assert stored.status == "pending" and not stored.is_active
+        assert Path(stored.file_path).name == stored.file_path
+        stored_file = upload_dir / stored.file_path
+        assert stored_file.resolve().parent == upload_dir.resolve()
+        assert stored_file.read_bytes() == content
+
+
 def test_migration_matches_models(database):
     engine, _ = database
     assert len(set(inspect(engine).get_table_names()) - {"alembic_version"}) == 11

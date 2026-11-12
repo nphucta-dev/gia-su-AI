@@ -1,6 +1,6 @@
 # Gia Sư AI — Back-end
 
-API Python 3.10+ dùng FastAPI. Có đăng ký, đăng nhập, xác thực JWT và phân quyền; lưu tài khoản trong MySQL.
+API Python 3.10+ dùng FastAPI. Có đăng ký, đăng nhập, xác thực JWT, hồ sơ cá nhân và tải tài liệu cho ADMIN; lưu dữ liệu trong MySQL.
 
 Schema hiện tại dùng `INT AUTO_INCREMENT` cho ID của 11 bảng; API trả `id` dạng số. Database cũ đang dùng UUID cần chạy migration `0002_integer_ids` sau khi dừng server và sao lưu, theo [hướng dẫn chuyển ID](../database/README.md#chuyển-database-cũ-từ-uuid-sang-id-tự-tăng).
 
@@ -226,9 +226,41 @@ Frontend gửi `Authorization: Bearer <token>` ở mỗi request cần đăng nh
 
 Băm bằng scrypt (`hashlib.scrypt` có sẵn trong Python), salt ngẫu nhiên 16 byte, N=2^15, r=8, p=3. Chuỗi lưu có dạng `scrypt$N$r$p$salt$hash`, tham số nằm trong chuỗi nên có thể tăng độ khó sau này mà không làm hỏng hash cũ. Dùng `verify_password` (so sánh thời gian cố định) khi đăng nhập và `needs_rehash` để nâng cấp hash cũ sau khi đăng nhập thành công. Việc băm chạy trong thread pool để không chặn các request khác.
 
+## Hồ sơ cá nhân
+
+`GET /api/profile` trả đối tượng `user` gồm `id`, `name`, `email`, `role`, `createdAt`, `birthYear` của tài khoản đang đăng nhập, gồm cả LEARNER và ADMIN.
+
+`PATCH /api/profile` nhận JSON và Bearer token:
+
+```json
+{"name": "Nguyễn Văn An", "birthYear": 2000}
+```
+
+Có thể gửi riêng từng trường; bỏ qua năm sinh để giữ nguyên hoặc gửi `null` để xóa năm sinh. Họ tên hợp lệ, tối đa 120 ký tự; năm sinh là số nguyên từ 1900 đến năm hiện tại. API không cho chỉnh sửa ID, email, role, mật khẩu hoặc trạng thái tài khoản. User ID luôn lấy từ token. Thành công trả `200` với `message` và `user`; lỗi dữ liệu `422`, thiếu/sai token `401`, tài khoản vô hiệu hóa `403`.
+
+`GET /api/auth/me` giữ định dạng cũ để khôi phục phiên; hồ sơ đầy đủ dùng `/api/profile`. Không cần migration mới vì cột `birth_year` đã có trong bảng `users`.
+
+## Tải tài liệu ADMIN
+
+Các API sau yêu cầu token của **ADMIN đang hoạt động**; LEARNER nhận `403`, thiếu token nhận `401`:
+
+| API | Công dụng |
+| --- | --- |
+| `GET /api/admin/documents/options` | Môn và chủ đề active từ MySQL cho form upload; trả `subjects`, mỗi môn có `topics`. |
+| `GET /api/admin/documents` | Danh sách tài liệu đã lưu; trả `documents`. |
+| `POST /api/admin/documents` | Tải PDF/TXT và tạo metadata; trả `201` với `message`, `document`. |
+
+POST dùng **multipart/form-data** với `file`, `topic_id`, `title` (1–200 ký tự). File tối đa **10 MiB**, không rỗng, đuôi và MIME phải khớp PDF/TXT. PDF kiểm tra chữ ký `%PDF-`; TXT phải là UTF-8 hợp lệ. Chủ đề và môn cha phải tồn tại, đang active. Swagger `/docs` có form chọn file sau khi Authorize bằng token ADMIN.
+
+File lưu bằng tên ngẫu nhiên trong `back-end/storage/documents/`, metadata vào bảng `documents` với `status=pending`, `is_active=false`. `file_path` lưu tên file tương đối trong kho riêng, không nhận đường dẫn từ client và không trả đường dẫn nội bộ. Nếu ghi metadata thất bại, file mới tạo được dọn bỏ. Thư mục này không phục vụ như tài nguyên tĩnh và đã được Git bỏ qua.
+
+Đặt `UPLOAD_DIR` để đổi nơi lưu; đường dẫn tương đối tính từ `back-end/`. Khi chuyển môi trường cần mang theo cả kho file và database. Bước trích xuất PDF/TXT, tạo chunks và bật nguồn là nghiệp vụ tiếp theo; API upload chưa chuyển tài liệu sang ready.
+
+Middleware giữ giới hạn 10 KB cho JSON; riêng POST upload nhận tối đa 10 MiB cộng 64 KiB multipart. Service vẫn kiểm tra giới hạn file riêng, kể cả request chunked. CORS cho phép PATCH. Phản hồi tài khoản, hồ sơ và tài liệu quản trị có `Cache-Control: no-store`.
+
 ## Việc cần làm tiếp
 
 - Các API danh mục, chat và quiz sử dụng model trong `app/models/` và session transaction của `app/db/database.py`; kiểm tra chủ sở hữu và quy tắc nghiệp vụ theo tài liệu SRS trước khi lưu dữ liệu.
 - Chưa có refresh token và đăng xuất thu hồi token: token đã phát hành vẫn dùng được đến khi hết hạn. Nếu cần thu hồi ngay, thêm danh sách token bị thu hồi hoặc số phiên bản token theo người dùng.
 - Giới hạn số lần gọi theo IP cho `/api/auth/register` (mỗi lần băm tốn CPU và 32 MiB bộ nhớ).
-- Các trang danh mục, chat, quiz và quản trị nội dung ngoài luồng tài khoản còn dùng dữ liệu minh họa; cần API nghiệp vụ tương ứng để lưu và xử lý dữ liệu thật.
+- Danh mục, chat, quiz và CRUD môn/chủ đề còn dùng dữ liệu minh họa. Hồ sơ và upload/danh sách tài liệu đã dùng API thật; phần xử lý nội dung file và bật/tắt nguồn chưa triển khai.

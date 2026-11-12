@@ -1,0 +1,288 @@
+0001 HỒ SƠ DỰ ÁN PHẦN MỀM
+0002 GIA SƯ AI
+0003 PRODUCT BACKLOG
+0004 /
+0005 1. Mục tiêu sản phẩm và quy ước
+0006 Gia sư AI là ứng dụng web tiếng Việt cho phép người học chọn môn và chủ đề, hỏi gia sư AI theo cách gợi mở, học từ tài liệu nguồn, làm bài trắc nghiệm và theo dõi kết quả. Backlog xác định các hạng mục giao được cho nhóm 4 thành viên trong chu kỳ 4 tuần.
+0007 1.1. Phạm vi triển khai
+0008 [TABLE]
+0009 Thành phần | Mô tả triển khai
+0010 Vai trò | LEARNER học tập; ADMIN quản lý nội dung; khách dùng đăng ký/đăng nhập.
+0011 Nội dung | 01–02 môn, mỗi môn khoảng 05–10 chủ đề; chương lưu bằng topics.chapter_name.
+0012 AI hội thoại | Một LLM API; ngữ cảnh theo phiên, gợi ý 3 mức, xác nhận trước khi xem lời giải.
+0013 Nguồn học | Tài liệu PDF có văn bản hoặc TXT; chia đoạn; tra cứu theo chủ đề, trích dẫn khi có nguồn.
+0014 Luyện tập | Mỗi quiz gồm 05 câu trắc nghiệm A–D, 03 mức độ, chấm một lần.
+0015 Dữ liệu | PostgreSQL, 11 bảng, 2 vai trò, tiến độ theo chủ đề và lịch sử hội thoại.
+0016 [/TABLE]
+0017 1.2. Cấp độ ưu tiên MoSCoW
+0018 [TABLE]
+0019 Mức | Định nghĩa | Cách triển khai
+0020 Must | Năng lực cốt lõi hoặc điều kiện an toàn cần đạt. | Cam kết hoàn thành và kiểm thử.
+0021 Should | Cải thiện trải nghiệm, có thể triển khai sau khi phần Must ổn định. | Ưu tiên khi không ảnh hưởng mốc chính.
+0022 Could | Tính năng gia tăng, không quyết định luồng học chính. | Chỉ thực hiện khi còn năng lực.
+0023 Won’t | Hạng mục không thuộc phiên bản 1.0. | Theo dõi cho phiên bản tiếp theo.
+0024 [/TABLE]
+0025 Cấu trúc mã: EP-xx → F-xx.x → SF-xx.x.x. Cột “SRS” tham chiếu mã FR/NFR/AT trong tài liệu đặc tả. T1–T4 là tuần thực hiện; TV1–TV4 là thành viên phụ trách chính.
+0026 2. Tổng quan Product Backlog
+0027 [TABLE]
+0028 Epic | Nhóm năng lực | Ưu tiên | F | SF | Must | Should | Could
+0029 EP-01 | Tài khoản và hồ sơ người học | Must | 2 | 6 | 5 | 1 | 0
+0030 EP-02 | Danh mục môn học và chủ đề | Must | 2 | 5 | 4 | 1 | 0
+0031 EP-03 | Hội thoại gia sư AI | Must | 2 | 8 | 7 | 1 | 0
+0032 EP-04 | Phương pháp hướng dẫn Socratic | Must | 2 | 5 | 4 | 1 | 0
+0033 EP-05 | Tài liệu nguồn và truy xuất RAG | Must | 3 | 9 | 8 | 0 | 1
+0034 EP-06 | Sinh bài luyện tập bằng AI | Must | 2 | 6 | 4 | 2 | 0
+0035 EP-07 | Chấm điểm và tiến độ học tập | Must | 2 | 7 | 6 | 1 | 0
+0036 EP-08 | Quản trị nội dung học tập | Must | 2 | 4 | 3 | 1 | 0
+0037 EP-09 | Đánh giá phản hồi và hạn mức sử dụng | Must | 2 | 5 | 2 | 3 | 0
+0038 EP-10 | Bảo mật, kiểm thử và triển khai | Must | 3 | 9 | 9 | 0 | 0
+0039 TỔNG |  |  | 22 | 64 | 52 | 11 | 1
+0040 [/TABLE]
+0041 3. Danh sách Epic, Feature và Sub Feature
+0042 Mỗi Sub Feature là một đầu việc có thể nghiệm thu độc lập. Trách nhiệm ghi theo người phụ trách chính; các thành viên phối hợp tích hợp và kiểm thử khi cần.
+0043 EP-01. Tài khoản và hồ sơ người học
+0044 F-01.1  Đăng ký, đăng nhập và phiên xác thực
+0045 [TABLE]
+0046 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0047 SF-01.1.1 | Đăng ký email duy nhất, mật khẩu tối thiểu 8 ký tự | Must | T1 | TV1 | FR-01.1
+0048 SF-01.1.2 | Kiểm tra biểu mẫu, báo lỗi tiếng Việt và không lưu mật khẩu thô | Must | T1 | TV1 | FR-01.1
+0049 SF-01.1.3 | Đăng nhập bằng email/mật khẩu và tạo phiên xác thực | Must | T1 | TV1 | FR-01.2
+0050 SF-01.1.4 | Đăng xuất, loại bỏ thông tin phiên ở phía client | Must | T1 | TV1 | FR-01.2
+0051 [/TABLE]
+0052 Nghiệm thu: Người dùng tạo và truy cập tài khoản an toàn; email trùng và đăng nhập sai có thông báo.
+0053 F-01.2  Hồ sơ và vai trò
+0054 [TABLE]
+0055 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0056 SF-01.2.1 | Xem, cập nhật họ tên và năm sinh | Should | T1 | TV1 | FR-01.3
+0057 SF-01.2.2 | Phân biệt vai trò LEARNER và ADMIN, chỉ tài khoản active được truy cập | Must | T1 | TV1 | FR-01.3
+0058 [/TABLE]
+0059 Nghiệm thu: Người học quản lý thông tin cơ bản; tài khoản được phân quyền LEARNER/ADMIN.
+0060 EP-02. Danh mục môn học và chủ đề
+0061 F-02.1  Khám phá nội dung học
+0062 [TABLE]
+0063 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0064 SF-02.1.1 | Xem danh sách môn học theo cấp học và trạng thái active | Must | T1 | TV1 | FR-02.1–02.2
+0065 SF-02.1.2 | Hiển thị chủ đề nhóm theo chapter_name của từng môn | Should | T1 | TV1 | FR-02.1–02.2
+0066 SF-02.1.3 | Chọn một chủ đề để bắt đầu chat hoặc luyện tập | Must | T1 | TV2 | FR-02.3
+0067 [/TABLE]
+0068 Nghiệm thu: Danh mục hiển thị đúng môn, cấp học, chương và chủ đề đang hoạt động.
+0069 F-02.2  Quản lý danh mục
+0070 [TABLE]
+0071 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0072 SF-02.2.1 | Tạo và sửa tên, cấp học môn; tên/chương/mô tả chủ đề | Must | T2 | TV1 | FR-08.1
+0073 SF-02.2.2 | Kích hoạt và vô hiệu hóa môn/chủ đề bằng is_active | Must | T2 | TV1 | FR-08.1
+0074 [/TABLE]
+0075 Nghiệm thu: ADMIN cập nhật môn và chủ đề, không xóa dữ liệu đã có quan hệ lịch sử.
+0076 EP-03. Hội thoại gia sư AI
+0077 F-03.1  Chat theo ngữ cảnh
+0078 [TABLE]
+0079 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0080 SF-03.1.1 | Tạo phiên chat gắn tài khoản và chủ đề | Must | T2 | TV2 | FR-03.1
+0081 SF-03.1.2 | Thiết kế khung chat, gửi câu hỏi và hiển thị phản hồi tiếng Việt | Must | T2 | TV2 | FR-03.1
+0082 SF-03.1.3 | Đưa các tin gần nhất của phiên vào ngữ cảnh gọi LLM | Must | T2 | TV2 | FR-03.2
+0083 SF-03.1.4 | Hiển thị trạng thái đang xử lý và khóa nút gửi khi chờ | Should | T2 | TV2 | NFR-01
+0084 [/TABLE]
+0085 Nghiệm thu: Người học gửi câu hỏi theo chủ đề và nhận phản hồi AI đúng luồng.
+0086 F-03.2  Lịch sử và độ tin cậy
+0087 [TABLE]
+0088 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0089 SF-03.2.1 | Lưu tin nhắn role=user/assistant kèm thời gian gửi | Must | T2 | TV2 | FR-03.2
+0090 SF-03.2.2 | Liệt kê phiên chat và mở lại nội dung từng phiên | Must | T2 | TV2 | FR-03.3
+0091 SF-03.2.3 | Chặn câu hỏi rỗng, chỉ có khoảng trắng | Must | T2 | TV2 | FR-03.3
+0092 SF-03.2.4 | Thông báo timeout, hết quota hoặc lỗi kết nối; có thao tác gửi lại | Must | T4 | TV2 | FR-03.4
+0093 [/TABLE]
+0094 Nghiệm thu: Mỗi người xem lại đúng phiên của mình; lỗi AI không làm mất tin đã lưu.
+0095 EP-04. Phương pháp hướng dẫn Socratic
+0096 F-04.1  Gợi ý theo từng bước
+0097 [TABLE]
+0098 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0099 SF-04.1.1 | Thiết kế system prompt cho câu hỏi gợi mở ở lượt đầu | Must | T2 | TV2 | FR-04.1
+0100 SF-04.1.2 | Hỗ trợ 3 mức gợi ý và lưu hint_level của phản hồi | Must | T2 | TV2 | FR-04.2
+0101 SF-04.1.3 | Nút “Đơn giản hơn” và “Cho ví dụ” gửi yêu cầu có ngữ cảnh | Should | T3 | TV2 | FR-04.2
+0102 [/TABLE]
+0103 Nghiệm thu: AI hướng dẫn học sinh tự suy luận trước khi xem lời giải hoàn chỉnh.
+0104 F-04.2  Hiển thị lời giải có xác nhận
+0105 [TABLE]
+0106 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0107 SF-04.2.1 | Nút “Xem lời giải” mở hộp xác nhận trước khi gọi AI | Must | T3 | TV2 | FR-04.3
+0108 SF-04.2.2 | Lưu is_full_solution cho tin nhắn lời giải đã xác nhận | Must | T3 | TV2 | FR-04.4
+0109 [/TABLE]
+0110 Nghiệm thu: Câu trả lời hoàn chỉnh chỉ xuất hiện khi người học xác nhận.
+0111 EP-05. Tài liệu nguồn và truy xuất RAG
+0112 F-05.1  Tiếp nhận tài liệu
+0113 [TABLE]
+0114 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0115 SF-05.1.1 | Tải PDF có văn bản hoặc TXT và gắn một chủ đề | Must | T2 | TV3 | FR-05.1
+0116 SF-05.1.2 | Kiểm tra loại file, kích thước và thông báo lỗi đầu vào | Must | T2 | TV3 | FR-05.1
+0117 SF-05.1.3 | Trích văn bản, chuyển trạng thái pending/ready/error | Must | T2 | TV3 | FR-05.2
+0118 [/TABLE]
+0119 Nghiệm thu: ADMIN nhập tài liệu học tập hợp lệ và theo dõi trạng thái xử lý.
+0120 F-05.2  Tách đoạn và tìm kiếm nguồn
+0121 [TABLE]
+0122 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0123 SF-05.2.1 | Tách văn bản thành chunk và lưu thứ tự chunk_index | Must | T2 | TV3 | FR-05.2
+0124 SF-05.2.2 | Tra cứu đoạn liên quan theo chủ đề bằng từ khóa | Must | T2 | TV3 | FR-05.3
+0125 SF-05.2.3 | Chỉ tìm trong documents có is_active=true và status=ready | Must | T2 | TV3 | FR-05.3
+0126 SF-05.2.4 | Tạo embedding và tìm kiếm vector pgvector nếu dữ liệu cho phép | Could | T4 | TV3 | FR-05.3
+0127 [/TABLE]
+0128 Nghiệm thu: Các đoạn có nội dung liên quan được tìm trong tài liệu đã sẵn sàng.
+0129 F-05.3  Trích dẫn và độ tin cậy
+0130 [TABLE]
+0131 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0132 SF-05.3.1 | Lưu danh sách nguồn tham khảo của phản hồi trong source_refs | Must | T2 | TV3 | FR-05.4
+0133 SF-05.3.2 | Hiển thị nguồn hoặc nêu rõ khi không tìm thấy đoạn liên quan | Must | T3 | TV3 | FR-05.4
+0134 [/TABLE]
+0135 Nghiệm thu: AI trả lời có nguồn phù hợp, không tự tạo tài liệu không tồn tại.
+0136 EP-06. Sinh bài luyện tập bằng AI
+0137 F-06.1  Tạo bộ câu hỏi trắc nghiệm
+0138 [TABLE]
+0139 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0140 SF-06.1.1 | Chọn chủ đề và mức easy/medium/hard | Must | T2 | TV4 | FR-06.1
+0141 SF-06.1.2 | Gọi LLM sinh JSON gồm 5 câu, 4 lựa chọn A–D và lời giải thích | Must | T2 | TV4 | FR-06.2
+0142 SF-06.1.3 | Validate 5 câu, đáp án A–D và giải thích trước khi lưu toàn bộ | Must | T2 | TV4 | FR-06.3
+0143 [/TABLE]
+0144 Nghiệm thu: AI sinh bộ 5 câu theo chủ đề và độ khó, lưu khi cấu trúc hợp lệ.
+0145 F-06.2  Màn hình làm bài
+0146 [TABLE]
+0147 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0148 SF-06.2.1 | Hiển thị lần lượt 5 câu cùng lựa chọn A–D | Must | T3 | TV4 | FR-06.2
+0149 SF-06.2.2 | Đánh dấu đáp án, cảnh báo câu chưa làm trước khi nộp | Should | T3 | TV4 | FR-07.1
+0150 SF-06.2.3 | Hiện thông báo và thử lại khi AI sinh dữ liệu sai định dạng | Should | T4 | TV4 | FR-06.3
+0151 [/TABLE]
+0152 Nghiệm thu: Người học chọn đáp án, nộp bài và nhận thông báo khi có lỗi.
+0153 EP-07. Chấm điểm và tiến độ học tập
+0154 F-07.1  Nộp và chấm quiz
+0155 [TABLE]
+0156 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0157 SF-07.1.1 | Lưu lựa chọn của từng câu vào quiz_answers | Must | T3 | TV4 | FR-07.1
+0158 SF-07.1.2 | So sánh đáp án, tính score 0–100 và chặn nộp lặp | Must | T3 | TV4 | FR-07.2–07.3
+0159 SF-07.1.3 | Hiển thị kết quả và giải thích những câu làm sai | Must | T3 | TV4 | FR-07.2
+0160 [/TABLE]
+0161 Nghiệm thu: Mỗi bài chỉ hoàn tất một lần; điểm và giải thích được lưu chính xác.
+0162 F-07.2  Tiến độ và dashboard
+0163 [TABLE]
+0164 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0165 SF-07.2.1 | Cộng total_quizzes, correct_count, total_count khi quiz hoàn tất | Must | T3 | TV4 | FR-07.3
+0166 SF-07.2.2 | Tính mastery_percent = correct_count / total_count × 100 | Must | T3 | TV4 | FR-07.3
+0167 SF-07.2.3 | Dashboard hiển thị tổng bài, điểm trung bình và số phiên chat | Must | T3 | TV4 | FR-07.4
+0168 SF-07.2.4 | Liệt kê chủ đề có tỷ lệ thành thạo thấp để người học ôn tập | Should | T4 | TV4 | FR-07.4
+0169 [/TABLE]
+0170 Nghiệm thu: Kết quả bài hoàn thành cập nhật được tiến độ theo chủ đề.
+0171 EP-08. Quản trị nội dung học tập
+0172 F-08.1  Giao diện quản trị
+0173 [TABLE]
+0174 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0175 SF-08.1.1 | Trang quản trị môn/chủ đề dùng API CRUD và trạng thái active | Should | T3 | TV1 | FR-08.1
+0176 SF-08.1.2 | Trang upload tài liệu, xem status và quản lý bật/tắt | Must | T3 | TV3 | FR-08.2
+0177 [/TABLE]
+0178 Nghiệm thu: ADMIN có màn hình quản lý danh mục và tài liệu cần cho nội dung học.
+0179 F-08.2  Phân quyền và phát hành nội dung
+0180 [TABLE]
+0181 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0182 SF-08.2.1 | Chặn LEARNER gọi API ADMIN với HTTP 403 | Must | T3 | TV1 | FR-08.3
+0183 SF-08.2.2 | Không cho bật nguồn status khác ready; tài liệu tắt không dùng trong chat mới | Must | T3 | TV3 | FR-08.2
+0184 [/TABLE]
+0185 Nghiệm thu: Chỉ tài liệu đã xử lý xong và được bật mới dùng trong câu trả lời.
+0186 EP-09. Đánh giá phản hồi và hạn mức sử dụng
+0187 F-09.1  Phản hồi chất lượng câu trả lời
+0188 [TABLE]
+0189 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0190 SF-09.1.1 | Nút “Hữu ích” và “Chưa hữu ích” cho tin assistant | Should | T4 | TV2 | FR-09.1
+0191 SF-09.1.2 | Cập nhật feedback trên cùng tin nhắn, không tạo bản ghi mới | Should | T4 | TV2 | FR-09.2
+0192 [/TABLE]
+0193 Nghiệm thu: Người học đánh giá từng phản hồi của AI, có thể đổi ý.
+0194 F-09.2  Hạn mức hỏi AI
+0195 [TABLE]
+0196 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0197 SF-09.2.1 | Giới hạn mặc định 30 yêu cầu AI thành công/ngày/tài khoản | Must | T3 | TV1 | FR-09.3
+0198 SF-09.2.2 | Thông báo rõ hạn mức đã dùng hết và thời điểm cho phép tiếp tục | Should | T3 | TV1 | FR-09.3
+0199 SF-09.2.3 | Cho đọc lịch sử và dashboard khi hết hạn mức | Must | T4 | TV1 | FR-09.3
+0200 [/TABLE]
+0201 Nghiệm thu: Hạn mức bảo vệ chi phí dịch vụ mà vẫn duy trì truy cập lịch sử.
+0202 EP-10. Bảo mật, kiểm thử và triển khai
+0203 F-10.1  Bảo mật hệ thống
+0204 [TABLE]
+0205 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0206 SF-10.1.1 | Băm mật khẩu bcrypt/Argon2; khóa API trong biến môi trường backend | Must | T1 | TV1 | FR-10.3; NFR-02
+0207 SF-10.1.2 | Kiểm tra chủ sở hữu khi truy cập chat/quiz/tiến độ theo ID | Must | T3 | TV1 | FR-10.1
+0208 SF-10.1.3 | Không gửi email, họ tên hay mật khẩu vào payload LLM; gắn nhãn AI | Must | T3 | TV2 | FR-10.2–10.4
+0209 [/TABLE]
+0210 Nghiệm thu: Thông tin đăng nhập, tài khoản và khóa dịch vụ được bảo vệ.
+0211 F-10.2  Chất lượng và ổn định
+0212 [TABLE]
+0213 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0214 SF-10.2.1 | Migration PostgreSQL đủ 11 bảng; FK, UNIQUE, CHECK hợp lệ | Must | T1 | TV1 | NFR-07
+0215 SF-10.2.2 | Viết test cho đăng nhập, quyền dữ liệu, 5 câu quiz, trích dẫn nguồn | Must | T4 | TV1–4 | NFR-04; AT-01–09
+0216 SF-10.2.3 | Giao diện responsive từ 360px, không tràn ngang màn hình chat/quiz | Must | T4 | TV2 | NFR-05; AT-10
+0217 [/TABLE]
+0218 Nghiệm thu: Lỗi có thông báo, dữ liệu không sai lệch, giao diện dùng được trên điện thoại.
+0219 F-10.3  Đóng gói và bàn giao
+0220 [TABLE]
+0221 Mã | Sub Feature / Công việc | MoSCoW | Tuần | Owner | SRS
+0222 SF-10.3.1 | Repository, README, .env.example và hướng dẫn chạy local | Must | T1 | TV1 | NFR-10
+0223 SF-10.3.2 | Triển khai demo và lưu cấu hình HTTPS khi có máy chủ công khai | Must | T4 | TV1 | NFR-02; NFR-10
+0224 SF-10.3.3 | Chuẩn bị dữ liệu mẫu 1–2 môn, 5–10 chủ đề mỗi môn và kịch bản demo | Must | T4 | TV3–4 | AT-01–10
+0225 [/TABLE]
+0226 Nghiệm thu: Có môi trường demo chạy được và tài liệu để nhóm khác tiếp tục triển khai.
+0227 4. Liên kết backlog với thiết kế cơ sở dữ liệu
+0228 Các Epic được triển khai trên mô hình PostgreSQL gồm 11 bảng dưới đây. Không có bảng nghiệp vụ phụ nằm ngoài danh mục này trong phiên bản 1.0.
+0229 [TABLE]
+0230 Bảng | Nghiệp vụ | Epic sử dụng
+0231 users | Tài khoản, mật khẩu, vai trò, hồ sơ | EP-01, 08, 10
+0232 subjects | Môn học và cấp học | EP-02, 08
+0233 topics | Chủ đề, chương, trạng thái | EP-02, 05, 06, 08
+0234 documents | Tài liệu, nguồn, trạng thái xử lý | EP-05, 08
+0235 document_chunks | Đoạn văn bản và embedding tùy chọn | EP-05
+0236 chat_sessions | Phiên chat theo người dùng và chủ đề | EP-03, 09, 10
+0237 chat_messages | Tin user/assistant, gợi ý, feedback, nguồn | EP-03, 04, 05, 09
+0238 quizzes | Bài luyện tập, độ khó và điểm | EP-06, 07
+0239 quiz_questions | Câu hỏi, lựa chọn, đáp án và giải thích | EP-06, 07
+0240 quiz_answers | Câu trả lời của người học | EP-07
+0241 learning_progress | Tiến độ và tỷ lệ thành thạo theo chủ đề | EP-07
+0242 [/TABLE]
+0243 [TABLE]
+0244 Nguyên tắc nghiệp vụ / Điểm quiz và tiến độ chỉ được cập nhật sau khi chấm thành công; một câu hỏi có tối đa một câu trả lời. Chỉ dùng tài liệu có status=ready và is_active=true. Lượt hỏi AI thành công/ngày được tính từ lịch sử chat, không tạo bảng hạn mức riêng.
+0245 [/TABLE]
+0246 5. Kế hoạch thực thi theo 4 tuần
+0247 [TABLE]
+0248 Tuần | Đích bàn giao | Trọng tâm | Phụ trách
+0249 T1 | Có thể đăng nhập, chọn môn/chủ đề, kết nối DB. | Auth; users/subjects/topics; migration; repo; nền giao diện. | TV1, TV2
+0250 T2 | Chat AI có lịch sử và truy xuất tài liệu dùng được. | Phiên chat; LLM; prompt Socratic; upload PDF/TXT; chunk; tra cứu. | TV2, TV3, TV1
+0251 T3 | Hoàn tất luồng học, luyện tập và quản trị. | Quiz 05 câu; chấm; dashboard; gợi ý; trích dẫn; admin; feedback; quota. | TV4, TV2, TV3, TV1
+0252 T4 | Có bản demo kiểm thử và hướng dẫn chạy. | Test bảo mật; AI lỗi; responsive; seed data; triển khai và nghiệm thu. | Cả 4 thành viên
+0253 [/TABLE]
+0254 5.1. Phân công trách nhiệm
+0255 [TABLE]
+0256 Vai trò | Phạm vi đầu việc chính | Sản phẩm bàn giao
+0257 TV1 | Backend nền, xác thực, danh mục, migration, phân quyền và cấu hình hệ thống. | Auth API, users/subjects/topics, migration, quota, deploy.
+0258 TV2 | Frontend chat, quản lý phiên, Socratic, gọi LLM và giao diện responsive. | Chat UI, prompt, lịch sử, gợi ý, phản hồi.
+0259 TV3 | Nạp tài liệu, tách đoạn, tra cứu nguồn, trích dẫn và giao diện quản lý tài liệu. | Upload, documents/chunks, retrieval, nguồn tham khảo.
+0260 TV4 | Sinh trắc nghiệm, giao diện làm bài, chấm điểm và dashboard. | Quiz UI/API, quizzes/questions/answers, learning_progress.
+0261 [/TABLE]
+0262 6. Nguyên tắc nghiệm thu và hoàn thành
+0263 Mỗi Sub Feature Must được xem là hoàn thành khi có mã nguồn đã tích hợp, luồng chạy từ giao diện tới backend, dữ liệu hợp lệ và bằng chứng kiểm thử cho trường hợp thành công/lỗi. Các luồng truy cập dữ liệu theo ID phải kiểm tra quyền sở hữu.
+0264 [TABLE]
+0265 Mã | Kịch bản nghiệm thu quan trọng | Kết quả cần đạt
+0266 AT-01 | Đăng ký, email trùng, đăng nhập và đăng xuất. | Email duy nhất; không lộ mật khẩu; xác thực có hiệu lực.
+0267 AT-02 | Tạo phiên, hỏi AI, tải lại trang và mở lịch sử. | Đúng chủ đề, có phản hồi và không mất nội dung cũ.
+0268 AT-03 | Gợi ý 3 mức; bấm xem lời giải khi chưa xác nhận. | Không lộ lời giải đầy đủ trước xác nhận.
+0269 AT-04 | Tải nguồn PDF/TXT; bật/tắt; hỏi có dẫn nguồn. | Chỉ tài liệu ready & active được dùng; không bịa nguồn.
+0270 AT-05 | Sinh 05 câu, lựa chọn A–D; nộp lại quiz. | Chấm đúng và duy nhất một lần; giải thích câu sai.
+0271 AT-06 | Nộp quiz và mở dashboard. | Chỉ quiz completed cập nhật mastery_percent và thống kê.
+0272 AT-07 | LEARNER gọi API admin hoặc truy cập phiên người khác. | HTTP 403/404, không rò rỉ dữ liệu.
+0273 AT-08 | LLM timeout, quota, hoặc JSON sinh quiz sai. | Thông báo phù hợp; dữ liệu nhất quán và không phát sinh quiz lỗi.
+0274 AT-09 | Hết 30 lượt AI thành công trong ngày. | Chặn lượt mới; vẫn đọc lịch sử, dashboard.
+0275 AT-10 | Mở chat, quiz trên màn hình điện thoại 360px. | Không tràn ngang, các nút dùng được.
+0276 [/TABLE]
+0277 7. Phạm vi phát triển kế tiếp
+0278 Các hạng mục sau được quản lý ở danh sách sản phẩm dài hạn và không nằm trong mục tiêu nghiệm thu phiên bản 1.0.
+0279 [TABLE]
+0280 Hạng mục | Mức | Định hướng
+0281 Đăng nhập Google và quên mật khẩu qua email | Won’t | Mở rộng tiện ích tài khoản.
+0282 Đọc ảnh đề bài bằng OCR và chấm tự luận | Won’t | Nâng cấp đa dạng bài học.
+0283 Pre-test, post-test và độ khó tự thích ứng | Won’t | Phân tích năng lực theo thời gian.
+0284 Huy hiệu, chuỗi ngày học, email nhắc học | Won’t | Tăng tương tác và duy trì học tập.
+0285 Thanh toán, tài khoản phụ huynh/giáo viên, lớp học | Won’t | Mở rộng nhóm người dùng và thương mại hóa.
+0286 Golden set tự động, so sánh nhiều mô hình AI | Won’t | Đánh giá và vận hành AI nâng cao.
+0287 [/TABLE]
+0288 Tài liệu đồng bộ với: Đặc tả yêu cầu phần mềm (SRS) Gia sư AI v1.0 và Thiết kế cơ sở dữ liệu Gia sư AI v1.0.

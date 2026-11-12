@@ -1,0 +1,279 @@
+0001 HỒ SƠ DỰ ÁN PHẦN MỀM
+0002 GIA SƯ AI
+0003 TÀI LIỆU THIẾT KẾ CƠ SỞ DỮ LIỆU /
+0004 1. Tổng quan mô hình dữ liệu
+0005 Cơ sở dữ liệu lưu thông tin tài khoản, danh mục học, nguồn tài liệu, lịch sử chat AI, bài luyện tập và thống kê kết quả. Các bảng được kết nối bằng khóa ngoại nhằm bảo đảm dữ liệu thuộc đúng người dùng, đúng môn/chủ đề và có thể truy xuất lịch sử.
+0006 [TABLE]
+0007 Nhóm nghiệp vụ | Bảng dữ liệu | Số bảng
+0008 Người dùng | users | 01
+0009 Danh mục học | subjects, topics | 02
+0010 Tài liệu cho AI | documents, document_chunks | 02
+0011 Hội thoại AI | chat_sessions, chat_messages | 02
+0012 Luyện tập | quizzes, quiz_questions, quiz_answers | 03
+0013 Tiến độ | learning_progress | 01
+0014 [/TABLE]
+0015 1.1. Quy ước thiết kế
+0016 PK (Primary Key): khóa chính, định danh duy nhất mỗi hàng; dùng UUID.
+0017 FK (Foreign Key): khóa ngoại, tham chiếu tới khóa chính của bảng khác.
+0018 UNIQUE: không được có bản ghi trùng tổ hợp giá trị quy định.
+0019 NOT NULL: dữ liệu bắt buộc; NULL: được phép chưa có thông tin.
+0020 CHECK: giới hạn giá trị hợp lệ; DEFAULT: giá trị mặc định khi thêm mới.
+0021 TIMESTAMPTZ: thời điểm có thông tin múi giờ; API trả về ISO 8601.
+0022 JSONB: dữ liệu cấu trúc JSON, áp dụng cho lựa chọn câu hỏi và danh sách trích dẫn.
+0023 ON DELETE CASCADE: xóa bản ghi phụ thuộc; RESTRICT: ngăn xóa khi còn dữ liệu liên quan.
+0024 1.2. Ký hiệu và quy tắc chung
+0025 Các tên bảng/cột dùng snake_case. Khóa UUID được tạo bằng gen_random_uuid(). Mật khẩu chỉ lưu dạng hash. Các bảng có created_at lấy mặc định now(); updated_at phải được backend cập nhật khi có thay đổi. Hệ thống ưu tiên vô hiệu hóa môn/chủ đề/tài liệu thay cho xóa để không làm mất lịch sử học.
+0026 [TABLE]
+0027 Quy tắc truy cập dữ liệu / Người học chỉ được truy cập chat_sessions, quizzes và learning_progress thuộc user_id của mình. Tin nhắn, câu hỏi và câu trả lời được kiểm tra chủ sở hữu thông qua chuỗi khóa ngoại.
+0028 [/TABLE]
+0029 2. Sơ đồ quan hệ tổng quan
+0030 Mũi tên thể hiện chiều từ bảng cha (được tham chiếu) sang bảng con (chứa FK). Mỗi liên kết mặc định là quan hệ 1–N; riêng quiz_questions → quiz_answers là 1–0..1.
+0031 Hình 1. Sơ đồ khóa chính và khóa ngoại của 11 bảng.
+0032 2.1. Danh sách khóa ngoại
+0033 [TABLE]
+0034 Khóa ngoại (FK) | Tham chiếu (PK) | ON DELETE
+0035 topics.subject_id | subjects.id | RESTRICT
+0036 documents.topic_id | topics.id | RESTRICT
+0037 document_chunks.document_id | documents.id | CASCADE
+0038 chat_sessions.user_id | users.id | CASCADE
+0039 chat_sessions.topic_id | topics.id | RESTRICT
+0040 chat_messages.session_id | chat_sessions.id | CASCADE
+0041 quizzes.user_id | users.id | CASCADE
+0042 quizzes.topic_id | topics.id | RESTRICT
+0043 quiz_questions.quiz_id | quizzes.id | CASCADE
+0044 quiz_answers.question_id | quiz_questions.id | CASCADE
+0045 learning_progress.user_id | users.id | CASCADE
+0046 learning_progress.topic_id | topics.id | RESTRICT
+0047 [/TABLE]
+0048 3. Từ điển dữ liệu chi tiết
+0049 Mỗi bảng sau đây có đầy đủ tên cột, kiểu dữ liệu, ràng buộc và chức năng. Cột được đánh dấu PK hoặc FK ngay trong cột “Ràng buộc”.
+0050 3.1. users — Tài khoản người dùng
+0051 Lưu thông tin xác thực và phân quyền. Mỗi người dùng mang một vai trò LEARNER hoặc ADMIN.
+0052 [TABLE]
+0053 Tên cột | Kiểu dữ liệu | Ràng buộc / khóa | Giải thích
+0054 id | UUID | PK · NOT NULL · DEFAULT gen_random_uuid() | Mã định danh người dùng.
+0055 email | VARCHAR(255) | NOT NULL · UNIQUE | Email đăng nhập, chuẩn hóa chữ thường.
+0056 password_hash | VARCHAR(255) | NOT NULL | Mật khẩu đã băm bằng bcrypt hoặc Argon2.
+0057 full_name | VARCHAR(120) | NOT NULL | Họ tên hiển thị.
+0058 birth_year | SMALLINT | NULL | Năm sinh, phục vụ hồ sơ người học.
+0059 role | VARCHAR(10) | NOT NULL · DEFAULT LEARNER · CHECK | Giá trị LEARNER hoặc ADMIN.
+0060 is_active | BOOLEAN | NOT NULL · DEFAULT TRUE | Trạng thái tài khoản.
+0061 created_at | TIMESTAMPTZ | NOT NULL · DEFAULT now() | Ngày tạo tài khoản.
+0062 updated_at | TIMESTAMPTZ | NOT NULL · DEFAULT now() | Thời điểm cập nhật gần nhất.
+0063 [/TABLE]
+0064 UNIQUE (email)
+0065 CHECK (role IN ('LEARNER', 'ADMIN'))
+0066 Không gửi email, full_name, password_hash vào prompt LLM.
+0067 3.2. subjects — Danh mục môn học
+0068 Định nghĩa các môn và cấp học được phép hiển thị trên ứng dụng.
+0069 [TABLE]
+0070 Tên cột | Kiểu dữ liệu | Ràng buộc / khóa | Giải thích
+0071 id | UUID | PK · NOT NULL | Mã môn học.
+0072 name | VARCHAR(120) | NOT NULL | Tên môn, ví dụ Toán.
+0073 grade_level | VARCHAR(50) | NOT NULL | Cấp học, ví dụ THPT.
+0074 is_active | BOOLEAN | NOT NULL · DEFAULT TRUE | Cho phép hiển thị môn học.
+0075 created_at | TIMESTAMPTZ | NOT NULL · DEFAULT now() | Ngày tạo bản ghi.
+0076 [/TABLE]
+0077 UNIQUE (name, grade_level)
+0078 Có thể vô hiệu hóa thay vì xóa khi môn đã có dữ liệu học.
+0079 3.3. topics — Chủ đề và chương học
+0080 Mỗi chủ đề thuộc một môn học. Tên chương được lưu ngay trên chủ đề.
+0081 [TABLE]
+0082 Tên cột | Kiểu dữ liệu | Ràng buộc / khóa | Giải thích
+0083 id | UUID | PK · NOT NULL | Mã chủ đề.
+0084 subject_id | UUID | FK → subjects.id · NOT NULL | Môn học chứa chủ đề.
+0085 chapter_name | VARCHAR(150) | NOT NULL | Tên chương trong môn học.
+0086 name | VARCHAR(180) | NOT NULL | Tên chủ đề.
+0087 description | TEXT | NULL | Mô tả ngắn hoặc phạm vi kiến thức.
+0088 is_active | BOOLEAN | NOT NULL · DEFAULT TRUE | Cho phép lựa chọn để học.
+0089 created_at | TIMESTAMPTZ | NOT NULL · DEFAULT now() | Ngày tạo chủ đề.
+0090 [/TABLE]
+0091 UNIQUE (subject_id, chapter_name, name)
+0092 FK subject_id ON DELETE RESTRICT: không xóa môn còn chủ đề.
+0093 3.4. documents — Tài liệu học tập
+0094 Lưu thông tin nguồn tài liệu theo chủ đề; nội dung được chia thành các document_chunks.
+0095 [TABLE]
+0096 Tên cột | Kiểu dữ liệu | Ràng buộc / khóa | Giải thích
+0097 id | UUID | PK · NOT NULL | Mã tài liệu.
+0098 topic_id | UUID | FK → topics.id · NOT NULL | Chủ đề mà tài liệu hỗ trợ.
+0099 title | VARCHAR(200) | NOT NULL | Tiêu đề tài liệu.
+0100 file_path | TEXT | NOT NULL | Đường dẫn file PDF/TXT trên server hoặc storage.
+0101 source_url | TEXT | NULL | Địa chỉ nguồn hoặc trang xuất bản hợp pháp.
+0102 status | VARCHAR(10) | NOT NULL · DEFAULT pending · CHECK | pending / ready / error.
+0103 is_active | BOOLEAN | NOT NULL · DEFAULT FALSE | Chỉ tài liệu được bật mới được dùng.
+0104 created_at | TIMESTAMPTZ | NOT NULL · DEFAULT now() | Thời gian tải lên.
+0105 processed_at | TIMESTAMPTZ | NULL | Thời điểm xử lý xong hoặc kết thúc với lỗi.
+0106 [/TABLE]
+0107 CHECK (status IN ('pending', 'ready', 'error'))
+0108 FK topic_id ON DELETE RESTRICT. Chỉ truy xuất khi status = ready AND is_active = TRUE.
+0109 3.5. document_chunks — Đoạn tài liệu phục vụ RAG
+0110 Mỗi bản ghi là một đoạn nội dung có thứ tự thuộc một tài liệu.
+0111 [TABLE]
+0112 Tên cột | Kiểu dữ liệu | Ràng buộc / khóa | Giải thích
+0113 id | UUID | PK · NOT NULL | Mã đoạn nội dung.
+0114 document_id | UUID | FK → documents.id · NOT NULL | Tài liệu gốc.
+0115 chunk_index | INTEGER | NOT NULL · CHECK >= 0 | Thứ tự đoạn trong tài liệu.
+0116 content | TEXT | NOT NULL | Nội dung văn bản của đoạn.
+0117 embedding | VECTOR(768) | NULL | Vector ngữ nghĩa; cài pgvector khi dùng tìm vector.
+0118 created_at | TIMESTAMPTZ | NOT NULL · DEFAULT now() | Ngày tạo đoạn.
+0119 [/TABLE]
+0120 UNIQUE (document_id, chunk_index)
+0121 FK document_id ON DELETE CASCADE; kích thước vector 768 phải khớp mô hình embedding sử dụng. Có thể tìm từ khóa trên content khi embedding trống.
+0122 3.6. chat_sessions — Phiên hội thoại
+0123 Nhóm nhiều tin nhắn của một người học vào một chủ đề.
+0124 [TABLE]
+0125 Tên cột | Kiểu dữ liệu | Ràng buộc / khóa | Giải thích
+0126 id | UUID | PK · NOT NULL | Mã phiên chat.
+0127 user_id | UUID | FK → users.id · NOT NULL | Người tạo và sở hữu phiên.
+0128 topic_id | UUID | FK → topics.id · NOT NULL | Chủ đề của phiên.
+0129 title | VARCHAR(200) | NULL | Tên phiên hiển thị trong lịch sử.
+0130 created_at | TIMESTAMPTZ | NOT NULL · DEFAULT now() | Lúc bắt đầu chat.
+0131 updated_at | TIMESTAMPTZ | NOT NULL · DEFAULT now() | Lần có tin nhắn mới gần nhất.
+0132 [/TABLE]
+0133 FK user_id ON DELETE CASCADE; topic_id ON DELETE RESTRICT
+0134 Mọi API truy cập phiên phải kiểm tra chat_sessions.user_id với người dùng đăng nhập.
+0135 3.7. chat_messages — Tin nhắn hội thoại
+0136 Lưu câu hỏi người học, phản hồi AI, gợi ý, trích dẫn và đánh giá.
+0137 [TABLE]
+0138 Tên cột | Kiểu dữ liệu | Ràng buộc / khóa | Giải thích
+0139 id | UUID | PK · NOT NULL | Mã tin nhắn.
+0140 session_id | UUID | FK → chat_sessions.id · NOT NULL | Phiên chứa tin nhắn.
+0141 role | VARCHAR(12) | NOT NULL · CHECK | user hoặc assistant.
+0142 content | TEXT | NOT NULL | Nội dung tin nhắn.
+0143 hint_level | SMALLINT | NULL · CHECK 1..3 | Mức gợi ý của tin assistant.
+0144 is_full_solution | BOOLEAN | NOT NULL · DEFAULT FALSE | TRUE nếu đã trả lời lời giải đầy đủ sau xác nhận.
+0145 feedback | SMALLINT | NULL · CHECK -1 / 1 | 1: hữu ích; -1: chưa hữu ích.
+0146 source_refs | JSONB | NOT NULL · DEFAULT [] | Danh sách nguồn đã dùng cho tin assistant.
+0147 token_count | INTEGER | NULL · CHECK >= 0 | Số token ghi nhận cho phản hồi AI nếu API cung cấp.
+0148 created_at | TIMESTAMPTZ | NOT NULL · DEFAULT now() | Thời gian gửi tin.
+0149 [/TABLE]
+0150 CHECK (role IN ('user', 'assistant'))
+0151 FK session_id ON DELETE CASCADE. feedback/hint_level/source_refs dùng cho tin assistant; chỉ backend được đặt is_full_solution = TRUE sau xác nhận.
+0152 3.8. quizzes — Bài luyện tập của người học
+0153 Mỗi quiz là một lần tạo và nộp 05 câu trắc nghiệm.
+0154 [TABLE]
+0155 Tên cột | Kiểu dữ liệu | Ràng buộc / khóa | Giải thích
+0156 id | UUID | PK · NOT NULL | Mã bài luyện tập.
+0157 user_id | UUID | FK → users.id · NOT NULL | Người sở hữu bài.
+0158 topic_id | UUID | FK → topics.id · NOT NULL | Chủ đề được kiểm tra.
+0159 difficulty | VARCHAR(10) | NOT NULL · CHECK | easy / medium / hard.
+0160 status | VARCHAR(15) | NOT NULL · DEFAULT in_progress | in_progress hoặc completed.
+0161 score | NUMERIC(5,2) | NULL · CHECK 0..100 | Điểm phần trăm; chỉ có khi hoàn thành.
+0162 created_at | TIMESTAMPTZ | NOT NULL · DEFAULT now() | Thời điểm tạo quiz.
+0163 completed_at | TIMESTAMPTZ | NULL | Thời điểm nộp và chấm thành công.
+0164 [/TABLE]
+0165 CHECK (difficulty IN ('easy','medium','hard'))
+0166 CHECK (status IN ('in_progress','completed')). FK user_id ON DELETE CASCADE, topic_id ON DELETE RESTRICT.
+0167 3.9. quiz_questions — Câu hỏi trắc nghiệm
+0168 Lưu từng câu của một quiz, thứ tự, lựa chọn, đáp án đúng và giải thích.
+0169 [TABLE]
+0170 Tên cột | Kiểu dữ liệu | Ràng buộc / khóa | Giải thích
+0171 id | UUID | PK · NOT NULL | Mã câu hỏi.
+0172 quiz_id | UUID | FK → quizzes.id · NOT NULL | Bài luyện tập chứa câu hỏi.
+0173 position | SMALLINT | NOT NULL · CHECK 1..5 | Thứ tự câu hỏi trong bộ 05 câu.
+0174 question_text | TEXT | NOT NULL | Nội dung câu hỏi.
+0175 options | JSONB | NOT NULL | Đối tượng bốn lựa chọn A/B/C/D.
+0176 correct_answer | CHAR(1) | NOT NULL · CHECK A/B/C/D | Đáp án chuẩn do AI tạo và backend xác thực.
+0177 explanation | TEXT | NOT NULL | Giải thích đáp án.
+0178 [/TABLE]
+0179 UNIQUE (quiz_id, position)
+0180 FK quiz_id ON DELETE CASCADE. API lấy đề chưa nộp không được gửi correct_answer hay explanation.
+0181 3.10. quiz_answers — Câu trả lời của người học
+0182 Ghi đúng một câu trả lời cho từng quiz_question sau khi nộp.
+0183 [TABLE]
+0184 Tên cột | Kiểu dữ liệu | Ràng buộc / khóa | Giải thích
+0185 id | UUID | PK · NOT NULL | Mã câu trả lời.
+0186 question_id | UUID | FK → quiz_questions.id · NOT NULL · UNIQUE | Câu hỏi được trả lời.
+0187 user_answer | CHAR(1) | NOT NULL · CHECK A/B/C/D | Lựa chọn người học.
+0188 is_correct | BOOLEAN | NOT NULL | Kết quả so với đáp án chuẩn.
+0189 created_at | TIMESTAMPTZ | NOT NULL · DEFAULT now() | Thời điểm nộp câu trả lời.
+0190 [/TABLE]
+0191 UNIQUE (question_id) bảo đảm một câu chỉ có tối đa một đáp án lưu
+0192 FK question_id ON DELETE CASCADE. User được suy ra từ quizzes.user_id, không lưu user_id trùng lặp.
+0193 3.11. learning_progress — Tiến độ học theo chủ đề
+0194 Một bản ghi tổng hợp cho mỗi cặp người học và chủ đề sau khi quiz hoàn thành.
+0195 [TABLE]
+0196 Tên cột | Kiểu dữ liệu | Ràng buộc / khóa | Giải thích
+0197 id | UUID | PK · NOT NULL | Mã bản ghi tiến độ.
+0198 user_id | UUID | FK → users.id · NOT NULL | Người học.
+0199 topic_id | UUID | FK → topics.id · NOT NULL | Chủ đề đang thống kê.
+0200 total_quizzes | INTEGER | NOT NULL · DEFAULT 0 · CHECK >= 0 | Số quiz hoàn thành.
+0201 correct_count | INTEGER | NOT NULL · DEFAULT 0 · CHECK >= 0 | Tổng câu trả lời đúng.
+0202 total_count | INTEGER | NOT NULL · DEFAULT 0 · CHECK >= 0 | Tổng câu đã chấm.
+0203 mastery_percent | NUMERIC(5,2) | NOT NULL · DEFAULT 0 · CHECK 0..100 | Tỷ lệ thành thạo theo %.
+0204 last_studied_at | TIMESTAMPTZ | NULL | Thời điểm nộp quiz gần nhất.
+0205 [/TABLE]
+0206 UNIQUE (user_id, topic_id)
+0207 CHECK (correct_count <= total_count); mastery_percent = ROUND(correct_count / total_count × 100, 2), với total_count = 0 thì 0. FK user_id ON DELETE CASCADE, topic_id ON DELETE RESTRICT.
+0208 4. Quan hệ và quy tắc toàn vẹn
+0209 [TABLE]
+0210 Quan hệ | Kiểu | Quy tắc
+0211 subjects → topics | 1–N | Mỗi chủ đề thuộc đúng một môn học.
+0212 topics → documents | 1–N | Một chủ đề có thể có nhiều tài liệu.
+0213 documents → document_chunks | 1–N | Một tài liệu được tách thành nhiều đoạn.
+0214 users → chat_sessions | 1–N | Mỗi phiên chat thuộc một người dùng.
+0215 topics → chat_sessions | 1–N | Mỗi phiên gắn một chủ đề.
+0216 chat_sessions → chat_messages | 1–N | Một phiên có nhiều tin nhắn theo thời gian.
+0217 users/topics → quizzes | 1–N | Mỗi quiz thuộc một người dùng và một chủ đề.
+0218 quizzes → quiz_questions | 1–N | Mỗi quiz hợp lệ có chính xác 05 câu.
+0219 quiz_questions → quiz_answers | 1–0..1 | Mỗi câu có tối đa một câu trả lời đã lưu.
+0220 users/topics → learning_progress | 1–N | Mỗi cặp user_id + topic_id có tối đa một dòng tiến độ.
+0221 [/TABLE]
+0222 4.1. Tính điểm và cập nhật tiến độ
+0223 1. Khi tạo quiz, backend yêu cầu AI trả cấu trúc 05 câu, kiểm tra đủ A/B/C/D, đáp án và giải thích trước khi ghi CSDL.
+0224 2. Khi nộp quiz, backend khóa hoặc kiểm tra status = in_progress; chỉ một giao dịch chấm được phép hoàn tất.
+0225 3. Backend lưu tối đa một quiz_answer cho mỗi quiz_question và tính score = số câu đúng / 5 × 100.
+0226 4. Trong cùng transaction, đổi quiz.status sang completed, cập nhật score, completed_at và learning_progress.
+0227 5. Tiến độ tổng hợp số quiz hoàn thành, tổng câu đúng/tổng câu đã chấm; mastery_percent làm tròn đến 2 chữ số.
+0228 [TABLE]
+0229 Ví dụ / Người học làm 2 quiz (mỗi quiz 5 câu) với 3 và 4 câu đúng: total_quizzes = 2; correct_count = 7; total_count = 10; mastery_percent = 70.00.
+0230 [/TABLE]
+0231 4.2. Lưu trích dẫn nguồn
+0232 Trường chat_messages.source_refs là mảng JSONB. Mỗi phần tử chứa document_id, chunk_id và title (có thể bổ sung vị trí trang nếu đọc được). Các ID nằm trong JSONB không phải FK vật lý; backend cần kiểm tra nguồn khi hiển thị và xử lý trường hợp tài liệu không còn hoạt động.
+0233 [TABLE]
+0234 Trường JSON | Ví dụ | Ý nghĩa
+0235 document_id | UUID tài liệu | Liên kết đến documents.id.
+0236 chunk_id | UUID đoạn | Liên kết đến document_chunks.id.
+0237 title | “Chuyên đề hàm số” | Nhãn nguồn hiển thị cho người học.
+0238 [/TABLE]
+0239 5. Chỉ mục và các ràng buộc quan trọng
+0240 [TABLE]
+0241 Đối tượng | Chỉ mục / constraint đề xuất | Mục đích
+0242 users | UNIQUE (email) | Chống tài khoản trùng.
+0243 subjects | UNIQUE (name, grade_level) | Chống môn trùng cùng cấp.
+0244 topics | INDEX (subject_id); UNIQUE (subject_id, chapter_name, name) | Lọc danh mục nhanh.
+0245 document_chunks | UNIQUE (document_id, chunk_index) | Không trùng vị trí đoạn.
+0246 chat_sessions | INDEX (user_id, updated_at DESC) | Trang lịch sử chat của người dùng.
+0247 chat_messages | INDEX (session_id, created_at) | Tải tin theo thứ tự thời gian.
+0248 quizzes | INDEX (user_id, completed_at DESC) | Trang lịch sử quiz.
+0249 quiz_questions | UNIQUE (quiz_id, position) | Chống trùng số thứ tự câu.
+0250 quiz_answers | UNIQUE (question_id) | Ngăn chấm/trả lời hai lần.
+0251 learning_progress | UNIQUE (user_id, topic_id) | Chỉ một tiến độ cho mỗi chủ đề.
+0252 [/TABLE]
+0253 5.1. Kiểm tra dữ liệu tại backend
+0254 Chuẩn hóa users.email thành chữ thường trước khi lưu; kiểm tra mật khẩu đủ độ dài.
+0255 Khi tạo quiz, xác thực đúng 05 câu, có đúng bốn lựa chọn và đáp án hợp lệ.
+0256 Không trả quiz_questions.correct_answer và explanation trong API lấy đề chưa nộp.
+0257 Mọi thao tác liên quan chat_messages và quiz_answers phải suy ra chủ sở hữu qua bảng cha.
+0258 Hạn mức chat theo ngày có thể tính trên các phản hồi assistant thành công trong chat_messages.
+0259 Ràng buộc trạng thái và việc chấm chỉ một lần phải kiểm soát trong giao dịch CSDL.
+0260 6. Ví dụ dữ liệu và nguyên tắc triển khai
+0261 6.1. Dữ liệu mẫu
+0262 [TABLE]
+0263 Bảng | Minh họa một bản ghi
+0264 subjects | id: …; name: Toán; grade_level: THPT; is_active: true
+0265 topics | subject_id: …; chapter_name: Hàm số; name: Hàm số bậc hai
+0266 documents | topic_id: …; title: Tổng hợp hàm bậc hai; status: ready; is_active: true
+0267 chat_sessions | user_id: …; topic_id: …; title: Câu hỏi về parabol
+0268 chat_messages | role: assistant; hint_level: 1; is_full_solution: false
+0269 quizzes | difficulty: medium; status: completed; score: 80.00
+0270 quiz_questions | position: 1; options: {"A":"…","B":"…","C":"…","D":"…"}
+0271 quiz_answers | user_answer: B; is_correct: true
+0272 learning_progress | total_quizzes: 1; correct_count: 4; total_count: 5; mastery_percent: 80.00
+0273 [/TABLE]
+0274 6.2. Quy tắc tạo CSDL
+0275 Tạo extension pgcrypto để dùng gen_random_uuid() nếu môi trường PostgreSQL yêu cầu.
+0276 Khi dùng trường VECTOR(768), cài extension pgvector và chọn mô hình embedding 768 chiều; trường có thể để NULL nếu tìm kiếm theo văn bản.
+0277 Chạy migration trước, sau đó seed dữ liệu subjects/topics và tạo tài khoản ADMIN thử nghiệm.
+0278 Áp dụng ON DELETE theo danh sách FK; hạn chế xóa cứng môn/chủ đề/tài liệu khi đã có lịch sử.
+0279 Kiểm thử transaction nộp bài đồng thời và việc chặn truy cập chéo giữa hai người dùng.

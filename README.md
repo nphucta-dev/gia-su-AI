@@ -5,6 +5,7 @@
 - [Backend và API](back-end/README.md)
 - [Khởi tạo MySQL, migration và dữ liệu mẫu](database/README.md)
 - [Frontend](front-end/README.md)
+- [Ngữ cảnh dự án, tài liệu và mô tả task](docs/PROJECT_CONTEXT.md)
 
 Database dùng MySQL 8.0.16 trở lên, gồm 11 bảng theo tài liệu thiết kế. Cấu hình kết nối MySQL trên máy trong `back-end/.env`, sau đó thực hiện các lệnh khởi tạo trong hướng dẫn database. Có thể dùng `docker compose up -d db` nếu muốn chạy MySQL bằng Docker.
 

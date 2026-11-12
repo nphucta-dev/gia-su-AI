@@ -35,6 +35,25 @@ class SqlAlchemyUserRepository:
             role=role,
         )
 
+    async def update_profile(
+        self,
+        user_id: int,
+        *,
+        name: str | None = None,
+        birth_year: int | None = None,
+        update_birth_year: bool = False,
+    ) -> User | None:
+        parsed_id = parse_user_id(user_id)
+        if parsed_id is None:
+            return None
+        return await asyncio.to_thread(
+            self._update_profile,
+            parsed_id,
+            name=name,
+            birth_year=birth_year,
+            update_birth_year=update_birth_year,
+        )
+
     def _find_by_email(self, email: str) -> User | None:
         with self._sessions() as db:
             user = db.scalar(select(UserModel).where(UserModel.email == email))
@@ -70,6 +89,29 @@ class SqlAlchemyUserRepository:
                 raise DuplicateEmailError(email) from None
             raise
 
+    def _update_profile(
+        self,
+        user_id: int,
+        *,
+        name: str | None,
+        birth_year: int | None,
+        update_birth_year: bool,
+    ) -> User | None:
+        with self._sessions.begin() as db:
+            user = db.get(UserModel, user_id, with_for_update=True)
+            if user is None:
+                return None
+            if not user.is_active:
+                return self._to_user(user)
+            if name is not None:
+                user.full_name = name
+            if update_birth_year:
+                user.birth_year = birth_year
+            db.flush()
+            db.refresh(user)
+            saved_user = self._to_user(user)
+        return saved_user
+
     @staticmethod
     def _to_user(user: UserModel) -> User:
         created_at = user.created_at.astimezone(timezone.utc)
@@ -81,4 +123,5 @@ class SqlAlchemyUserRepository:
             role=user.role,
             created_at=created_at.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             is_active=user.is_active,
+            birth_year=user.birth_year,
         )

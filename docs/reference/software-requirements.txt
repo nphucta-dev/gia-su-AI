@@ -1,0 +1,209 @@
+0001 HỒ SƠ DỰ ÁN PHẦN MỀM
+0002 GIA SƯ AI
+0003 TÀI LIỆU ĐẶC TẢ YÊU CẦU PHẦN MỀM
+0004 /
+0005 1. Giới thiệu
+0006 1.1. Mục đích
+0007 Gia sư AI là ứng dụng web hỗ trợ người học đặt câu hỏi bằng tiếng Việt, trao đổi với gia sư AI theo phương pháp gợi mở (Socratic), luyện tập kiến thức và theo dõi kết quả. Tài liệu này xác định yêu cầu chức năng, phi chức năng, mô hình dữ liệu, quy trình sử dụng và tiêu chí nghiệm thu để nhóm phát triển triển khai thống nhất.
+0008 1.2. Phạm vi sản phẩm
+0009 [TABLE]
+0010 Hạng mục | Đặc tả
+0011 Người dùng | LEARNER: học và làm bài; ADMIN: quản lý môn học, chủ đề và tài liệu.
+0012 Nội dung học | 01–02 môn học, mỗi môn khoảng 05–10 chủ đề có dữ liệu được duyệt.
+0013 Năng lực AI | Hội thoại theo chủ đề, gợi ý từng bước, giải thích lời giải, truy xuất tài liệu nguồn.
+0014 Đánh giá | Mỗi bài gồm 05 câu trắc nghiệm, có chấm điểm và giải thích.
+0015 Lưu trữ | Tài khoản, danh mục học, tài liệu, đoạn tài liệu, phiên chat, bài tập và tiến độ.
+0016 Nền tảng | Web trên máy tính và điện thoại; backend API, PostgreSQL, tích hợp một LLM API.
+0017 [/TABLE]
+0018 1.3. Thuật ngữ
+0019 [TABLE]
+0020 Thuật ngữ | Ý nghĩa
+0021 Socratic | Phương pháp dạy bằng câu hỏi gợi mở và gợi ý theo từng bước.
+0022 LLM | Mô hình ngôn ngữ lớn nhận câu hỏi và sinh phản hồi.
+0023 RAG | Tìm thông tin trong tài liệu liên quan trước khi yêu cầu AI phản hồi.
+0024 Phiên chat | Một chuỗi tin nhắn của người học và AI theo một chủ đề.
+0025 Quiz | Bài luyện tập trắc nghiệm gồm 05 câu và một lần nộp kết quả.
+0026 [/TABLE]
+0027 2. Vai trò và chức năng
+0028 2.1. Phân quyền
+0029 [TABLE]
+0030 Vai trò | Quyền truy cập
+0031 Khách | Xem giới thiệu; tạo tài khoản; đăng nhập.
+0032 LEARNER | Chọn chủ đề; chat với AI; tạo và nộp quiz; xem lịch sử, điểm số và tiến độ của mình.
+0033 ADMIN | Quản lý danh mục môn/chủ đề; tải, kiểm tra và bật/tắt tài liệu nguồn.
+0034 [/TABLE]
+0035 2.2. Nhóm chức năng
+0036 [TABLE]
+0037 Mã | Nhóm chức năng | Mô tả
+0038 F01 | Tài khoản | Đăng ký, đăng nhập, đăng xuất và chỉnh sửa hồ sơ.
+0039 F02 | Danh mục học tập | Xem môn học, chương và chủ đề có thể học.
+0040 F03 | Hội thoại AI | Tạo phiên chat, hỏi bài, lưu lịch sử và xem lại.
+0041 F04 | Hướng dẫn Socratic | Gợi ý nhiều mức, xác nhận trước khi hiện lời giải đầy đủ.
+0042 F05 | Tài liệu nguồn | Nạp tài liệu, tách đoạn, truy xuất nội dung và cung cấp nguồn.
+0043 F06 | Tạo bài tập | AI sinh 05 câu trắc nghiệm theo chủ đề và mức độ.
+0044 F07 | Chấm bài & tiến độ | Nộp quiz, chấm điểm, giải thích và thống kê kết quả.
+0045 F08 | Quản lý nội dung | ADMIN tạo/sửa danh mục, quản lý tài liệu.
+0046 F09 | Phản hồi & hạn mức | Đánh giá mức hữu ích của câu trả lời; kiểm soát lượt hỏi.
+0047 F10 | Bảo mật & xử lý lỗi | Phân quyền, bảo vệ dữ liệu và xử lý lỗi dịch vụ AI.
+0048 [/TABLE]
+0049 3. Yêu cầu chức năng chi tiết
+0050 F01. Tài khoản
+0051 FR-01.1  Đăng ký bằng email duy nhất và mật khẩu từ 08 ký tự; lưu password_hash, không lưu mật khẩu gốc.
+0052 FR-01.2  Đăng nhập/đăng xuất; API yêu cầu xác thực từ chối truy cập khi thiếu thông tin đăng nhập.
+0053 FR-01.3  Người dùng chỉnh sửa họ tên, năm sinh; phân biệt quyền LEARNER và ADMIN.
+0054 Tiêu chí nghiệm thu: Email trùng không tạo tài khoản mới; người chưa đăng nhập không mở được lịch sử cá nhân.
+0055 F02. Danh mục học tập
+0056 FR-02.1  Hiển thị môn học theo cấp học; mỗi chủ đề gắn một môn và tên chương.
+0057 FR-02.2  Người học chỉ xem các môn/chủ đề có is_active = true.
+0058 FR-02.3  Chọn chủ đề để bắt đầu một phiên chat hoặc một bài luyện tập.
+0059 Tiêu chí nghiệm thu: Chủ đề bị vô hiệu hóa không có trong danh mục học mới.
+0060 F03. Hội thoại gia sư AI
+0061 FR-03.1  Người học tạo phiên chat theo chủ đề, gửi câu hỏi tiếng Việt và nhận phản hồi AI.
+0062 FR-03.2  Lưu từng tin nhắn với vai trò user/assistant; tiếp tục hội thoại theo ngữ cảnh các tin gần nhất.
+0063 FR-03.3  Cho xem lại lịch sử và mở lại phiên cũ; từ chối câu hỏi trống, chỉ chứa khoảng trắng.
+0064 FR-03.4  Thông báo thân thiện khi LLM timeout, hết quota hoặc mất kết nối; không làm mất tin nhắn đã lưu.
+0065 Tiêu chí nghiệm thu: Tải lại trang vẫn thấy nội dung chat đúng tài khoản; người khác không xem được phiên đó.
+0066 F04. Gia sư gợi mở (Socratic)
+0067 FR-04.1  Phản hồi đầu tiên ưu tiên câu hỏi gợi mở hoặc gợi ý mức 1 thay vì đưa ngay đáp án hoàn chỉnh.
+0068 FR-04.2  Có 03 mức gợi ý; người học có thể yêu cầu ví dụ hoặc giải thích đơn giản hơn.
+0069 FR-04.3  Nút “Xem lời giải” hiển thị hộp xác nhận; sau xác nhận AI mới cung cấp lời giải chi tiết.
+0070 FR-04.4  Tin nhắn trả lời đầy đủ được đánh dấu để phân biệt với lời gợi ý.
+0071 Tiêu chí nghiệm thu: Không hiện lời giải đầy đủ trước khi người học xác nhận.
+0072 F05. Tra cứu tài liệu nguồn
+0073 FR-05.1  ADMIN tải PDF dạng văn bản hoặc TXT, gắn tài liệu với một chủ đề.
+0074 FR-05.2  Hệ thống trích văn bản, chia thành các đoạn và lưu trạng thái pending / ready / error.
+0075 FR-05.3  Khi hỏi bài, hệ thống tra cứu các đoạn liên quan từ tài liệu active và ready.
+0076 FR-05.4  Câu trả lời dựa trên tài liệu ghi trích dẫn; nếu không tìm thấy nguồn phù hợp thì thông báo rõ.
+0077 Tiêu chí nghiệm thu: Tài liệu bị tắt không xuất hiện trong nguồn của câu trả lời mới; không tạo nguồn không tồn tại.
+0078 F06. Tạo bài luyện tập
+0079 FR-06.1  Người học chọn chủ đề và độ khó Dễ / Vừa / Khó.
+0080 FR-06.2  LLM sinh 05 câu trắc nghiệm; mỗi câu có bốn lựa chọn A–D, đáp án và giải thích.
+0081 FR-06.3  Backend kiểm tra định dạng dữ liệu trả về trước khi lưu; lỗi sinh bài có nút thử lại.
+0082 Tiêu chí nghiệm thu: Bài hợp lệ có đúng 05 câu và mỗi câu chỉ có 01 đáp án đúng.
+0083 F07. Chấm bài và tiến độ
+0084 FR-07.1  Người học chọn đáp án và nộp bài một lần; nhắc khi còn câu chưa trả lời.
+0085 FR-07.2  Backend so sánh đáp án, tính điểm phần trăm và hiển thị giải thích câu sai.
+0086 FR-07.3  Lưu kết quả quiz; cập nhật tổng bài, tổng câu, số câu đúng và mức thành thạo theo chủ đề.
+0087 FR-07.4  Dashboard hiển thị bài đã hoàn thành, điểm trung bình, số phiên chat và các chủ đề cần ôn.
+0088 Tiêu chí nghiệm thu: Cùng một quiz không được chấm hai lần; tiến độ cập nhật sau khi nộp thành công.
+0089 F08. Quản trị nội dung
+0090 FR-08.1  ADMIN tạo, sửa, kích hoạt/vô hiệu hóa môn học và chủ đề.
+0091 FR-08.2  ADMIN tải tài liệu, xem trạng thái xử lý và bật/tắt tài liệu nguồn.
+0092 FR-08.3  LEARNER không được truy cập API quản trị.
+0093 Tiêu chí nghiệm thu: Tài khoản LEARNER gọi API quản trị phải nhận lỗi 403.
+0094 F09. Đánh giá phản hồi và hạn mức
+0095 FR-09.1  Người học chọn “Hữu ích” hoặc “Chưa hữu ích” cho tin nhắn assistant.
+0096 FR-09.2  Mỗi câu trả lời chỉ có một giá trị feedback hiện tại; có thể đổi đánh giá.
+0097 FR-09.3  Giới hạn mặc định 30 lượt yêu cầu AI thành công/ngày/người dùng; hết hạn mức vẫn xem được lịch sử.
+0098 Tiêu chí nghiệm thu: Khi đạt hạn mức, câu hỏi mới bị từ chối có thông báo, dữ liệu học cũ vẫn truy cập được.
+0099 F10. Bảo mật và xử lý lỗi
+0100 FR-10.1  Yêu cầu đọc/sửa lịch sử, quiz và dashboard phải kiểm tra quyền sở hữu từ user_id đăng nhập.
+0101 FR-10.2  Không đưa email, họ tên hoặc mật khẩu vào dữ liệu gửi cho nhà cung cấp LLM.
+0102 FR-10.3  Khóa LLM API chỉ lưu trên máy chủ, cấu hình qua biến môi trường.
+0103 FR-10.4  Hiển thị nhãn cảnh báo nội dung do AI tạo tại màn hình chat.
+0104 Tiêu chí nghiệm thu: Không truy cập được tài nguyên người khác bằng cách thay đổi ID trong URL/API.
+0105 4. Màn hình và luồng sử dụng
+0106 [TABLE]
+0107 Màn hình | Nội dung chính
+0108 Đăng ký / đăng nhập | Email, mật khẩu, thông báo lỗi và chuyển đến trang học.
+0109 Trang học | Danh sách môn, chương, chủ đề; nút bắt đầu chat/luyện tập.
+0110 Chat AI | Danh sách tin nhắn, khung nhập, gợi ý, xem lời giải, trích dẫn và lịch sử.
+0111 Luyện tập | Chọn độ khó, 05 câu trắc nghiệm, trạng thái câu đã chọn và nút nộp.
+0112 Kết quả & dashboard | Điểm, đáp án, giải thích, số bài đã làm và tiến độ từng chủ đề.
+0113 Hồ sơ | Họ tên, năm sinh, lịch sử học tập và thông tin tài khoản.
+0114 Quản trị | Quản lý môn/chủ đề, tải tài liệu, trạng thái và bật/tắt nguồn.
+0115 [/TABLE]
+0116 4.1. Luồng A — Hỏi gia sư AI
+0117 1. Người học đăng nhập và chọn môn/chủ đề.
+0118 2. Hệ thống tạo chat_session và nhận câu hỏi; kiểm tra quyền và hạn mức.
+0119 3. Backend tìm các đoạn tài liệu phù hợp và tạo prompt hướng dẫn Socratic.
+0120 4. LLM phản hồi; hệ thống lưu chat_message kèm nguồn và hiển thị trong giao diện.
+0121 5. Người học tiếp tục hỏi, yêu cầu gợi ý hoặc xác nhận xem lời giải.
+0122 4.2. Luồng B — Luyện tập
+0123 1. Chọn chủ đề, mức độ và yêu cầu tạo bài.
+0124 2. Hệ thống sinh, kiểm tra, lưu 05 câu hỏi và hiển thị câu hỏi.
+0125 3. Người học chọn đáp án, xác nhận nộp bài; backend chấm điểm.
+0126 4. Hệ thống lưu kết quả, cập nhật learning_progress và trình bày giải thích.
+0127 4.3. Luồng C — Quản lý tài liệu
+0128 1. ADMIN chọn chủ đề và tải PDF có văn bản hoặc TXT.
+0129 2. Hệ thống kiểm tra file, trích văn bản, tách đoạn và cập nhật trạng thái.
+0130 3. ADMIN xem kết quả, bật tài liệu; chat sử dụng các đoạn của tài liệu đã sẵn sàng.
+0131 5. Dữ liệu và quy tắc nghiệp vụ
+0132 Hệ thống sử dụng PostgreSQL với 11 bảng. Cấu trúc cột, khóa chính, khóa ngoại và các ràng buộc được định nghĩa trong tài liệu “Thiết kế cơ sở dữ liệu – Gia sư AI”, phiên bản 1.0.
+0133 [TABLE]
+0134 Nhóm dữ liệu | Bảng
+0135 Tài khoản | users
+0136 Môn/chủ đề | subjects, topics
+0137 Tài liệu nguồn | documents, document_chunks
+0138 Hội thoại AI | chat_sessions, chat_messages
+0139 Luyện tập | quizzes, quiz_questions, quiz_answers
+0140 Tiến độ | learning_progress
+0141 [/TABLE]
+0142 Mỗi chat_session thuộc một user và một topic; chỉ chủ sở hữu được xem, sửa hoặc tiếp tục.
+0143 Mỗi quiz thuộc một user và một topic; có 05 quiz_questions, mỗi câu có tối đa 01 quiz_answer.
+0144 Điểm quiz là tỷ lệ phần trăm số câu đúng trong các câu của bài; không đổi sau khi chấm.
+0145 Mức thành thạo một chủ đề = số câu đúng / tổng số câu đã chấm × 100%; chỉ tính quiz hoàn thành.
+0146 Tài liệu chỉ được truy xuất khi status = ready và is_active = true.
+0147 Tài khoản, môn/chủ đề và nguồn tài liệu dùng trạng thái is_active để bảo toàn lịch sử.
+0148 6. Yêu cầu phi chức năng
+0149 [TABLE]
+0150 Mã | Nhóm | Yêu cầu / kiểm thử
+0151 NFR-01 | Hiệu năng | Giao diện hiển thị trạng thái đang xử lý ngay sau khi gửi; phản hồi LLM có timeout cấu hình.
+0152 NFR-02 | Bảo mật | HTTPS khi triển khai; password_hash dùng bcrypt hoặc Argon2; xác thực và phân quyền từng API.
+0153 NFR-03 | Riêng tư | Không gửi dữ liệu nhận dạng cá nhân cho LLM; mỗi người chỉ xem dữ liệu học của mình.
+0154 NFR-04 | Độ tin cậy | Xử lý lỗi mạng, quota và dữ liệu AI sai định dạng; không lưu quiz hoặc điểm dở dang.
+0155 NFR-05 | Khả dụng | Giao diện tiếng Việt, có trạng thái tải, lỗi và dữ liệu trống; responsive từ 360px.
+0156 NFR-06 | Chất lượng AI | Sử dụng prompt Socratic nhất quán; kiểm thử câu hỏi, gợi ý và nguồn trích dẫn.
+0157 NFR-07 | Dữ liệu | Sử dụng migration DB; khóa ngoại và unique ở mức CSDL; sao lưu dữ liệu trước demo.
+0158 NFR-08 | Giới hạn | Có hạn mức gọi AI theo tài khoản và kiểm soát số lượt gọi bị lỗi/trùng.
+0159 NFR-09 | Minh bạch | Hiển thị nhãn “Câu trả lời do AI tạo, hãy đối chiếu với tài liệu học tập”.
+0160 NFR-10 | Triển khai | Ứng dụng khởi động được từ repository, có hướng dẫn cấu hình môi trường và chạy demo.
+0161 [/TABLE]
+0162 7. Công nghệ và kiến trúc
+0163 [TABLE]
+0164 Lớp | Công nghệ / trách nhiệm
+0165 Frontend | HTML, CSS, JavaScript; các trang đăng nhập, danh mục, chat, quiz, dashboard và admin.
+0166 Backend API | Python FastAPI; xác thực, phân quyền, điều phối AI, xử lý quiz, CRUD tài liệu.
+0167 CSDL | PostgreSQL; SQLAlchemy và Alembic để quản lý model/migration.
+0168 AI | Một nhà cung cấp LLM qua API; prompt Socratic và chuẩn JSON khi sinh quiz.
+0169 Tra cứu nguồn | Tách đoạn document_chunks; tìm kiếm từ khóa hoặc vector trên dữ liệu phù hợp.
+0170 Triển khai | Một môi trường demo; biến môi trường cho khóa API và chuỗi kết nối CSDL.
+0171 [/TABLE]
+0172 [TABLE]
+0173 Nguyên tắc tích hợp / Dịch vụ AI phải được gọi từ backend; frontend không chứa API key. API sinh quiz chỉ lưu câu hỏi sau khi validate thành công toàn bộ cấu trúc.
+0174 [/TABLE]
+0175 8. Phân công và kế hoạch triển khai
+0176 [TABLE]
+0177 Thành viên | Phụ trách chính | Sản phẩm bàn giao
+0178 01 | Tài khoản & danh mục | DB migration, xác thực, API tài khoản/môn/chủ đề, giao diện đăng nhập.
+0179 02 | Chat AI & frontend | Giao diện chat, lịch sử, API gửi tin, quản lý ngữ cảnh và prompt.
+0180 03 | Tài liệu & RAG | Upload, trích văn bản, document_chunks, truy xuất và trích dẫn nguồn.
+0181 04 | Quiz & dashboard | Sinh quiz, nộp/chấm, bảng kết quả, tiến độ và dashboard.
+0182 [/TABLE]
+0183 [TABLE]
+0184 Tuần | Mốc triển khai
+0185 01 | Khởi tạo project/DB, đăng nhập, môn/chủ đề, giao diện chính, thử kết nối LLM.
+0186 02 | Chat AI end-to-end, lịch sử hội thoại, quản lý tài liệu và tra cứu nguồn.
+0187 03 | Sinh và chấm quiz, dashboard, quản trị cơ bản, phân quyền và hạn mức.
+0188 04 | Tích hợp, kiểm thử, xử lý lỗi, triển khai và chuẩn bị kịch bản demo.
+0189 [/TABLE]
+0190 9. Kiểm thử và nghiệm thu
+0191 [TABLE]
+0192 Mã | Kịch bản nghiệm thu | Kết quả mong đợi
+0193 AT-01 | Đăng ký và đăng nhập bằng tài khoản hợp lệ | Đăng nhập thành công; email trùng bị từ chối.
+0194 AT-02 | Chọn chủ đề và gửi câu hỏi | Có phản hồi tiếng Việt; lưu phiên và tin nhắn.
+0195 AT-03 | Yêu cầu gợi ý, sau đó xác nhận lời giải | Gợi ý hiển thị theo mức; lời giải chỉ hiện sau xác nhận.
+0196 AT-04 | Chat dùng tài liệu đang bật | Nguồn liên quan được ghi nhận; tài liệu tắt không được dùng.
+0197 AT-05 | Sinh quiz 05 câu và nộp | Chấm đúng, giải thích và lưu kết quả duy nhất.
+0198 AT-06 | Xem tiến độ sau khi làm bài | Điểm và phần trăm thành thạo được cập nhật đúng.
+0199 AT-07 | Đổi user_id / session_id ở yêu cầu API | Không truy cập được dữ liệu người khác.
+0200 AT-08 | LLM lỗi/quota, quiz sai JSON | Có thông báo phù hợp; không phát sinh dữ liệu lỗi.
+0201 AT-09 | ADMIN quản lý tài liệu; LEARNER thử API admin | ADMIN thao tác được, LEARNER nhận 403.
+0202 AT-10 | Mở web trên điện thoại | Không tràn ngang; chat và quiz thao tác được.
+0203 [/TABLE]
+0204 10. Điều kiện bàn giao
+0205 Mã nguồn frontend/backend, file .env.example và hướng dẫn chạy môi trường phát triển.
+0206 Migration tạo đủ 11 bảng, dữ liệu mẫu và mô tả các API cốt lõi.
+0207 Tài liệu kiểm thử cùng minh chứng các kịch bản nghiệm thu chính.
+0208 Ứng dụng demo chạy ổn định với tài khoản LEARNER và ADMIN.
+0209 Phạm vi thử nghiệm dành cho người từ đủ 18 tuổi; tài liệu học có quyền sử dụng và được ghi nguồn.

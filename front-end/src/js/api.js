@@ -16,13 +16,14 @@ export class ApiError extends Error {
 export async function api(path, { method = 'GET', body, auth = true, signal } = {}) {
   const token = auth ? getAccessToken() : '';
   const headers = { Accept: 'application/json' };
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const multipart = body instanceof FormData;
+  if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
   let response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
       method, headers, signal, cache: 'no-store',
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
     });
   } catch (error) {
     if (error.name === 'AbortError') throw error;

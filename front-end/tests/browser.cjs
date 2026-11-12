@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { withApplication, login, TOKEN_KEY } = require('./helpers.cjs');
 const { runLoginChecks } = require('./login.cjs');
+const { runProfileUploadChecks } = require('./profile-upload.cjs');
 
 async function runBrowserChecks(application) {
   await runLoginChecks(application);
@@ -38,6 +39,8 @@ async function runBrowserChecks(application) {
   } finally {
     await context.close();
   }
+
+  await runProfileUploadChecks(application);
 
   // Backend dừng phải hiện lỗi và giữ trạng thái khách, không giả lập đăng nhập thành công.
   await stopBackend();
