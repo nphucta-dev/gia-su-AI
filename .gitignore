@@ -1,0 +1,12 @@
+
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+database/backups/
+
+# Generated browser test screenshots
+/front-end/tests/test-output/

@@ -1,0 +1,57 @@
+/* ADMIN shell follows the supplied responsive Figma board; learner styles stay isolated. */
+body[data-role=admin]{background:#f8fafc}
+.admin-context{font-size:13px;color:var(--muted)}
+body[data-role=admin] .site-header{position:sticky;top:0;z-index:20}
+body[data-role=admin] .header-inner{max-width:none;min-height:72px}
+body[data-role=admin] .brand{font-size:18px}
+body[data-role=admin] .brand-mark{width:32px;height:32px;border-radius:8px}
+body[data-role=admin] .admin-context{display:none}
+body[data-role=admin] .account-menu>summary{border:0;background:var(--pale);font-size:13px}
+body[data-role=admin] .app-shell{max-width:1440px;padding:28px 20px 64px}
+body[data-role=admin] .footer{display:none}
+body[data-role=admin] .preview-banner{text-align:left;font-size:12px;padding:10px 20px;background:#eef2ff}
+.admin-nav-backdrop{position:fixed;inset:72px 0 0;background:rgba(15,23,42,.4);border:0;z-index:18}
+body[data-role=admin] .nav.open{position:fixed;top:72px;bottom:0;left:0;right:auto;width:min(280px,85vw);z-index:21;background:#111827;border:0;justify-content:flex-start;padding:26px 16px;gap:8px}
+body[data-role=admin] .nav-link{color:#cbd5e1;min-height:48px;display:flex;align-items:center;padding:12px 16px;border-radius:7px}
+body[data-role=admin] .nav-link:hover,body[data-role=admin] .nav-link.active{background:#37308b;color:#fff}
+body[data-role=admin] .nav-link:focus-visible{outline-color:#c7d2fe}
+body.admin-drawer-open{overflow:hidden}
+@media(min-width:1100px){
+ body[data-role=admin]{padding-left:232px}
+ body[data-role=admin] .site-header{height:76px;background:#fff;border-bottom:1px solid #edf0f5}
+ body[data-role=admin] .header-inner{height:76px;padding:14px 40px}
+ body[data-role=admin] .brand{position:fixed;top:28px;left:24px;z-index:23;color:#fff;gap:10px}
+ body[data-role=admin] .site-header:before{content:'';position:fixed;top:0;bottom:0;left:0;width:232px;background:#111827;z-index:20}
+ body[data-role=admin] .site-header:after{content:'Không gian quản trị';position:fixed;top:80px;left:24px;color:#94a3b8;z-index:22;font-size:12px}
+ body[data-role=admin] .admin-context{display:block}
+ body[data-role=admin] .nav{position:fixed;top:124px;left:12px;width:208px;display:flex;flex-direction:column;margin:0;z-index:22;gap:6px}
+ body[data-role=admin] .nav-link{font-size:14px;gap:12px}
+ body[data-role=admin] .nav-link:before{content:'';width:5px;height:5px;border:1px solid currentColor;border-radius:1px;flex-shrink:0}
+ body[data-role=admin] .header-actions{margin-left:auto}
+ body[data-role=admin] .app-shell{padding:36px 40px 80px}
+ body[data-role=admin] .preview-banner{padding:10px 40px}
+}
+@media(max-width:600px){
+ body[data-role=admin] .header-inner{gap:10px;padding:12px 16px}
+ body[data-role=admin] .brand{font-size:17px;gap:8px}
+ body[data-role=admin] .account-menu>summary{padding:8px 10px}
+ body[data-role=admin] .app-shell{padding:24px 16px 48px}
+ body[data-role=admin] .preview-banner{padding:10px 16px;line-height:1.6}
+}
+/* The compact desktop rail retains logo, navigation icons and its toggle. */
+.admin-sidebar-toggle{display:none}
+body[data-role=admin] .nav-link:before{content:attr(data-icon);display:grid;place-items:center;width:24px;height:24px;flex-shrink:0;font-size:20px;line-height:1;border:0}
+@media(min-width:1100px){
+ body[data-role=admin]{--admin-sidebar-width:232px;padding-left:var(--admin-sidebar-width)}
+ body[data-role=admin] .site-header:before{width:var(--admin-sidebar-width)}
+ body[data-role=admin] .admin-sidebar-toggle{position:fixed;left:calc(var(--admin-sidebar-width) - 62px);bottom:24px;z-index:23;display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid #475569;border-radius:7px;background:#1e293b;color:#fff;font-size:25px;line-height:1}
+ body[data-role=admin] .admin-sidebar-toggle:hover{background:#37308b}
+ body[data-role=admin] .admin-sidebar-toggle:focus-visible{outline-color:#c7d2fe}
+ body[data-role=admin].admin-sidebar-collapsed{--admin-sidebar-width:80px}
+ body[data-role=admin].admin-sidebar-collapsed .brand{display:flex;left:24px}
+ body[data-role=admin].admin-sidebar-collapsed .brand>span:not(.brand-mark),
+ body[data-role=admin].admin-sidebar-collapsed .site-header:after{display:none}
+ body[data-role=admin].admin-sidebar-collapsed .nav{display:flex;left:12px;width:56px}
+ body[data-role=admin].admin-sidebar-collapsed .nav-link{justify-content:center;padding:12px;gap:0;font-size:0}
+ body[data-role=admin].admin-sidebar-collapsed .nav-link:before{font-size:22px}
+}

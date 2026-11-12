@@ -1,0 +1,12 @@
+{
+  "name": "gia-su-ai-frontend",
+  "private": true,
+  "scripts": {
+    "start": "node serve.cjs",
+    "test": "node tests/browser.cjs",
+    "test:login": "node tests/login.cjs"
+  },
+  "devDependencies": {
+    "playwright": ">=1.50 <2"
+  }
+}
