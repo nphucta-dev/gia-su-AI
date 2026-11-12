@@ -15,6 +15,7 @@ import uvicorn
 
 from app.config import Settings
 from app.main import create_app
+from app.repositories.catalog_repository import InMemoryCatalogRepository
 from app.repositories.user_repository import InMemoryUserRepository
 from app.utils.password import hash_password
 
@@ -25,8 +26,13 @@ def fast_hasher(password: str) -> str:
 
 def create_browser_app():
     repository = InMemoryUserRepository()
+    catalog = InMemoryCatalogRepository()
+    toan = catalog.add_subject("Toán học", "THPT")
+    catalog.add_topic(toan, "Chương 1 · Đại số", "Phương trình bậc hai", "Biệt thức, nghiệm và hệ thức Viète.")
+    catalog.add_topic(toan, "Chương 1 · Đại số", "Hàm số và đồ thị", "Khảo sát hàm số và đọc đồ thị.")
     app = create_app(
         user_repository=repository,
+        catalog_repository=catalog,
         password_hasher=fast_hasher,
         settings=Settings(jwt_secret=os.environ["JWT_SECRET"]),
     )

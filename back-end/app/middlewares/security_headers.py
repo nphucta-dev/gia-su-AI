@@ -21,8 +21,8 @@ class SecurityHeadersMiddleware:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
                 headers["X-Content-Type-Options"] = "nosniff"
-                if path.startswith("/api/auth"):
-                    # Phản hồi xác thực (kể cả lỗi) không được lưu cache ở trình duyệt hay proxy.
+                if path.startswith(("/api/auth", "/api/catalog")):
+                    # Phản hồi xác thực/danh mục (kể cả lỗi) không được lưu cache ở trình duyệt hay proxy.
                     headers["Cache-Control"] = "no-store"
             await send(message)
 
