@@ -1,6 +1,6 @@
 # Gia Sư AI — Back-end
 
-API Python 3.10+ dùng FastAPI. Có đăng ký, đăng nhập, xác thực JWT, hồ sơ cá nhân và tải tài liệu cho ADMIN; lưu dữ liệu trong MySQL.
+API Python 3.10+ dùng FastAPI. Có đăng ký, đăng nhập, xác thực JWT, hồ sơ cá nhân, quản lý môn/chủ đề và tải tài liệu cho ADMIN; lưu dữ liệu trong MySQL.
 
 Schema hiện tại dùng `INT AUTO_INCREMENT` cho ID của 11 bảng; API trả `id` dạng số. Database cũ đang dùng UUID cần chạy migration `0002_integer_ids` sau khi dừng server và sao lưu, theo [hướng dẫn chuyển ID](../database/README.md#chuyển-database-cũ-từ-uuid-sang-id-tự-tăng).
 
@@ -241,6 +241,23 @@ Authorization: Bearer <access_token>
 
 Phản hồi giữ cấu trúc `subjects → chapters → topics`; mỗi môn có `id`, `name`, `gradeLevel`, `chapters`, mỗi chủ đề có `id`, `name`, `description`. `GET /api/catalog/topics/{topic_id}` tiếp tục kiểm tra môn/chủ đề active trước khi mở luồng học.
 
+## Quản lý môn và chủ đề (ADMIN)
+
+Các API sau yêu cầu Bearer token của ADMIN đang hoạt động. Thiếu token trả 401, LEARNER trả 403. Danh sách quản trị gồm cả nội dung đã tắt và môn chưa có chủ đề.
+
+| API | Nội dung |
+| --- | --- |
+| `GET /api/admin/subjects` | Trả `subjects`, mỗi môn có `id`, `name`, `gradeLevel`, `isActive`. |
+| `POST /api/admin/subjects` | Tạo môn bằng JSON `{"name":"Toán","gradeLevel":"THPT"}`; trả 201 và `subject`. |
+| `PATCH /api/admin/subjects/{id}` | Sửa các trường được gửi: `name`, `gradeLevel`, `isActive`; trả `subject`. |
+| `GET /api/admin/topics` | Trả `topics`, gồm `id`, `subjectId`, `subjectName`, `gradeLevel`, `chapterName`, `name`, `description`, `isActive`. |
+| `POST /api/admin/topics` | Tạo chủ đề bằng JSON `{"subjectId":1,"chapterName":"Chương 1","name":"Hàm số","description":"Mô tả"}`; trả 201 và `topic`. |
+| `PATCH /api/admin/topics/{id}` | Sửa các trường được gửi: `subjectId`, `chapterName`, `name`, `description`, `isActive`; trả `topic`. |
+
+`description` có thể bỏ qua khi tạo, hoặc gửi `null` để xóa mô tả khi sửa. Tên môn tối đa 120 ký tự, cấp học 50, tên chương 150, tên chủ đề 180. Backend chuẩn hóa khoảng trắng, từ chối trường lạ và dữ liệu sai (422), báo trùng tên trong cùng phạm vi bằng 409, bản ghi không tồn tại bằng 404. Cùng tên môn khác cấp học, hoặc cùng tên chủ đề khác chương/môn vẫn hợp lệ.
+
+Bật/tắt dùng `PATCH` với `{"isActive":false}` hoặc `true`. Tắt môn ẩn các chủ đề của môn khỏi danh mục học và lựa chọn upload; không đổi trạng thái riêng của từng chủ đề. Bật lại môn vẫn giữ những chủ đề đã tắt. Các thao tác này giữ nguyên tài liệu và lịch sử đã lưu, không xóa bản ghi.
+
 ## Hồ sơ cá nhân
 
 `GET /api/profile` trả đối tượng `user` gồm `id`, `name`, `email`, `role`, `createdAt`, `birthYear` của tài khoản đang đăng nhập, gồm cả LEARNER và ADMIN.
@@ -278,4 +295,4 @@ Middleware giữ giới hạn 10 KB cho JSON; riêng POST upload nhận tối đ
 - Các API ghi danh mục, chat và quiz sử dụng model trong `app/models/` và session transaction của `app/db/database.py`; kiểm tra chủ sở hữu và quy tắc nghiệp vụ theo tài liệu SRS trước khi lưu dữ liệu.
 - Chưa có refresh token và đăng xuất thu hồi token: token đã phát hành vẫn dùng được đến khi hết hạn. Nếu cần thu hồi ngay, thêm danh sách token bị thu hồi hoặc số phiên bản token theo người dùng.
 - Giới hạn số lần gọi theo IP cho `/api/auth/register` (mỗi lần băm tốn CPU và 32 MiB bộ nhớ).
-- Danh sách môn/chủ đề, hồ sơ và upload/danh sách tài liệu đã dùng API thật. Nội dung chat, quiz, dashboard và CRUD môn/chủ đề còn phần minh họa; xử lý nội dung file và bật/tắt nguồn chưa triển khai.
+- Danh sách và quản lý môn/chủ đề, hồ sơ, upload/danh sách tài liệu đã dùng API thật. Nội dung chat, quiz và dashboard còn phần minh họa; xử lý nội dung file và bật/tắt nguồn chưa triển khai.

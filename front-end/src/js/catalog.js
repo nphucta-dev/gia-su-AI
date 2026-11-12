@@ -4,8 +4,13 @@ import { onSessionCleared } from './session.js';
 const cache = new Map();
 const pending = new Map();
 let version = 0;
+export function invalidateCatalog() {
+  cache.clear();
+  pending.clear();
+  version++;
+}
 // Đăng xuất / đổi tài khoản thì bỏ cache, kể cả request đang bay.
-onSessionCleared(() => { cache.clear(); pending.clear(); version++; });
+onSessionCleared(invalidateCatalog);
 
 export function loadCatalog({ force = false, gradeLevel = '' } = {}) {
   const grade = typeof gradeLevel === 'string' ? gradeLevel.trim() : '';

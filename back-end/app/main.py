@@ -29,11 +29,13 @@ from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.repositories.document_repository import DocumentRepository, SqlAlchemyDocumentRepository
 from app.repositories.user_repository import User
 from app.routes.auth import router as auth_router
+from app.routes.admin_catalog import router as admin_catalog_router
 from app.routes.catalog import router as catalog_router
 from app.routes.me import router as me_router
 from app.routes.profile import router as profile_router
 from app.routes.documents import router as documents_router
 from app.services.auth_service import AuthService, UserRepository
+from app.services.admin_catalog_service import AdminCatalogService
 from app.services.catalog_service import CatalogRepository, CatalogService
 from app.services.token_service import TokenService
 from app.utils.password import hash_password
@@ -90,6 +92,7 @@ def create_app(
     app.state.upload_dir = Path(upload_dir) if upload_dir is not None else settings.upload_dir
     app.state.auth_service = AuthService(repository, password_hasher or hash_password)
     app.state.catalog_service = CatalogService(catalog)
+    app.state.admin_catalog_service = AdminCatalogService(catalog)
     app.state.token_service = token_service or TokenService(
         secret=settings.jwt_secret,
         issuer=settings.jwt_issuer,
@@ -100,6 +103,7 @@ def create_app(
     app.include_router(auth_router)
     app.include_router(me_router)
     app.include_router(catalog_router)
+    app.include_router(admin_catalog_router)
     app.include_router(profile_router)
     app.include_router(documents_router)
 

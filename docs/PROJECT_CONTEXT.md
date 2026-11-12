@@ -197,13 +197,16 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   `POST/GET /api/admin/documents` upload/liệt kê tài liệu và `/options` lấy danh mục cho form ADMIN.
   Danh sách môn/chủ đề dùng `GET /api/catalog/subjects`, có query `gradeLevel` lọc đúng cấp học,
   giữ lọc môn/chủ đề active và nhóm chương; trang học có bộ chọn cấp học gọi API này.
+  Quản trị môn/chủ đề có `GET/POST/PATCH /api/admin/subjects` và `/api/admin/topics`, chỉ ADMIN;
+  danh sách gồm cả nội dung đã tắt. TK-016 tạo/sửa tên, cấp học, chương, mô tả và TK-017 bật/tắt
+  được nối giao diện quản trị với MySQL. Vô hiệu hóa giữ tài liệu/lịch sử, không xóa bản ghi.
 - Backend theo cấu trúc routes, schemas, validators, services, repositories, models, db và utils;
   SQLAlchemy/Alembic quản lý schema MySQL 11 bảng; seed có danh mục và tài khoản mẫu.
 - Frontend HTML/CSS/JS, Node `serve.cjs` cổng 4173 proxy `/api` tới Uvicorn cổng 8000;
   đăng ký/đăng nhập/phiên đã nối backend.
-- Danh sách môn/chủ đề, hồ sơ và upload/danh sách tài liệu đã nối API thật. Upload lưu file riêng và metadata MySQL
+- Danh sách và quản lý môn/chủ đề, hồ sơ, upload/danh sách tài liệu đã nối API thật. Upload lưu file riêng và metadata MySQL
   ở trạng thái pending/inactive, chưa có extract/chunks hoặc bật nguồn. Chat, quiz, dashboard
-  và CRUD danh mục còn phần minh họa. Chế độ xem thử localhost tiếp tục dùng dữ liệu mẫu.
+  còn phần minh họa. Chế độ xem thử localhost tiếp tục dùng dữ liệu mẫu.
   Cần kiểm tra từng phần trước khi đánh dấu TK xong.
 - Venv mặc định ở `back-end/venv`; các lệnh chạy ở README hiện hành. Không tự chạy migration,
   seed, sửa database hay gọi LLM chỉ vì đang đọc các bước trong tài liệu.

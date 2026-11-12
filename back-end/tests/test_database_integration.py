@@ -185,6 +185,87 @@ async def test_catalog_grade_filter_in_mysql(database):
         assert empty_result.json() == {"subjects": []}
 
 
+@pytest.mark.anyio
+async def test_admin_catalog_persists_edits_and_toggles_without_deleting_history(database):
+    _, sessions = database
+    suffix = uuid4().hex
+    with sessions.begin() as db:
+        admin, _, _ = make_catalog(db)
+        admin.role = "ADMIN"
+        admin_id = admin.id
+    settings = Settings(jwt_secret="mysql-admin-catalog-" + "x" * 40)
+    app = create_app(session_factory=sessions, settings=settings)
+    token = app.state.token_service.create_access_token(admin_id).access_token
+    headers = {"Authorization": f"Bearer {token}"}
+    subject_name = f"Môn quản trị {suffix}"
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test", headers=headers,
+    ) as client:
+        response = await client.post("/api/admin/subjects", json={"name": subject_name, "gradeLevel": "THCS"})
+        assert response.status_code == 201, response.text
+        subject_id = response.json()["subject"]["id"]
+        assert type(subject_id) is int
+        # Cùng tên nhưng khác cấp học là hai môn hợp lệ.
+        higher = await client.post("/api/admin/subjects", json={"name": subject_name, "gradeLevel": "THPT"})
+        assert higher.status_code == 201
+        duplicate = await client.post("/api/admin/subjects", json={"name": subject_name, "gradeLevel": "THCS"})
+        assert duplicate.status_code == 409
+        topic_body = {"subjectId": subject_id, "chapterName": "Chương 1", "name": "Chủ đề mới", "description": "Mô tả cũ"}
+        created = await client.post("/api/admin/topics", json=topic_body)
+        assert created.status_code == 201, created.text
+        topic_id = created.json()["topic"]["id"]
+        assert (await client.post("/api/admin/topics", json=topic_body)).status_code == 409
+        revised = await client.patch(f"/api/admin/topics/{topic_id}", json={"name": "Chủ đề đã sửa", "description": None})
+        assert revised.status_code == 200
+        assert revised.json()["topic"]["description"] is None
+        assert revised.json()["topic"]["chapterName"] == "Chương 1"
+        # Lỗi trùng UNIQUE phải rollback, không để lại cập nhật từng phần.
+        failed = await client.patch(f"/api/admin/subjects/{subject_id}", json={"gradeLevel": "THPT", "isActive": False})
+        assert failed.status_code == 409
+
+        with sessions.begin() as db:
+            history = ChatSession(user_id=admin_id, topic_id=topic_id, title="Lịch sử cần giữ")
+            source = Document(topic_id=topic_id, title="Nguồn cần giữ", file_path=f"{suffix}.txt")
+            db.add_all([history, source])
+            db.flush()
+            message = ChatMessage(session_id=history.id, role="user", content="Câu hỏi đã lưu")
+            db.add(message)
+            db.flush()
+            history_id, source_id, message_id = history.id, source.id, message.id
+
+        assert (await client.get(f"/api/catalog/topics/{topic_id}")).status_code == 200
+        disabled = await client.patch(f"/api/admin/subjects/{subject_id}", json={"isActive": False})
+        assert disabled.status_code == 200
+        assert (await client.get(f"/api/catalog/topics/{topic_id}")).status_code == 404
+        assert subject_id not in {row["id"] for row in (await client.get("/api/catalog/subjects")).json()["subjects"]}
+        assert subject_id not in {row["id"] for row in (await client.get("/api/admin/documents/options")).json()["subjects"]}
+        admin_topics = (await client.get("/api/admin/topics")).json()["topics"]
+        assert next(row for row in admin_topics if row["id"] == topic_id)["isActive"] is True
+        assert (await client.patch(f"/api/admin/topics/{topic_id}", json={"isActive": False})).status_code == 200
+        assert (await client.patch(f"/api/admin/subjects/{subject_id}", json={"isActive": True})).status_code == 200
+        assert (await client.get(f"/api/catalog/topics/{topic_id}")).status_code == 404
+        assert (await client.patch(f"/api/admin/topics/{topic_id}", json={"isActive": True})).status_code == 200
+        assert (await client.get(f"/api/catalog/topics/{topic_id}")).status_code == 200
+
+    # Mở app mới chứng minh thay đổi nằm trong MySQL, không chỉ trong bộ nhớ.
+    restored = create_app(session_factory=sessions, settings=settings)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=restored, raise_app_exceptions=False),
+        base_url="http://test", headers=headers,
+    ) as client:
+        subject_rows = (await client.get("/api/admin/subjects")).json()["subjects"]
+        saved_subject = next(row for row in subject_rows if row["id"] == subject_id)
+        assert saved_subject["gradeLevel"] == "THCS" and saved_subject["isActive"] is True
+        topic_rows = (await client.get("/api/admin/topics")).json()["topics"]
+        saved_topic = next(row for row in topic_rows if row["id"] == topic_id)
+        assert saved_topic["name"] == "Chủ đề đã sửa" and saved_topic["description"] is None
+    with sessions() as db:
+        assert db.get(ChatSession, history_id).topic_id == topic_id
+        assert db.get(ChatMessage, message_id).content == "Câu hỏi đã lưu"
+        assert db.get(Document, source_id).topic_id == topic_id
+
+
 def test_migration_matches_models(database):
     engine, _ = database
     assert len(set(inspect(engine).get_table_names()) - {"alembic_version"}) == 11

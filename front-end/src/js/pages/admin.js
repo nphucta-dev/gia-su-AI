@@ -1,5 +1,6 @@
 import { getAccessToken, getSession, onSessionCleared } from '../session.js';
 import { api } from '../api.js';
+import { invalidateCatalog } from '../catalog.js';
 import { el, button, heading, panel, field, badge, notice, toast } from '../components/ui.js';
 import { setupValidation, validateFields, showServerErrors } from '../components/validation.js';
 
@@ -45,7 +46,14 @@ export function renderAdmin() {
   let uploadOpen = false;
   const {subjects, topics} = catalog;
   const liveDocuments = active === 'documents' && !preview;
-  if (!liveDocuments) root.append(el('div', {className:'admin-preview-note'}, notice('Bản xem trước: thay đổi chỉ nằm trong bộ nhớ, chưa lưu lên máy chủ. Tải lại trang hoặc đăng xuất sẽ đặt lại dữ liệu.', 'warning')));
+  if (preview) root.append(el('div', {className:'admin-preview-note'}, notice('Bản xem trước: thay đổi chỉ nằm trong bộ nhớ, chưa lưu lên máy chủ. Tải lại trang hoặc đăng xuất sẽ đặt lại dữ liệu.', 'warning')));
+  let liveSubjects = [];
+  let liveTopics = [];
+  let liveDocumentCounts = null;
+  let catalogReady = preview;
+  let catalogPending = false;
+  let catalogVersion = 0;
+  let catalogSearch = '';
   let documents = catalog.documents;
   let uploadSubjects = subjects;
   let uploadTopics = topics;
@@ -68,7 +76,9 @@ export function renderAdmin() {
       }
       return uploadOpen ? drawUpload() : drawDocuments();
     }
-    drawCatalog();
+    if (preview) drawCatalog();
+    else if (catalogReady) drawLiveCatalog();
+    else content.replaceChildren(el('p', {role:'status'}, 'Đang tải môn học và chủ đề…'));
   }
 
   function currentPage() {
@@ -78,7 +88,7 @@ export function renderAdmin() {
   function serverDocument(item) {
     const created = new Date(item.createdAt);
     return {
-      id:item.id, name:item.title, fileName:item.fileName, topic:item.topicName,
+      id:item.id, topicId:item.topicId, name:item.title, fileName:item.fileName, topic:item.topicName,
       size:Number.isFinite(item.sizeBytes) ? formatSize(item.sizeBytes) : 'Chưa có kích thước',
       date:Number.isNaN(created.getTime()) ? '' : created.toLocaleDateString('vi-VN'),
       status:item.status, active:item.isActive,
@@ -101,6 +111,167 @@ export function renderAdmin() {
       if (!currentPage()) return;
       content.replaceChildren(notice(error.message || 'Chưa thể tải danh sách tài liệu.', 'error'), button('Thử lại', loadDocuments, 'primary'));
     }
+  }
+
+  async function loadAdminCatalog() {
+    const version = ++catalogVersion;
+    catalogReady = false;
+    draw();
+    try {
+      const [subjectRequest, topicRequest, documentRequest] = await Promise.allSettled([
+        api('/admin/subjects'), api('/admin/topics'), active === 'topics' ? api('/admin/documents') : Promise.resolve(null)
+      ]);
+      if (!currentPage() || version !== catalogVersion) return;
+      if (subjectRequest.status === 'rejected') throw subjectRequest.reason;
+      if (topicRequest.status === 'rejected') throw topicRequest.reason;
+      const subjectResult = subjectRequest.value;
+      const topicResult = topicRequest.value;
+      if (!Array.isArray(subjectResult?.subjects) || !Array.isArray(topicResult?.topics)) {
+        throw new Error('Danh mục chưa hợp lệ. Vui lòng thử lại.');
+      }
+      liveSubjects = subjectResult.subjects;
+      liveTopics = topicResult.topics;
+      liveDocumentCounts = null;
+      if (documentRequest.status === 'fulfilled' && Array.isArray(documentRequest.value?.documents)) {
+        liveDocumentCounts = new Map();
+        documentRequest.value.documents.forEach(item => liveDocumentCounts.set(item.topicId, (liveDocumentCounts.get(item.topicId) || 0) + 1));
+      }
+      catalogReady = true;
+      draw();
+    } catch (error) {
+      if (!currentPage() || version !== catalogVersion) return;
+      content.replaceChildren(notice(error.message || 'Chưa thể tải môn học và chủ đề.', 'error'), button('Thử lại', loadAdminCatalog, 'primary'));
+    }
+  }
+
+  function drawLiveCatalog() {
+    const isSubject = active === 'subjects';
+    const collection = isSubject ? liveSubjects : liveTopics;
+    if (editing && !collection.includes(editing)) editing = null;
+    const clean = value => value.trim().replace(/\s+/g, ' ');
+    const name = el('input', {className:'input', value:editing?.name || '', maxlength:isSubject ? 120 : 180, required:true, placeholder:isSubject ? 'Ví dụ: Toán học' : 'Ví dụ: Phương trình bậc hai'});
+    const detail = el('input', {className:'input', value:(isSubject ? editing?.gradeLevel : editing?.chapterName) || '', maxlength:isSubject ? 50 : 150, required:true, placeholder:isSubject ? 'THPT' : 'Chương 1'});
+    const subjectSelect = isSubject ? null : el('select', {className:'select', required:true}, el('option', {value:''}, 'Chọn môn học'), ...liveSubjects.map(item => el('option', {value:item.id, selected:editing?.subjectId === item.id}, `${item.name} · ${item.gradeLevel}${item.isActive ? '' : ' (đã tắt)'}`)));
+    const description = isSubject ? null : el('textarea', {className:'textarea', maxlength:5000, rows:4, placeholder:'Nội dung người học sẽ tìm hiểu trong chủ đề này.'}, editing?.description || '');
+    const submit = el('button', {type:'submit', className:'button primary'}, editing ? 'Lưu thay đổi' : 'Thêm nội dung');
+    const cancel = button(editing ? 'Huỷ chỉnh sửa' : 'Hủy', () => { if (!catalogPending) { editing = null; draw(); } }, 'ghost');
+    const message = el('div', {role:'status', 'aria-live':'polite'});
+    const form = el('form', {className:'form-grid'}, field(isSubject ? 'Tên môn học' : 'Tên chủ đề', name), subjectSelect ? field('Môn học', subjectSelect) : null, field(isSubject ? 'Cấp học' : 'Chương', detail), description ? field('Mô tả', description) : null, submit, cancel, message);
+    setupValidation(form, [name, detail, ...(subjectSelect ? [subjectSelect, description] : [])]);
+    const search = el('input', {className:'input', type:'search', value:catalogSearch, placeholder:isSubject ? 'Tìm môn học hoặc cấp học…' : 'Tìm chủ đề, môn học hoặc chương…', 'aria-label':'Tìm trong danh mục'});
+    const rows = el('div', {className:'topic-list'});
+    const summary = el('p', {className:'catalog-summary', 'aria-live':'polite'});
+    const feedback = el('div', {role:'status', 'aria-live':'polite'});
+    const add = button(isSubject ? 'Thêm môn học' : 'Thêm chủ đề', () => {
+      if (catalogPending) return;
+      if (editing) { editing = null; draw(); pageHeading.querySelector('.button')?.click(); return; }
+      editor.hidden = false;
+      editor.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches ? 'instant' : 'smooth', block:'center'});
+      name.focus({preventScroll:true});
+    }, 'primary');
+
+    function replaceItem(item) {
+      const index = collection.findIndex(current => current.id === item.id);
+      if (index === -1) collection.push(item);
+      else collection[index] = item;
+      if (isSubject) {
+        liveTopics = liveTopics.map(topic => topic.subjectId === item.id ? {...topic, subjectName:item.name, gradeLevel:item.gradeLevel} : topic);
+      }
+    }
+
+    function setPending(value) {
+      catalogPending = value;
+      add.disabled = value;
+      for (const control of form.querySelectorAll('input,select,textarea,button')) control.disabled = value;
+      if (value) form.setAttribute('aria-busy', 'true');
+      else form.removeAttribute('aria-busy');
+      renderRows();
+    }
+
+    async function toggleItem(item) {
+      if (catalogPending) return;
+      feedback.replaceChildren();
+      setPending(true);
+      try {
+        const result = await api(`/admin/${active}/${item.id}`, {method:'PATCH', body:{isActive:!item.isActive}});
+        if (!currentPage() || !rows.isConnected) return;
+        const updated = isSubject ? result?.subject : result?.topic;
+        if (updated?.id !== item.id) throw new Error('Chưa thể xác nhận thay đổi. Vui lòng tải lại trang.');
+        replaceItem(updated);
+        invalidateCatalog();
+        toast(updated.isActive ? 'Đã kích hoạt nội dung.' : 'Đã vô hiệu hoá nội dung.');
+      } catch (error) {
+        if (currentPage() && rows.isConnected) feedback.replaceChildren(notice(error.message || 'Chưa thể cập nhật trạng thái. Vui lòng thử lại.', 'error'));
+      } finally {
+        if (currentPage() && rows.isConnected) setPending(false);
+        else catalogPending = false;
+      }
+    }
+
+    function renderRows() {
+      const query = catalogSearch.toLocaleLowerCase('vi');
+      const filtered = collection.filter(item => [item.name,item.gradeLevel,item.subjectName,item.chapterName].filter(Boolean).join(' ').toLocaleLowerCase('vi').includes(query));
+      const sorted = [...filtered].sort((a,b) => (isSubject ? a.name + a.gradeLevel : a.subjectName + a.gradeLevel + a.chapterName + a.name).localeCompare(isSubject ? b.name + b.gradeLevel : b.subjectName + b.gradeLevel + b.chapterName + b.name, 'vi') || a.id - b.id);
+      rows.replaceChildren();
+      let previousGroup = '';
+      for (const item of sorted) {
+        const group = isSubject ? '' : `${item.subjectName} · ${item.gradeLevel} · ${item.chapterName}`;
+        if (group && group !== previousGroup) rows.append(el('h3', {className:'catalog-group'}, group));
+        previousGroup = group;
+        const edit = button('Sửa', () => { if (!catalogPending) { editing = item; draw(); content.querySelector('input:not([type=search])')?.focus(); } }, 'secondary small');
+        const toggle = button(item.isActive ? 'Vô hiệu hoá' : 'Kích hoạt', () => toggleItem(item), 'ghost small');
+        edit.disabled = toggle.disabled = catalogPending;
+        const subject = !isSubject && liveSubjects.find(subject => subject.id === item.subjectId);
+        rows.append(el('article', {className:'topic-row', 'data-catalog-id':item.id},
+          el('div', {className:'catalog-name'}, el('h3', {}, item.name), el('p', {}, isSubject ? item.gradeLevel : `${item.subjectName} · ${item.gradeLevel} · ${item.chapterName}`), !isSubject && item.description ? el('p', {}, item.description) : null, subject && !subject.isActive ? el('p', {}, 'Môn học đã tắt; chủ đề đang ẩn với người học.') : null),
+          el('div', {className:'catalog-relation'}, isSubject ? `${liveTopics.filter(topic => topic.subjectId === item.id).length} chủ đề` : liveDocumentCounts ? `${liveDocumentCounts.get(item.id) || 0} tài liệu` : '—'),
+          badge(item.isActive ? 'Đang bật' : 'Đã tắt', item.isActive ? 'success' : 'warning'),
+          el('div', {className:'page-actions'}, edit, toggle)
+        ));
+      }
+      if (!sorted.length) rows.append(el('div', {className:'empty-state'}, el('h3', {}, 'Không tìm thấy nội dung'), el('p', {}, 'Thử một từ khóa khác hoặc thêm nội dung mới.')));
+      summary.textContent = `Hiển thị ${filtered.length} trong ${collection.length} ${isSubject ? 'môn học' : 'chủ đề'}`;
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (catalogPending) return;
+      message.replaceChildren();
+      const valid = validateFields([[name, clean(name.value) ? '' : 'Vui lòng nhập tên nội dung.'], [detail, clean(detail.value) ? '' : 'Vui lòng nhập thông tin phân loại.'], ...(subjectSelect ? [[subjectSelect, liveSubjects.some(item => String(item.id) === subjectSelect.value) ? '' : 'Vui lòng chọn môn học hợp lệ.']] : [])]);
+      if (!valid) return;
+      const itemId = editing?.id;
+      const body = isSubject ? {name:clean(name.value), gradeLevel:clean(detail.value)} : {name:clean(name.value), subjectId:Number(subjectSelect.value), chapterName:clean(detail.value), description:description.value.trim() || null};
+      setPending(true);
+      submit.textContent = 'Đang lưu…';
+      try {
+        const result = await api(`/admin/${active}${itemId ? `/${itemId}` : ''}`, {method:itemId ? 'PATCH' : 'POST', body});
+        if (!currentPage() || !form.isConnected) return;
+        const updated = isSubject ? result?.subject : result?.topic;
+        if (!updated?.id || (itemId && updated.id !== itemId)) throw new Error('Chưa thể xác nhận thay đổi. Vui lòng tải lại trang.');
+        replaceItem(updated);
+        invalidateCatalog();
+        editing = null;
+        catalogPending = false;
+        draw();
+        toast(itemId ? 'Đã lưu thay đổi.' : 'Đã thêm nội dung.');
+      } catch (error) {
+        if (!currentPage() || !form.isConnected) return;
+        setPending(false);
+        showServerErrors(error.fields, {name, gradeLevel:detail, grade_level:detail, chapterName:detail, chapter_name:detail, subjectId:subjectSelect, subject_id:subjectSelect, description});
+        message.replaceChildren(notice(error.message || 'Chưa thể lưu nội dung. Vui lòng thử lại.', 'error'));
+      } finally {
+        if (currentPage() && form.isConnected) { setPending(false); submit.textContent = itemId ? 'Lưu thay đổi' : 'Thêm nội dung'; }
+        else catalogPending = false;
+      }
+    });
+
+    search.addEventListener('input', () => { catalogSearch = search.value.trim(); renderRows(); });
+    const editor = el('section', {className:'panel catalog-editor', hidden:!editing}, el('h2', {}, editing ? 'Chỉnh sửa nội dung' : 'Thêm nội dung'), form);
+    pageHeading.querySelector('.page-actions')?.remove();
+    pageHeading.append(el('div', {className:'page-actions'}, add));
+    const list = el('section', {className:'panel catalog-panel'}, el('div', {className:'catalog-toolbar'}, el('h2', {}, isSubject ? 'Danh sách môn học' : 'Cấu trúc nội dung'), search), el('div', {className:'catalog-table-head', 'aria-hidden':'true'}, el('span', {}, isSubject ? 'Môn học / Cấp học' : 'Chủ đề / Môn học'), el('span', {}, isSubject ? 'Chủ đề' : 'Tài liệu'), el('span', {}, 'Trạng thái'), el('span', {}, 'Thao tác')), feedback, rows, summary);
+    content.replaceChildren(el('div', {className:'catalog-admin-layout'}, list, editor));
+    renderRows();
   }
 
   function drawCatalog() {
@@ -302,5 +473,6 @@ export function renderAdmin() {
   root.append(tabs, content);
   draw();
   if (liveDocuments) loadDocuments();
+  else if (!preview) loadAdminCatalog();
   return root;
 }
