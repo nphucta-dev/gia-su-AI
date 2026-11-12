@@ -31,11 +31,20 @@ def create_browser_app():
     toan = catalog.add_subject("Toán học", "THPT")
     quadratic = catalog.add_topic(toan, "Chương 1 · Đại số", "Phương trình bậc hai", "Biệt thức, nghiệm và hệ thức Viète.")
     functions = catalog.add_topic(toan, "Chương 1 · Đại số", "Hàm số và đồ thị", "Khảo sát hàm số và đọc đồ thị.")
+    lower_math = catalog.add_subject("Toán học", "THCS")
+    fractions = catalog.add_topic(lower_math, "Số học", "Phép cộng phân số", "Quy đồng mẫu số và cộng phân số.")
+    catalog.add_topic(lower_math, "Số học", "Chủ đề đã tắt", is_active=False)
+    hidden = catalog.add_subject("Môn học đã tắt", "THCS", is_active=False)
+    catalog.add_topic(hidden, "Chương 1", "Chủ đề thuộc môn đã tắt")
     documents = InMemoryDocumentRepository(
-        subjects=[SubjectRecord(id=toan, name="Toán học", grade_level="THPT")],
+        subjects=[
+            SubjectRecord(id=toan, name="Toán học", grade_level="THPT"),
+            SubjectRecord(id=lower_math, name="Toán học", grade_level="THCS"),
+        ],
         topics=[
             TopicRecord(id=quadratic, subject_id=toan, name="Phương trình bậc hai", chapter_name="Chương 1 · Đại số"),
             TopicRecord(id=functions, subject_id=toan, name="Hàm số và đồ thị", chapter_name="Chương 1 · Đại số"),
+            TopicRecord(id=fractions, subject_id=lower_math, name="Phép cộng phân số", chapter_name="Số học"),
         ],
     )
     app = create_app(

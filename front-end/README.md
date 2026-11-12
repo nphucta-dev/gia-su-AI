@@ -32,6 +32,7 @@ Nếu dùng Live Server thay cho `serve.cjs`, đặt meta `api-base` trong `inde
 - Đăng ký gọi `POST /api/auth/register`; lỗi trường từ server hiện cạnh ô nhập. Thành công chuyển đến đăng nhập và điền email vừa đăng ký.
 - Đăng nhập gọi `POST /api/auth/login`; thành công lưu token vào `sessionStorage` và mở trang chủ.
 - Trang chủ yêu cầu đăng nhập. Khi tải lại trang, frontend gọi `GET /api/auth/me` trước khi hiển thị các trang cần tài khoản.
+- Danh sách môn và chủ đề lấy từ `GET /api/catalog/subjects`. Bộ chọn **Cấp học** gọi API với `gradeLevel`, có lựa chọn tất cả, trạng thái tải/trống/lỗi và thử lại. Các cấp học được lấy từ danh mục thật, không cố định trong giao diện.
 - Menu hiển thị tên người dùng, hồ sơ và đăng xuất. LEARNER không có mục quản trị; trang quản trị còn kiểm tra `/api/admin/access` ở backend.
 - Hồ sơ gọi `GET /api/profile`, lưu họ tên/năm sinh bằng `PATCH /api/profile`; thay đổi giữ được sau khi tải lại trang. Email và vai trò chỉ hiển thị, không cho sửa.
 - ADMIN mở Tài liệu nguồn để tải PDF/TXT qua `POST /api/admin/documents`; form lấy môn/chủ đề thật từ `/api/admin/documents/options`, danh sách lấy từ `/api/admin/documents`. File và metadata được lưu ở backend/MySQL.
@@ -40,7 +41,7 @@ Nếu dùng Live Server thay cho `serve.cjs`, đặt meta `api-base` trong `inde
 
 API kiểm tra MySQL: http://127.0.0.1:8000/api/database. Swagger: http://127.0.0.1:8000/docs.
 
-Các trang học, chat, luyện tập và CRUD danh mục hiện vẫn có dữ liệu mẫu; phần này chưa có API nghiệp vụ tương ứng. Hồ sơ và upload/danh sách tài liệu đã kết nối backend. Phân quyền phía frontend phục vụ điều hướng; backend xác thực token và quyền trước khi cho phép API bảo vệ.
+Danh sách môn/chủ đề, hồ sơ và upload/danh sách tài liệu đã kết nối backend. Nội dung chat, câu hỏi luyện tập, dashboard và CRUD danh mục vẫn còn dữ liệu minh họa. Cache danh mục tách theo cấp học, được xóa khi đăng xuất; lọc ở trang học không làm mất danh mục dùng cho chọn chủ đề chat/luyện tập. Phân quyền phía frontend phục vụ điều hướng; backend xác thực token và quyền trước khi cho phép API bảo vệ.
 
 ## Cấu trúc
 

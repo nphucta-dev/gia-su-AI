@@ -226,6 +226,21 @@ Frontend gửi `Authorization: Bearer <token>` ở mỗi request cần đăng nh
 
 Băm bằng scrypt (`hashlib.scrypt` có sẵn trong Python), salt ngẫu nhiên 16 byte, N=2^15, r=8, p=3. Chuỗi lưu có dạng `scrypt$N$r$p$salt$hash`, tham số nằm trong chuỗi nên có thể tăng độ khó sau này mà không làm hỏng hash cũ. Dùng `verify_password` (so sánh thời gian cố định) khi đăng nhập và `needs_rehash` để nâng cấp hash cũ sau khi đăng nhập thành công. Việc băm chạy trong thread pool để không chặn các request khác.
 
+## Danh sách môn học
+
+`GET /api/catalog/subjects` yêu cầu token của LEARNER hoặc ADMIN đang hoạt động. API đọc MySQL, chỉ trả môn và chủ đề active, nhóm chủ đề theo chương; môn chưa có chủ đề active không có trong danh sách.
+
+Lọc theo cấp học bằng query tùy chọn `gradeLevel`:
+
+```http
+GET /api/catalog/subjects?gradeLevel=THCS
+Authorization: Bearer <access_token>
+```
+
+`gradeLevel` tối đa 50 ký tự, bỏ khoảng trắng hai đầu và so khớp đúng giá trị cấp học trong database. Không gửi, gửi rỗng hoặc chỉ khoảng trắng thì trả toàn bộ danh mục đang mở. Không có cấp học phù hợp trả `200` với `{"subjects": []}`; quá 50 ký tự trả `422`. Thiếu token trả `401`, tài khoản vô hiệu hóa trả `403`.
+
+Phản hồi giữ cấu trúc `subjects → chapters → topics`; mỗi môn có `id`, `name`, `gradeLevel`, `chapters`, mỗi chủ đề có `id`, `name`, `description`. `GET /api/catalog/topics/{topic_id}` tiếp tục kiểm tra môn/chủ đề active trước khi mở luồng học.
+
 ## Hồ sơ cá nhân
 
 `GET /api/profile` trả đối tượng `user` gồm `id`, `name`, `email`, `role`, `createdAt`, `birthYear` của tài khoản đang đăng nhập, gồm cả LEARNER và ADMIN.
@@ -260,7 +275,7 @@ Middleware giữ giới hạn 10 KB cho JSON; riêng POST upload nhận tối đ
 
 ## Việc cần làm tiếp
 
-- Các API danh mục, chat và quiz sử dụng model trong `app/models/` và session transaction của `app/db/database.py`; kiểm tra chủ sở hữu và quy tắc nghiệp vụ theo tài liệu SRS trước khi lưu dữ liệu.
+- Các API ghi danh mục, chat và quiz sử dụng model trong `app/models/` và session transaction của `app/db/database.py`; kiểm tra chủ sở hữu và quy tắc nghiệp vụ theo tài liệu SRS trước khi lưu dữ liệu.
 - Chưa có refresh token và đăng xuất thu hồi token: token đã phát hành vẫn dùng được đến khi hết hạn. Nếu cần thu hồi ngay, thêm danh sách token bị thu hồi hoặc số phiên bản token theo người dùng.
 - Giới hạn số lần gọi theo IP cho `/api/auth/register` (mỗi lần băm tốn CPU và 32 MiB bộ nhớ).
-- Danh mục, chat, quiz và CRUD môn/chủ đề còn dùng dữ liệu minh họa. Hồ sơ và upload/danh sách tài liệu đã dùng API thật; phần xử lý nội dung file và bật/tắt nguồn chưa triển khai.
+- Danh sách môn/chủ đề, hồ sơ và upload/danh sách tài liệu đã dùng API thật. Nội dung chat, quiz, dashboard và CRUD môn/chủ đề còn phần minh họa; xử lý nội dung file và bật/tắt nguồn chưa triển khai.

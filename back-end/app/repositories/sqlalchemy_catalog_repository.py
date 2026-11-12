@@ -14,20 +14,23 @@ class SqlAlchemyCatalogRepository:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._sessions = session_factory
 
-    async def list_active_subjects(self) -> list[CatalogSubject]:
-        return await asyncio.to_thread(self._list_active_subjects)
+    async def list_active_subjects(self, *, grade_level: str | None = None) -> list[CatalogSubject]:
+        return await asyncio.to_thread(self._list_active_subjects, grade_level=grade_level)
 
     async def find_open_topic(self, topic_id: int) -> OpenTopic | None:
         return await asyncio.to_thread(self._find_open_topic, topic_id)
 
-    def _list_active_subjects(self) -> list[CatalogSubject]:
+    def _list_active_subjects(self, *, grade_level: str | None = None) -> list[CatalogSubject]:
+        statement = (
+            select(Subject, Topic)
+            .join(Topic, Topic.subject_id == Subject.id)
+            .where(Subject.is_active.is_(True), Topic.is_active.is_(True))
+            .order_by(Subject.name, Subject.grade_level, Subject.id, Topic.id)
+        )
+        if grade_level is not None:
+            statement = statement.where(Subject.grade_level == grade_level)
         with self._sessions() as db:
-            rows = db.execute(
-                select(Subject, Topic)
-                .join(Topic, Topic.subject_id == Subject.id)
-                .where(Subject.is_active.is_(True), Topic.is_active.is_(True))
-                .order_by(Subject.name, Subject.grade_level, Subject.id, Topic.id)
-            ).all()
+            rows = db.execute(statement).all()
         grouped: dict[int, tuple[Subject, list[CatalogTopic]]] = {}
         for subject, topic in rows:
             _, topics = grouped.setdefault(subject.id, (subject, []))

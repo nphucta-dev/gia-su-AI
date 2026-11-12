@@ -1,13 +1,15 @@
-import { el, link, heading, panel, badge, button, notice } from '../components/ui.js';
+import { el, link, heading, panel, badge, button, notice, field } from '../components/ui.js';
 import { topics } from '../data.js';            // vẫn dùng cho dashboard (dữ liệu minh họa)
 import { loadCatalog } from '../catalog.js';
 
 export function renderHome() {
  const search = el('input', { className: 'input', type: 'search', placeholder: 'Tìm chủ đề học tập…', 'aria-label': 'Tìm chủ đề' });
+ const grade = el('select', { className: 'select', disabled: true }, el('option', { value: '' }, 'Tất cả cấp học'));
  const aside = el('aside', { className: 'panel subject-panel', hidden: true });
  const body = el('div', { role: 'status' }, 'Đang tải danh mục môn học…');
  let subjects = [];
  let selectedId = null;
+ let loadVersion = 0;
  const current = () => subjects.find(s => s.id === selectedId) || subjects[0];
  const topicRow = t => el('article', { className: 'topic-row' },
   el('div', {}, el('h3', {}, t.name), el('p', {}, t.description || 'Chưa có mô tả.')),
@@ -34,30 +36,49 @@ export function renderHome() {
    : [el('div', { className: 'empty-state', role: 'status' }, 'Không tìm thấy chủ đề. Thử từ khoá khác.')]));
  }
  function draw() {
+  body.removeAttribute('role');
   if (!subjects.length) {
    aside.hidden = true; search.disabled = true;
-   body.replaceChildren(el('div', { className: 'empty-state', role: 'status' }, 'Chưa có môn học hoặc chủ đề nào được mở. Vui lòng quay lại sau.'));
+   body.replaceChildren(el('div', { className: 'empty-state', role: 'status' }, grade.value
+    ? 'Chưa có môn học hoặc chủ đề nào được mở cho cấp học này.'
+    : 'Chưa có môn học hoặc chủ đề nào được mở. Vui lòng quay lại sau.'));
    return;
   }
   aside.hidden = false; search.disabled = false;
   drawAside(); drawBody();
  }
  async function load(force = false) {
+  const requestVersion = ++loadVersion;
+  const gradeLevel = grade.value;
   aside.hidden = true;
+  search.disabled = true;
+  root.setAttribute('aria-busy', 'true');
   body.setAttribute('role', 'status');
   body.replaceChildren('Đang tải danh mục môn học…');
   try {
-   const result = await loadCatalog({ force });
-   if (!root.isConnected) return;
+   const result = await loadCatalog({ force, gradeLevel });
+   if (!root.isConnected || requestVersion !== loadVersion) return;
+   if (!gradeLevel) {
+    const levels = [...new Set(result.map(subject => subject.gradeLevel).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+    grade.replaceChildren(el('option', { value: '' }, 'Tất cả cấp học'), ...levels.map(level => el('option', { value: level }, level)));
+   }
+   if (!result.some(subject => subject.id === selectedId)) selectedId = result[0]?.id ?? null;
    subjects = result; draw();
   } catch (error) {
-   if (!root.isConnected) return;
+   if (!root.isConnected || requestVersion !== loadVersion) return;
    body.removeAttribute('role');
    body.replaceChildren(notice(error.message, 'error'), button('Thử lại', () => load(true), 'primary'));
+  } finally {
+   if (root.isConnected && requestVersion === loadVersion) {
+    grade.disabled = false;
+    root.removeAttribute('aria-busy');
+   }
   }
  }
+ grade.addEventListener('change', () => load());
  search.addEventListener('input', () => { if (subjects.length) drawBody(); });
  const root = el('div', {}, heading('Hôm nay bạn muốn học gì?', 'Chọn môn học và chủ đề để bắt đầu. Mỗi câu hỏi là một bước hiểu sâu hơn.'),
+  el('div', { className: 'catalog-filters' }, field('Cấp học', grade)),
   el('div', { className: 'catalog-layout' }, aside, el('section', {}, el('div', { className: 'panel-header' }, el('h2', {}, 'Chủ đề theo chương'), search), body)),
   el('div', { className: 'study-note' }, el('h2', {}, 'Hiểu bài theo từng bước'), el('p', {}, 'Gia sư đặt câu hỏi gợi mở trước khi hiện lời giải. Bạn có thể yêu cầu ví dụ hoặc cách giải thích đơn giản hơn.'), link('Bắt đầu phiên học', '#chat', 'button primary')));
  load();

@@ -15,6 +15,8 @@
 /* Keep account controls at the right edge even when learning navigation is hidden. */
 .header-inner > .header-actions{margin-left:auto}
 
+.catalog-filters{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:24px}.catalog-filters>.field{width:min(100%,280px);min-width:0}.catalog-filters .select{max-width:100%}.catalog-layout>*{min-width:0}
+
 .preview-banner{padding:12px 24px;text-align:center;background:var(--pale);color:var(--hover);font-size:14px;border-bottom:1px solid var(--border)}
 
 .admin-page>.tabs{flex-wrap:wrap;gap:8px}.admin-page>.tabs .tab{min-height:44px;white-space:normal}.admin-profile{max-width:860px}.profile-details{margin:0 0 24px;display:grid;gap:20px}.profile-details dt{color:var(--muted);font-size:14px}.profile-details dd{margin:4px 0 0;font-weight:600;overflow-wrap:anywhere}.admin-preview-note{margin-bottom:24px}.admin-page .grid-2>*{min-width:0}.admin-page .topic-row{overflow-wrap:anywhere}.admin-page .page-actions{flex-wrap:wrap}.admin-page select{max-width:100%}

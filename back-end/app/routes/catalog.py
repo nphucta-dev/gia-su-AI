@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Request
+from fastapi import APIRouter, Depends, Path, Query, Request
 
 from app.dependencies.auth import get_current_user
 from app.schemas.auth import ErrorResponse
@@ -30,9 +30,13 @@ def get_catalog_service(request: Request) -> CatalogService:
 )
 async def list_subjects(
     service: Annotated[CatalogService, Depends(get_catalog_service)],
+    grade_level: Annotated[
+        str | None,
+        Query(alias="gradeLevel", max_length=50, description="Lọc đúng cấp học; bỏ trống để xem tất cả."),
+    ] = None,
 ) -> SubjectListResponse:
     """Chỉ trả môn active và chủ đề active; môn chưa có chủ đề active nào bị ẩn."""
-    return await service.list_subjects()
+    return await service.list_subjects(grade_level=grade_level)
 
 
 @router.get(

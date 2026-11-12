@@ -195,11 +195,13 @@ Các quy tắc service không được thay thế bằng giả định schema đ
 - FastAPI có đăng ký, đăng nhập, `/api/auth/me`, kiểm tra role ADMIN, health và kiểm tra database.
   Bổ sung theo yêu cầu người dùng: `GET/PATCH /api/profile` sửa họ tên/năm sinh của chính mình;
   `POST/GET /api/admin/documents` upload/liệt kê tài liệu và `/options` lấy danh mục cho form ADMIN.
+  Danh sách môn/chủ đề dùng `GET /api/catalog/subjects`, có query `gradeLevel` lọc đúng cấp học,
+  giữ lọc môn/chủ đề active và nhóm chương; trang học có bộ chọn cấp học gọi API này.
 - Backend theo cấu trúc routes, schemas, validators, services, repositories, models, db và utils;
   SQLAlchemy/Alembic quản lý schema MySQL 11 bảng; seed có danh mục và tài khoản mẫu.
 - Frontend HTML/CSS/JS, Node `serve.cjs` cổng 4173 proxy `/api` tới Uvicorn cổng 8000;
   đăng ký/đăng nhập/phiên đã nối backend.
-- Hồ sơ và upload/danh sách tài liệu đã nối API thật. Upload lưu file riêng và metadata MySQL
+- Danh sách môn/chủ đề, hồ sơ và upload/danh sách tài liệu đã nối API thật. Upload lưu file riêng và metadata MySQL
   ở trạng thái pending/inactive, chưa có extract/chunks hoặc bật nguồn. Chat, quiz, dashboard
   và CRUD danh mục còn phần minh họa. Chế độ xem thử localhost tiếp tục dùng dữ liệu mẫu.
   Cần kiểm tra từng phần trước khi đánh dấu TK xong.

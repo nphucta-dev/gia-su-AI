@@ -140,6 +140,51 @@ async def test_admin_upload_persists_file_and_document_in_mysql(database, tmp_pa
         assert stored_file.read_bytes() == content
 
 
+@pytest.mark.anyio
+async def test_catalog_grade_filter_in_mysql(database):
+    _, sessions = database
+    suffix = uuid4().hex
+    with sessions.begin() as db:
+        learner = User(email=f"catalog-{suffix}@example.com", full_name="Người học", password_hash="test-hash")
+        lower = Subject(name=f"Toán {suffix}", grade_level="THCS")
+        higher = Subject(name=f"Toán {suffix}", grade_level="THPT")
+        hidden = Subject(name=f"Môn đã tắt {suffix}", grade_level="THCS", is_active=False)
+        empty = Subject(name=f"Môn trống {suffix}", grade_level="THCS")
+        db.add_all([
+            learner, empty,
+            Topic(subject=lower, chapter_name="Số học", name="Phân số"),
+            Topic(subject=lower, chapter_name="Số học", name="Chủ đề đã tắt", is_active=False),
+            Topic(subject=higher, chapter_name="Đại số", name="Phương trình"),
+            Topic(subject=hidden, chapter_name="Chương 1", name="Chủ đề của môn đã tắt"),
+        ])
+        db.flush()
+        learner_id, lower_id, higher_id, hidden_id, empty_id = learner.id, lower.id, higher.id, hidden.id, empty.id
+    app = create_app(
+        session_factory=sessions,
+        settings=Settings(jwt_secret="mysql-catalog-integration-" + "x" * 40),
+    )
+    token = app.state.token_service.create_access_token(learner_id).access_token
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test", headers={"Authorization": f"Bearer {token}"},
+    ) as client:
+        unfiltered = await client.get("/api/catalog/subjects")
+        assert unfiltered.status_code == 200
+        ids = {subject["id"] for subject in unfiltered.json()["subjects"]}
+        assert {lower_id, higher_id} <= ids and not {hidden_id, empty_id} & ids
+        for grade, expected_id, excluded_id in (("THCS", lower_id, higher_id), ("THPT", higher_id, lower_id)):
+            response = await client.get("/api/catalog/subjects", params={"gradeLevel": f"  {grade}  "})
+            assert response.status_code == 200
+            subjects = response.json()["subjects"]
+            assert all(subject["gradeLevel"] == grade for subject in subjects)
+            assert expected_id in {subject["id"] for subject in subjects}
+            assert excluded_id not in {subject["id"] for subject in subjects}
+            own_subject = next(subject for subject in subjects if subject["id"] == expected_id)
+            assert sum(len(chapter["topics"]) for chapter in own_subject["chapters"]) == 1
+        empty_result = await client.get("/api/catalog/subjects", params={"gradeLevel": "not-a-real-grade"})
+        assert empty_result.json() == {"subjects": []}
+
+
 def test_migration_matches_models(database):
     engine, _ = database
     assert len(set(inspect(engine).get_table_names()) - {"alembic_version"}) == 11

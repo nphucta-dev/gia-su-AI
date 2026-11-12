@@ -42,9 +42,10 @@ def seed(catalog):
     return ids
 
 
-async def test_requires_authentication():
+@pytest.mark.parametrize("query", ["", "?gradeLevel=THCS"])
+async def test_requires_authentication(query):
     async with api() as (client, _):
-        response = await client.get(SUBJECTS, headers={"Authorization": ""})
+        response = await client.get(SUBJECTS + query, headers={"Authorization": ""})
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "NOT_AUTHENTICATED"
 
@@ -78,6 +79,78 @@ async def test_admin_can_also_read_catalog():
     async with api(role="ADMIN") as (client, catalog):
         seed(catalog)
         assert (await client.get(SUBJECTS)).status_code == 200
+
+
+def seed_multiple_grade_levels(catalog):
+    seed(catalog)
+    basic = catalog.add_subject("Toán", "THCS")
+    catalog.add_topic(basic, "Đại số", "Hằng đẳng thức")
+    hidden = catalog.add_subject("Môn đã tắt", "THCS", is_active=False)
+    catalog.add_topic(hidden, "Đại số", "Chủ đề không được hiển thị")
+    no_open_topic = catalog.add_subject("Chủ đề đã tắt", "THCS")
+    catalog.add_topic(no_open_topic, "Đại số", "Chủ đề đã tắt", is_active=False)
+    catalog.add_subject("Môn chưa có chủ đề", "THCS")
+
+
+@pytest.mark.parametrize("role", ["LEARNER", "ADMIN"])
+@pytest.mark.parametrize("grade, expected_count", [("THCS", 1), ("THPT", 2)])
+async def test_filters_active_subjects_and_topics_by_grade_level(role, grade, expected_count):
+    async with api(role=role) as (client, catalog):
+        seed_multiple_grade_levels(catalog)
+        response = await client.get(SUBJECTS, params={"gradeLevel": grade})
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "no-store"
+        subjects = response.json()["subjects"]
+        assert len(subjects) == expected_count
+        assert {subject["gradeLevel"] for subject in subjects} == {grade}
+        if grade == "THCS":
+            assert subjects[0]["name"] == "Toán"
+            assert subjects[0]["chapters"][0]["topics"][0]["name"] == "Hằng đẳng thức"
+
+
+@pytest.mark.parametrize("grade", [None, "", "   "])
+async def test_omitted_or_blank_grade_returns_all_open_subjects(grade):
+    async with api() as (client, catalog):
+        seed_multiple_grade_levels(catalog)
+        params = {} if grade is None else {"gradeLevel": grade}
+        response = await client.get(SUBJECTS, params=params)
+        assert response.status_code == 200
+        subjects = response.json()["subjects"]
+        assert len(subjects) == 3
+        assert {subject["gradeLevel"] for subject in subjects} == {"THCS", "THPT"}
+
+
+async def test_grade_filter_trims_surrounding_whitespace():
+    async with api() as (client, catalog):
+        seed_multiple_grade_levels(catalog)
+        response = await client.get(SUBJECTS, params={"gradeLevel": "  THCS  "})
+        assert response.status_code == 200
+        assert [subject["gradeLevel"] for subject in response.json()["subjects"]] == ["THCS"]
+
+
+@pytest.mark.parametrize("grade", ["Không tồn tại", "TH", "thcs", "x" * 50])
+async def test_unknown_or_non_matching_grade_returns_empty_catalog(grade):
+    async with api() as (client, catalog):
+        seed_multiple_grade_levels(catalog)
+        response = await client.get(SUBJECTS, params={"gradeLevel": grade})
+        assert response.status_code == 200
+        assert response.json() == {"subjects": []}
+
+
+async def test_grade_filter_rejects_value_longer_than_database_column():
+    async with api() as (client, catalog):
+        seed_multiple_grade_levels(catalog)
+        response = await client.get(SUBJECTS, params={"gradeLevel": "x" * 51})
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+async def test_swagger_documents_grade_filter():
+    async with api() as (client, _):
+        schema = (await client.get("/openapi.json")).json()
+        parameters = schema["paths"][SUBJECTS]["get"]["parameters"]
+        grade = next(parameter for parameter in parameters if parameter["name"] == "gradeLevel")
+        assert grade["in"] == "query" and grade["required"] is False
 
 
 async def test_open_topic_returns_subject_context():

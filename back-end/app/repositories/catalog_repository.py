@@ -65,13 +65,13 @@ class InMemoryCatalogRepository:
         }
         return topic_id
 
-    async def list_active_subjects(self) -> list[CatalogSubject]:
+    async def list_active_subjects(self, *, grade_level: str | None = None) -> list[CatalogSubject]:
         result: list[CatalogSubject] = []
         ordered = sorted(
             self._subjects.items(), key=lambda item: (item[1]["name"], item[1]["grade_level"], item[0])
         )
         for subject_id, subject in ordered:
-            if not subject["is_active"]:
+            if not subject["is_active"] or (grade_level is not None and subject["grade_level"] != grade_level):
                 continue
             topics = tuple(
                 CatalogTopic(topic_id, t["chapter_name"], t["name"], t["description"])

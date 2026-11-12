@@ -18,7 +18,7 @@ TOPIC_NOT_OPEN_MESSAGE = "Chủ đề không tồn tại hoặc chưa được m
 
 
 class CatalogRepository(Protocol):
-    async def list_active_subjects(self) -> list[CatalogSubject]: ...
+    async def list_active_subjects(self, *, grade_level: str | None = None) -> list[CatalogSubject]: ...
 
     async def find_open_topic(self, topic_id: int) -> OpenTopic | None: ...
 
@@ -27,9 +27,11 @@ class CatalogService:
     def __init__(self, repository: CatalogRepository) -> None:
         self._repository = repository
 
-    async def list_subjects(self) -> SubjectListResponse:
+    async def list_subjects(self, *, grade_level: str | None = None) -> SubjectListResponse:
+        if grade_level is not None:
+            grade_level = grade_level.strip() or None
         subjects = []
-        for subject in await self._repository.list_active_subjects():
+        for subject in await self._repository.list_active_subjects(grade_level=grade_level):
             chapters: dict[str, list[TopicItem]] = {}  # dict giữ thứ tự chương xuất hiện đầu tiên
             for topic in subject.topics:
                 chapters.setdefault(topic.chapter_name, []).append(
