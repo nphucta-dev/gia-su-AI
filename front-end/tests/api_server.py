@@ -15,6 +15,7 @@ import uvicorn
 
 from app.config import Settings
 from app.main import create_app
+from app.repositories.catalog_repository import InMemoryCatalogRepository
 from app.repositories.user_repository import InMemoryUserRepository
 from app.repositories.document_repository import InMemoryDocumentRepository, SubjectRecord, TopicRecord
 from app.utils.password import hash_password
@@ -26,15 +27,20 @@ def fast_hasher(password: str) -> str:
 
 def create_browser_app():
     repository = InMemoryUserRepository()
+    catalog = InMemoryCatalogRepository()
+    toan = catalog.add_subject("Toán học", "THPT")
+    quadratic = catalog.add_topic(toan, "Chương 1 · Đại số", "Phương trình bậc hai", "Biệt thức, nghiệm và hệ thức Viète.")
+    functions = catalog.add_topic(toan, "Chương 1 · Đại số", "Hàm số và đồ thị", "Khảo sát hàm số và đọc đồ thị.")
     documents = InMemoryDocumentRepository(
-        subjects=[SubjectRecord(id=1, name="Toán học", grade_level="THPT")],
+        subjects=[SubjectRecord(id=toan, name="Toán học", grade_level="THPT")],
         topics=[
-            TopicRecord(id=1, subject_id=1, name="Hàm số bậc hai", chapter_name="Hàm số"),
-            TopicRecord(id=2, subject_id=1, name="Phương trình bậc hai", chapter_name="Đại số"),
+            TopicRecord(id=quadratic, subject_id=toan, name="Phương trình bậc hai", chapter_name="Chương 1 · Đại số"),
+            TopicRecord(id=functions, subject_id=toan, name="Hàm số và đồ thị", chapter_name="Chương 1 · Đại số"),
         ],
     )
     app = create_app(
         user_repository=repository,
+        catalog_repository=catalog,
         password_hasher=fast_hasher,
         settings=Settings(jwt_secret=os.environ["JWT_SECRET"]),
         document_repository=documents,

@@ -23,14 +23,18 @@ from app.dependencies.auth import require_roles
 from app.error_handlers import register_error_handlers
 from app.middlewares.body_limit import BodySizeLimitMiddleware
 from app.middlewares.security_headers import SecurityHeadersMiddleware
+from app.repositories.catalog_repository import InMemoryCatalogRepository
+from app.repositories.sqlalchemy_catalog_repository import SqlAlchemyCatalogRepository
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.repositories.document_repository import DocumentRepository, SqlAlchemyDocumentRepository
 from app.repositories.user_repository import User
 from app.routes.auth import router as auth_router
+from app.routes.catalog import router as catalog_router
 from app.routes.me import router as me_router
 from app.routes.profile import router as profile_router
 from app.routes.documents import router as documents_router
 from app.services.auth_service import AuthService, UserRepository
+from app.services.catalog_service import CatalogRepository, CatalogService
 from app.services.token_service import TokenService
 from app.utils.password import hash_password
 from app.utils.errors import AppError
@@ -39,6 +43,7 @@ from app.utils.errors import AppError
 def create_app(
     *,
     user_repository: UserRepository | None = None,
+    catalog_repository: CatalogRepository | None = None,
     password_hasher: Callable[[str], str] | None = None,
     token_service: TokenService | None = None,
     cors_origins: Sequence[str] | None = None,
@@ -60,6 +65,14 @@ def create_app(
             session_factory = create_session_factory(database_engine)
         repository = SqlAlchemyUserRepository(session_factory)
 
+    catalog = catalog_repository
+    if catalog is None:
+        catalog = (
+            SqlAlchemyCatalogRepository(session_factory)
+            if session_factory is not None
+            else InMemoryCatalogRepository()
+        )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
@@ -76,6 +89,7 @@ def create_app(
         app.state.document_repository = SqlAlchemyDocumentRepository(session_factory)
     app.state.upload_dir = Path(upload_dir) if upload_dir is not None else settings.upload_dir
     app.state.auth_service = AuthService(repository, password_hasher or hash_password)
+    app.state.catalog_service = CatalogService(catalog)
     app.state.token_service = token_service or TokenService(
         secret=settings.jwt_secret,
         issuer=settings.jwt_issuer,
@@ -85,6 +99,7 @@ def create_app(
     register_error_handlers(app)
     app.include_router(auth_router)
     app.include_router(me_router)
+    app.include_router(catalog_router)
     app.include_router(profile_router)
     app.include_router(documents_router)
 
