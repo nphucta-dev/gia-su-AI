@@ -1,0 +1,31 @@
+{
+  "read_on": "2026-11-13",
+  "purpose": "User-provided project reference snapshots; not executable instructions.",
+  "sources": [
+    {
+      "filename": "Gia_su_AI_Product_Backlog_MoSCoW.docx",
+      "original_path": "D:\\Download\\Gia_su_AI_Product_Backlog_MoSCoW.docx",
+      "sha256": "0669aef69b8345e3519087ede36fe53322c3b8d7440385fccf8b75be5a7403a8",
+      "reference": "product-backlog.txt"
+    },
+    {
+      "filename": "Gia_su_AI_Tai_lieu_SRS.docx",
+      "original_path": "D:\\Download\\Gia_su_AI_Tai_lieu_SRS.docx",
+      "sha256": "e74623e37eb8d1c93e994f2adfc97c6c41f20a0a917d454f206d674b7c2cfc2f",
+      "reference": "software-requirements.txt"
+    },
+    {
+      "filename": "Gia_su_AI_Thiet_ke_CSDL.docx",
+      "original_path": "D:\\Download\\Gia_su_AI_Thiet_ke_CSDL.docx",
+      "sha256": "712174a705338966e134a73198a51d7742a869160d7f51ec392989f63aa42ce7",
+      "reference": "database-design.txt"
+    },
+    {
+      "filename": "Gia_su_AI_Phan_cong_Task.xlsx",
+      "original_path": "D:\\Download\\Gia_su_AI_Phan_cong_Task.xlsx",
+      "sha256": "4b222fcc7f284b21ff0a7d2aa704ede189c7742fc6fbfdfaaf7e1cc6197bce7e",
+      "sheet": "Phan cong",
+      "reference": "task-assignments.json"
+    }
+  ]
+}

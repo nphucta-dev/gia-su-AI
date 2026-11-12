@@ -6,7 +6,7 @@ bộ nhớ có thể truyền vào ``create_app`` cho các test không cần dat
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 
 from app.utils.errors import DuplicateEmailError
@@ -21,6 +21,7 @@ class User:
     role: str
     created_at: str
     is_active: bool = True
+    birth_year: int | None = None
 
 
 def parse_user_id(user_id: int | str) -> int | None:
@@ -67,3 +68,23 @@ class InMemoryUserRepository:
         self._users[user.id] = user
         self._id_by_email[email] = user.id
         return user
+
+    async def update_profile(
+        self,
+        user_id: int,
+        *,
+        name: str | None = None,
+        birth_year: int | None = None,
+        update_birth_year: bool = False,
+    ) -> User | None:
+        user = await self.find_by_id(user_id)
+        if user is None or not user.is_active:
+            return user
+        # Chỉ cập nhật trường hồ sơ; email, mật khẩu, vai trò và ID được giữ nguyên.
+        updated = replace(
+            user,
+            name=name if name is not None else user.name,
+            birth_year=birth_year if update_birth_year else user.birth_year,
+        )
+        self._users[user.id] = updated
+        return updated

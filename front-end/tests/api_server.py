@@ -17,6 +17,7 @@ from app.config import Settings
 from app.main import create_app
 from app.repositories.catalog_repository import InMemoryCatalogRepository
 from app.repositories.user_repository import InMemoryUserRepository
+from app.repositories.document_repository import InMemoryDocumentRepository, SubjectRecord, TopicRecord
 from app.utils.password import hash_password
 
 
@@ -28,13 +29,22 @@ def create_browser_app():
     repository = InMemoryUserRepository()
     catalog = InMemoryCatalogRepository()
     toan = catalog.add_subject("Toán học", "THPT")
-    catalog.add_topic(toan, "Chương 1 · Đại số", "Phương trình bậc hai", "Biệt thức, nghiệm và hệ thức Viète.")
-    catalog.add_topic(toan, "Chương 1 · Đại số", "Hàm số và đồ thị", "Khảo sát hàm số và đọc đồ thị.")
+    quadratic = catalog.add_topic(toan, "Chương 1 · Đại số", "Phương trình bậc hai", "Biệt thức, nghiệm và hệ thức Viète.")
+    functions = catalog.add_topic(toan, "Chương 1 · Đại số", "Hàm số và đồ thị", "Khảo sát hàm số và đọc đồ thị.")
+    documents = InMemoryDocumentRepository(
+        subjects=[SubjectRecord(id=toan, name="Toán học", grade_level="THPT")],
+        topics=[
+            TopicRecord(id=quadratic, subject_id=toan, name="Phương trình bậc hai", chapter_name="Chương 1 · Đại số"),
+            TopicRecord(id=functions, subject_id=toan, name="Hàm số và đồ thị", chapter_name="Chương 1 · Đại số"),
+        ],
+    )
     app = create_app(
         user_repository=repository,
         catalog_repository=catalog,
         password_hasher=fast_hasher,
         settings=Settings(jwt_secret=os.environ["JWT_SECRET"]),
+        document_repository=documents,
+        upload_dir=Path(os.environ["BROWSER_UPLOAD_DIR"]),
     )
     original_lifespan = app.router.lifespan_context
 

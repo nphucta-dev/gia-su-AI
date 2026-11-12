@@ -8,6 +8,7 @@ Chạy phát triển (từ thư mục back-end/)::
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated, Callable, Sequence
 
 from fastapi import Depends, FastAPI, Request
@@ -16,7 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.config import Settings, load_settings
+from app.config import DEFAULT_UPLOAD_BODY_BYTES, Settings, load_settings
 from app.db.database import create_database_engine, create_session_factory
 from app.dependencies.auth import require_roles
 from app.error_handlers import register_error_handlers
@@ -25,10 +26,13 @@ from app.middlewares.security_headers import SecurityHeadersMiddleware
 from app.repositories.catalog_repository import InMemoryCatalogRepository
 from app.repositories.sqlalchemy_catalog_repository import SqlAlchemyCatalogRepository
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
+from app.repositories.document_repository import DocumentRepository, SqlAlchemyDocumentRepository
 from app.repositories.user_repository import User
 from app.routes.auth import router as auth_router
 from app.routes.catalog import router as catalog_router
 from app.routes.me import router as me_router
+from app.routes.profile import router as profile_router
+from app.routes.documents import router as documents_router
 from app.services.auth_service import AuthService, UserRepository
 from app.services.catalog_service import CatalogRepository, CatalogService
 from app.services.token_service import TokenService
@@ -45,6 +49,8 @@ def create_app(
     cors_origins: Sequence[str] | None = None,
     settings: Settings | None = None,
     session_factory: sessionmaker[Session] | None = None,
+    document_repository: DocumentRepository | None = None,
+    upload_dir: Path | str | None = None,
 ) -> FastAPI:
     """Tạo ứng dụng. Các phụ thuộc được truyền vào để dễ thay kho dữ liệu (ví dụ CSDL
     thật) và để test độc lập, không cần mở cổng thật."""
@@ -78,6 +84,10 @@ def create_app(
     app = FastAPI(title="Gia Sư AI API", version="0.1.0", lifespan=lifespan)
     app.state.session_factory = session_factory
     app.state.user_repository = repository
+    app.state.document_repository = document_repository
+    if document_repository is None and session_factory is not None:
+        app.state.document_repository = SqlAlchemyDocumentRepository(session_factory)
+    app.state.upload_dir = Path(upload_dir) if upload_dir is not None else settings.upload_dir
     app.state.auth_service = AuthService(repository, password_hasher or hash_password)
     app.state.catalog_service = CatalogService(catalog)
     app.state.token_service = token_service or TokenService(
@@ -90,6 +100,8 @@ def create_app(
     app.include_router(auth_router)
     app.include_router(me_router)
     app.include_router(catalog_router)
+    app.include_router(profile_router)
+    app.include_router(documents_router)
 
     @app.get("/api/health", tags=["system"])
     async def health() -> dict[str, str]:
@@ -116,12 +128,16 @@ def create_app(
         return {"role": user.role, "message": "Bạn có quyền quản trị."}
 
     # Middleware thêm sau nằm ở ngoài: CORS ngoài cùng nên mọi phản hồi (kể cả 413) đều có header CORS.
-    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes)
+    app.add_middleware(
+        BodySizeLimitMiddleware,
+        max_bytes=settings.max_body_bytes,
+        upload_max_bytes=DEFAULT_UPLOAD_BODY_BYTES,
+    )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization"],
         max_age=600,
     )

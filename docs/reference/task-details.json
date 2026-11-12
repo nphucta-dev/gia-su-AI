@@ -1,0 +1,482 @@
+{
+  "source_file": "Gia_su_AI_Phan_cong_Task.xlsx",
+  "source_sha256": "4b222fcc7f284b21ff0a7d2aa704ede189c7742fc6fbfdfaaf7e1cc6197bce7e",
+  "usage": "Use only task title/description and concrete work. IDs are lookup labels only. Ignore all other workbook columns.",
+  "tasks": [
+    {
+      "id": "TK-001",
+      "title": "Form đăng ký",
+      "description": "Form đăng ký email/mật khẩu + hiển thị lỗi trùng email"
+    },
+    {
+      "id": "TK-002",
+      "title": "API đăng ký",
+      "description": "API đăng ký: email unique, validate mật khẩu >=8 ký tự"
+    },
+    {
+      "id": "TK-003",
+      "title": "Kiểm tra form đăng ký",
+      "description": "Validate form phía trình duyệt và báo lỗi tiếng Việt"
+    },
+    {
+      "id": "TK-004",
+      "title": "Kiểm tra dữ liệu đăng ký (API)",
+      "description": "Validate server và chỉ lưu password_hash; không lưu mật khẩu thô"
+    },
+    {
+      "id": "TK-005",
+      "title": "Form đăng nhập",
+      "description": "Form đăng nhập, lưu trạng thái xác thực và chuyển trang"
+    },
+    {
+      "id": "TK-006",
+      "title": "API đăng nhập",
+      "description": "API login, kiểm tra mật khẩu hash và cấp token/phiên"
+    },
+    {
+      "id": "TK-007",
+      "title": "Đăng xuất phía client",
+      "description": "Nút đăng xuất và xóa thông tin token ở client"
+    },
+    {
+      "id": "TK-008",
+      "title": "Xác thực token API",
+      "description": "API kiểm tra xác thực, từ chối token không hợp lệ"
+    },
+    {
+      "id": "TK-009",
+      "title": "Trang hồ sơ cá nhân",
+      "description": "Trang hồ sơ xem và sửa họ tên/năm sinh"
+    },
+    {
+      "id": "TK-010",
+      "title": "API hồ sơ cá nhân",
+      "description": "API GET/PATCH hồ sơ người dùng có kiểm tra quyền"
+    },
+    {
+      "id": "TK-011",
+      "title": "Phân quyền tài khoản",
+      "description": "Phân biệt vai trò LEARNER và ADMIN, chỉ tài khoản active được truy cập"
+    },
+    {
+      "id": "TK-012",
+      "title": "Danh sách môn học",
+      "description": "Trang danh sách môn theo cấp học, hiển thị trạng thái trống"
+    },
+    {
+      "id": "TK-013",
+      "title": "API danh sách môn",
+      "description": "API trả subjects đang active, lọc theo cấp học"
+    },
+    {
+      "id": "TK-014",
+      "title": "Nhóm chủ đề theo chương",
+      "description": "Hiển thị chủ đề nhóm theo chapter_name của từng môn"
+    },
+    {
+      "id": "TK-015",
+      "title": "Chọn chủ đề học",
+      "description": "Chọn một chủ đề để bắt đầu chat hoặc luyện tập"
+    },
+    {
+      "id": "TK-016",
+      "title": "CRUD môn học và chủ đề",
+      "description": "Tạo và sửa tên, cấp học môn; tên/chương/mô tả chủ đề"
+    },
+    {
+      "id": "TK-017",
+      "title": "Bật/tắt môn học và chủ đề",
+      "description": "Kích hoạt và vô hiệu hóa môn/chủ đề bằng is_active"
+    },
+    {
+      "id": "TK-018",
+      "title": "API tạo phiên chat",
+      "description": "Tạo phiên chat gắn tài khoản và chủ đề"
+    },
+    {
+      "id": "TK-019",
+      "title": "Giao diện chat AI",
+      "description": "Khung chat, ô nhập, tin nhắn user/AI và nút gửi"
+    },
+    {
+      "id": "TK-020",
+      "title": "API hỏi đáp LLM",
+      "description": "API gửi câu hỏi, gọi LLM và trả câu trả lời tiếng Việt"
+    },
+    {
+      "id": "TK-021",
+      "title": "Quản lý ngữ cảnh chat",
+      "description": "Đưa các tin gần nhất của phiên vào ngữ cảnh gọi LLM"
+    },
+    {
+      "id": "TK-022",
+      "title": "Trạng thái chờ phản hồi",
+      "description": "Hiển thị trạng thái đang xử lý và khóa nút gửi khi chờ"
+    },
+    {
+      "id": "TK-023",
+      "title": "Lưu tin nhắn hội thoại",
+      "description": "Lưu tin nhắn role=user/assistant kèm thời gian gửi"
+    },
+    {
+      "id": "TK-024",
+      "title": "Sidebar lịch sử chat",
+      "description": "Sidebar lịch sử và mở lại nội dung phiên chat"
+    },
+    {
+      "id": "TK-025",
+      "title": "API lịch sử hội thoại",
+      "description": "API liệt kê session và lấy messages đúng user"
+    },
+    {
+      "id": "TK-026",
+      "title": "Chặn câu hỏi rỗng (UI)",
+      "description": "Không cho gửi câu hỏi trắng/rỗng trên giao diện"
+    },
+    {
+      "id": "TK-027",
+      "title": "Chặn câu hỏi rỗng (API)",
+      "description": "API từ chối câu hỏi rỗng/chỉ chứa khoảng trắng"
+    },
+    {
+      "id": "TK-028",
+      "title": "Thông báo lỗi AI (UI)",
+      "description": "Giao diện thông báo lỗi AI và nút gửi lại"
+    },
+    {
+      "id": "TK-029",
+      "title": "Xử lý lỗi và retry AI",
+      "description": "Xử lý timeout/429/mất mạng, giữ tin nhắn và cho retry"
+    },
+    {
+      "id": "TK-030",
+      "title": "Thiết kế prompt Socratic",
+      "description": "Thiết kế system prompt cho câu hỏi gợi mở ở lượt đầu"
+    },
+    {
+      "id": "TK-031",
+      "title": "Nút gợi ý 3 mức",
+      "description": "Nút gợi ý cấp 1–3 và hiển thị hint level"
+    },
+    {
+      "id": "TK-032",
+      "title": "Điều phối gợi ý 3 mức",
+      "description": "Điều phối thang gợi ý, lưu hint_level cho message AI"
+    },
+    {
+      "id": "TK-033",
+      "title": "Nút giải thích bổ sung",
+      "description": "Nút Đơn giản hơn/Cho ví dụ trên chat"
+    },
+    {
+      "id": "TK-034",
+      "title": "API giải thích bổ sung",
+      "description": "API prompt bổ sung theo ngữ cảnh khi đổi cách giải thích"
+    },
+    {
+      "id": "TK-035",
+      "title": "Modal xác nhận lời giải",
+      "description": "Modal xác nhận trước khi xem lời giải"
+    },
+    {
+      "id": "TK-036",
+      "title": "API xem lời giải",
+      "description": "API xem lời giải yêu cầu cờ xác nhận hợp lệ"
+    },
+    {
+      "id": "TK-037",
+      "title": "Đánh dấu lời giải đầy đủ",
+      "description": "Lưu is_full_solution cho tin nhắn lời giải đã xác nhận"
+    },
+    {
+      "id": "TK-038",
+      "title": "Giao diện tải tài liệu",
+      "description": "Giao diện quản trị chọn chủ đề, chọn/tải file PDF/TXT"
+    },
+    {
+      "id": "TK-039",
+      "title": "API tải tài liệu",
+      "description": "API upload, kiểm tra quyền ADMIN, gắn documents.topic_id"
+    },
+    {
+      "id": "TK-040",
+      "title": "Kiểm tra file tải lên (UI)",
+      "description": "Hiện quy định file, lỗi định dạng và kích thước"
+    },
+    {
+      "id": "TK-041",
+      "title": "Kiểm tra file tải lên (API)",
+      "description": "Server xác thực MIME/đuôi/kích thước upload"
+    },
+    {
+      "id": "TK-042",
+      "title": "Trích xuất văn bản tài liệu",
+      "description": "Trích văn bản, chuyển trạng thái pending/ready/error"
+    },
+    {
+      "id": "TK-043",
+      "title": "Tách đoạn tài liệu",
+      "description": "Tách văn bản thành chunk và lưu thứ tự chunk_index"
+    },
+    {
+      "id": "TK-044",
+      "title": "Tra cứu đoạn theo từ khóa",
+      "description": "Tra cứu đoạn liên quan theo chủ đề bằng từ khóa"
+    },
+    {
+      "id": "TK-045",
+      "title": "Lọc nguồn hợp lệ",
+      "description": "Chỉ tìm trong documents có is_active=true và status=ready"
+    },
+    {
+      "id": "TK-046",
+      "title": "Tìm kiếm vector pgvector",
+      "description": "Tạo embedding và tìm kiếm vector pgvector nếu dữ liệu cho phép"
+    },
+    {
+      "id": "TK-047",
+      "title": "Lưu nguồn trích dẫn",
+      "description": "Lưu danh sách nguồn tham khảo của phản hồi trong source_refs"
+    },
+    {
+      "id": "TK-048",
+      "title": "Hiển thị nguồn tham khảo",
+      "description": "Hiện nguồn tham khảo của AI hoặc thông báo thiếu nguồn"
+    },
+    {
+      "id": "TK-049",
+      "title": "API nguồn trích dẫn",
+      "description": "API gửi source_refs hợp lệ và ghi rõ khi không có chunk"
+    },
+    {
+      "id": "TK-050",
+      "title": "Chọn chủ đề và độ khó quiz",
+      "description": "Chọn chủ đề và mức easy/medium/hard"
+    },
+    {
+      "id": "TK-051",
+      "title": "AI sinh quiz JSON",
+      "description": "Gọi LLM sinh JSON gồm 5 câu, 4 lựa chọn A–D và lời giải thích"
+    },
+    {
+      "id": "TK-052",
+      "title": "Kiểm tra và lưu quiz",
+      "description": "Validate 5 câu, đáp án A–D và giải thích trước khi lưu toàn bộ"
+    },
+    {
+      "id": "TK-053",
+      "title": "Giao diện làm quiz",
+      "description": "Hiển thị lần lượt 5 câu cùng lựa chọn A–D"
+    },
+    {
+      "id": "TK-054",
+      "title": "Cảnh báo câu chưa trả lời",
+      "description": "Đánh dấu đáp án, cảnh báo câu chưa làm trước khi nộp"
+    },
+    {
+      "id": "TK-055",
+      "title": "Lỗi sinh quiz (UI)",
+      "description": "Giao diện lỗi tạo quiz và nút tạo lại bài"
+    },
+    {
+      "id": "TK-056",
+      "title": "Lỗi sinh quiz (API)",
+      "description": "Trả lỗi chuẩn khi JSON LLM không hợp lệ và cho thử lại"
+    },
+    {
+      "id": "TK-057",
+      "title": "Gửi đáp án quiz",
+      "description": "Lưu state đáp án A–D khi làm bài, gửi payload nộp"
+    },
+    {
+      "id": "TK-058",
+      "title": "API lưu câu trả lời",
+      "description": "API ghi 01 quiz_answer / question_id, gắn submitted answer"
+    },
+    {
+      "id": "TK-059",
+      "title": "API chấm điểm quiz",
+      "description": "So sánh đáp án, tính score 0–100 và chặn nộp lặp"
+    },
+    {
+      "id": "TK-060",
+      "title": "Trang kết quả quiz",
+      "description": "Trang kết quả: điểm, đáp án đúng và giải thích sai"
+    },
+    {
+      "id": "TK-061",
+      "title": "API trả kết quả quiz",
+      "description": "API kết quả trả từng lựa chọn, đúng/sai, explanation"
+    },
+    {
+      "id": "TK-062",
+      "title": "Cập nhật thống kê học",
+      "description": "Cộng total_quizzes, correct_count, total_count khi quiz hoàn tất"
+    },
+    {
+      "id": "TK-063",
+      "title": "Tính mức thành thạo",
+      "description": "Tính mastery_percent = correct_count / total_count × 100"
+    },
+    {
+      "id": "TK-064",
+      "title": "Trang dashboard",
+      "description": "Trang dashboard: tổng quiz, điểm trung bình và phiên chat"
+    },
+    {
+      "id": "TK-065",
+      "title": "API thống kê dashboard",
+      "description": "API thống kê quiz completed và số chat_sessions theo user"
+    },
+    {
+      "id": "TK-066",
+      "title": "Danh sách chủ đề cần ôn",
+      "description": "Danh sách các chủ đề cần ôn kèm % thành thạo"
+    },
+    {
+      "id": "TK-067",
+      "title": "API gợi ý chủ đề ôn",
+      "description": "API xếp chủ đề theo mastery_percent tăng dần"
+    },
+    {
+      "id": "TK-068",
+      "title": "Trang quản trị môn/chủ đề",
+      "description": "Trang quản trị môn/chủ đề dùng API CRUD và trạng thái active"
+    },
+    {
+      "id": "TK-069",
+      "title": "Trang quản trị tài liệu",
+      "description": "Trang admin upload, xem trạng thái và bật/tắt tài liệu"
+    },
+    {
+      "id": "TK-070",
+      "title": "API quản trị tài liệu",
+      "description": "API listing/update is_active, status tài liệu đúng quyền"
+    },
+    {
+      "id": "TK-071",
+      "title": "Phân quyền API ADMIN",
+      "description": "Chặn LEARNER gọi API ADMIN với HTTP 403"
+    },
+    {
+      "id": "TK-072",
+      "title": "Kiểm soát trạng thái nguồn",
+      "description": "Không cho bật nguồn status khác ready; tài liệu tắt không dùng trong chat mới"
+    },
+    {
+      "id": "TK-073",
+      "title": "UI đánh giá phản hồi AI",
+      "description": "Nút “Hữu ích” và “Chưa hữu ích” cho tin assistant"
+    },
+    {
+      "id": "TK-074",
+      "title": "API cập nhật phản hồi",
+      "description": "Cập nhật feedback trên cùng tin nhắn, không tạo bản ghi mới"
+    },
+    {
+      "id": "TK-075",
+      "title": "Hạn mức lượt gọi AI",
+      "description": "Giới hạn mặc định 30 yêu cầu AI thành công/ngày/tài khoản"
+    },
+    {
+      "id": "TK-076",
+      "title": "UI hiển thị quota",
+      "description": "Giao diện hiển thị còn bao nhiêu lượt và thời điểm reset"
+    },
+    {
+      "id": "TK-077",
+      "title": "API thông tin quota",
+      "description": "API quota trả remaining và next_reset_at rõ ràng"
+    },
+    {
+      "id": "TK-078",
+      "title": "UI truy cập khi hết quota",
+      "description": "Cho phép truy cập lịch sử và dashboard khi hết quota"
+    },
+    {
+      "id": "TK-079",
+      "title": "API truy cập khi hết quota",
+      "description": "Tách kiểm tra quota khỏi GET lịch sử và GET dashboard"
+    },
+    {
+      "id": "TK-080",
+      "title": "Băm và kiểm tra mật khẩu",
+      "description": "Băm và verify password bằng bcrypt/Argon2"
+    },
+    {
+      "id": "TK-081",
+      "title": "Bảo vệ khóa API LLM",
+      "description": "Bảo vệ LLM API key bằng biến môi trường trên server"
+    },
+    {
+      "id": "TK-082",
+      "title": "Kiểm tra quyền sở hữu dữ liệu",
+      "description": "Kiểm tra chủ sở hữu khi truy cập chat/quiz/tiến độ theo ID"
+    },
+    {
+      "id": "TK-083",
+      "title": "Nhãn cảnh báo nội dung AI",
+      "description": "Hiện nhãn cố định Câu trả lời do AI tạo tại khung chat"
+    },
+    {
+      "id": "TK-084",
+      "title": "Ẩn dữ liệu cá nhân khỏi prompt",
+      "description": "Loại email/họ tên/mật khẩu khỏi payload gửi LLM"
+    },
+    {
+      "id": "TK-085",
+      "title": "Migration 11 bảng CSDL",
+      "description": "Migration PostgreSQL đủ 11 bảng; FK, UNIQUE, CHECK hợp lệ"
+    },
+    {
+      "id": "TK-086",
+      "title": "Kiểm thử UI đăng nhập/chat",
+      "description": "Test thủ công UI auth/chat: nhập sai, phiên riêng, lỗi AI"
+    },
+    {
+      "id": "TK-087",
+      "title": "Kiểm thử UI quiz/admin",
+      "description": "Test thủ công UI quiz/admin/dashboard và responsive"
+    },
+    {
+      "id": "TK-088",
+      "title": "Pytest Auth, Quiz, quyền truy cập",
+      "description": "Pytest Auth, permissions, quiz 5 câu và nộp 1 lần"
+    },
+    {
+      "id": "TK-089",
+      "title": "Kiểm thử AI và RAG",
+      "description": "Test AI/RAG: prompt, trích dẫn, lỗi LLM/quota"
+    },
+    {
+      "id": "TK-090",
+      "title": "Responsive giao diện chat",
+      "description": "Responsive 360px cho đăng nhập, danh mục, chat"
+    },
+    {
+      "id": "TK-091",
+      "title": "Responsive quiz/dashboard",
+      "description": "Responsive 360px cho quiz, dashboard, admin"
+    },
+    {
+      "id": "TK-092",
+      "title": "Khởi tạo repository và README",
+      "description": "Repository, README, .env.example và hướng dẫn chạy local"
+    },
+    {
+      "id": "TK-093",
+      "title": "Triển khai demo",
+      "description": "Triển khai demo và lưu cấu hình HTTPS khi có máy chủ công khai"
+    },
+    {
+      "id": "TK-094",
+      "title": "Kịch bản demo ứng dụng",
+      "description": "Chuẩn bị kịch bản thao tác demo từ đăng nhập tới quiz"
+    },
+    {
+      "id": "TK-095",
+      "title": "Seed dữ liệu demo",
+      "description": "Seed 1–2 môn, 5–10 chủ đề/môn + tài liệu nguồn hợp lệ"
+    }
+  ]
+}
