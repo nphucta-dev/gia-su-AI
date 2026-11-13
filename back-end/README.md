@@ -280,13 +280,18 @@ Các API sau yêu cầu token của **ADMIN đang hoạt động**; LEARNER nh�
 | --- | --- |
 | `GET /api/admin/documents/options` | Môn và chủ đề active từ MySQL cho form upload; trả `subjects`, mỗi môn có `topics`. |
 | `GET /api/admin/documents` | Danh sách tài liệu đã lưu; trả `documents`. |
-| `POST /api/admin/documents` | Tải PDF/TXT và tạo metadata; trả `201` với `message`, `document`. |
+| `POST /api/admin/documents` | Tải PDF/TXT, trích văn bản và lưu các đoạn; trả `201` với `message`, `document`. |
+| `POST /api/admin/documents/{id}/process` | Xử lý tài liệu cũ đang chờ hoặc thử lại tài liệu lỗi; không cần body, trả `200`. |
 
 POST dùng **multipart/form-data** với `file`, `topic_id`, `title` (1–200 ký tự). File tối đa **10 MiB**, không rỗng, đuôi và MIME phải khớp PDF/TXT. PDF kiểm tra chữ ký `%PDF-`; TXT phải là UTF-8 hợp lệ. Chủ đề và môn cha phải tồn tại, đang active. Swagger `/docs` có form chọn file sau khi Authorize bằng token ADMIN.
 
-File lưu bằng tên ngẫu nhiên trong `back-end/storage/documents/`, metadata vào bảng `documents` với `status=pending`, `is_active=false`. `file_path` lưu tên file tương đối trong kho riêng, không nhận đường dẫn từ client và không trả đường dẫn nội bộ. Nếu ghi metadata thất bại, file mới tạo được dọn bỏ. Thư mục này không phục vụ như tài nguyên tĩnh và đã được Git bỏ qua.
+File lưu bằng tên ngẫu nhiên trong `back-end/storage/documents/`, metadata ban đầu có `status=pending`, `is_active=false`. Sau đó backend xử lý ngay trong yêu cầu upload: đọc TXT UTF-8/BOM hoặc trích văn bản PDF bằng `pypdf`, chuẩn hóa văn bản và chia đoạn. Thành công chuyển sang `ready`; tệp không thể xử lý chuyển sang `error` và vẫn giữ file để kiểm tra/thử lại. `document` trả thêm `processedAt` và `chunkCount`. `file_path` lưu tên file tương đối trong kho riêng, không nhận đường dẫn từ client và không trả đường dẫn nội bộ. Nếu ghi metadata ban đầu thất bại, file mới tạo được dọn bỏ. Thư mục này không phục vụ như tài nguyên tĩnh và đã được Git bỏ qua.
 
-Đặt `UPLOAD_DIR` để đổi nơi lưu; đường dẫn tương đối tính từ `back-end/`. Khi chuyển môi trường cần mang theo cả kho file và database. Bước trích xuất PDF/TXT, tạo chunks và bật nguồn là nghiệp vụ tiếp theo; API upload chưa chuyển tài liệu sang ready.
+TK-042 và TK-043 không gọi model AI hoặc OCR. PDF cần có lớp văn bản và không mã hóa. Các giới hạn xử lý hiện tại: 200 trang PDF, 1.000.000 ký tự văn bản, luồng nội dung mỗi trang tối đa 4 MiB; mỗi đoạn tối đa 1.000 ký tự, chồng lấp tối đa 150 ký tự, tối đa 2.000 đoạn. Đây là các lựa chọn triển khai, có hằng số trong `app/services/document_text.py`.
+
+Các đoạn được lưu vào `document_chunks` theo `chunk_index` bắt đầu từ 0, cùng transaction với `status` và `processed_at` trong `documents`. Ghi lỗi sẽ rollback để tránh `ready` khi thiếu đoạn. Xử lý lại một tài liệu đã `ready` không tạo trùng đoạn; các yêu cầu đồng thời được bảo vệ bằng khóa bản ghi cha. Nguồn sau xử lý vẫn tắt, chờ phần quản trị kích hoạt.
+
+Đặt `UPLOAD_DIR` để đổi nơi lưu; đường dẫn tương đối tính từ `back-end/`. Khi chuyển môi trường cần mang theo cả kho file và database. Tài liệu cũ đang `pending` có thể gọi API `/process` hoặc bấm **Xử lý** ở trang quản trị. Không cần migration mới.
 
 Middleware giữ giới hạn 10 KB cho JSON; riêng POST upload nhận tối đa 10 MiB cộng 64 KiB multipart. Service vẫn kiểm tra giới hạn file riêng, kể cả request chunked. CORS cho phép PATCH. Phản hồi tài khoản, hồ sơ và tài liệu quản trị có `Cache-Control: no-store`.
 
@@ -295,4 +300,4 @@ Middleware giữ giới hạn 10 KB cho JSON; riêng POST upload nhận tối đ
 - Các API ghi danh mục, chat và quiz sử dụng model trong `app/models/` và session transaction của `app/db/database.py`; kiểm tra chủ sở hữu và quy tắc nghiệp vụ theo tài liệu SRS trước khi lưu dữ liệu.
 - Chưa có refresh token và đăng xuất thu hồi token: token đã phát hành vẫn dùng được đến khi hết hạn. Nếu cần thu hồi ngay, thêm danh sách token bị thu hồi hoặc số phiên bản token theo người dùng.
 - Giới hạn số lần gọi theo IP cho `/api/auth/register` (mỗi lần băm tốn CPU và 32 MiB bộ nhớ).
-- Danh sách và quản lý môn/chủ đề, hồ sơ, upload/danh sách tài liệu đã dùng API thật. Nội dung chat, quiz và dashboard còn phần minh họa; xử lý nội dung file và bật/tắt nguồn chưa triển khai.
+- Danh sách và quản lý môn/chủ đề, hồ sơ, upload/liệt kê/xử lý tài liệu đã dùng API thật. Nội dung chat, quiz và dashboard còn phần minh họa; bật/tắt nguồn và truy xuất tài liệu cho AI chưa triển khai.

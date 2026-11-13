@@ -204,8 +204,12 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   SQLAlchemy/Alembic quản lý schema MySQL 11 bảng; seed có danh mục và tài khoản mẫu.
 - Frontend HTML/CSS/JS, Node `serve.cjs` cổng 4173 proxy `/api` tới Uvicorn cổng 8000;
   đăng ký/đăng nhập/phiên đã nối backend.
-- Danh sách và quản lý môn/chủ đề, hồ sơ, upload/danh sách tài liệu đã nối API thật. Upload lưu file riêng và metadata MySQL
-  ở trạng thái pending/inactive, chưa có extract/chunks hoặc bật nguồn. Chat, quiz, dashboard
+- Danh sách và quản lý môn/chủ đề, hồ sơ, upload/danh sách tài liệu đã nối API thật. TK-042/043 đã nối
+  trích văn bản PDF/TXT và lưu `document_chunks` theo thứ tự, không gọi AI/OCR. Upload xử lý đồng bộ;
+  thành công `ready`, lỗi `error`, cập nhật `processed_at` và trả `chunkCount`/`processedAt`.
+  ADMIN có `POST /api/admin/documents/{id}/process` để xử lý pending cũ hoặc thử lại lỗi; UI có nút tương ứng.
+  Chunks và trạng thái được ghi cùng transaction, xử lý ready không tạo đoạn trùng. Nguồn vẫn inactive;
+  chưa triển khai bật nguồn hoặc retrieval. Chat, quiz, dashboard
   còn phần minh họa. Chế độ xem thử localhost tiếp tục dùng dữ liệu mẫu.
   Cần kiểm tra từng phần trước khi đánh dấu TK xong.
 - Venv mặc định ở `back-end/venv`; các lệnh chạy ở README hiện hành. Không tự chạy migration,

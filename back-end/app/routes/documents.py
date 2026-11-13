@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Path, Request
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException
 
@@ -32,6 +32,31 @@ async def options(user: AdminUser, service: Annotated[DocumentService, Depends(g
 @router.get("", response_model=DocumentListResponse, summary="Danh sách tài liệu đã tải")
 async def list_documents(user: AdminUser, service: Annotated[DocumentService, Depends(get_document_service)]) -> DocumentListResponse:
     return DocumentListResponse(documents=await service.list_documents())
+
+
+def processing_message(status: str, *, uploaded: bool = False) -> str:
+    if status == "ready":
+        return "Tải lên và xử lý tài liệu thành công." if uploaded else "Xử lý tài liệu thành công."
+    return "Đã lưu tài liệu nhưng xử lý nội dung thất bại. Hãy kiểm tra tệp TXT hoặc PDF có lớp văn bản rồi thử lại."
+
+
+@router.post(
+    "/{document_id}/process", response_model=DocumentResponse,
+    summary="Trích văn bản và chia đoạn tài liệu đang chờ hoặc xử lý lỗi",
+    responses={
+        401: {"model": ErrorResponse, "description": "Chưa đăng nhập"},
+        403: {"model": ErrorResponse, "description": "Chỉ ADMIN đang hoạt động"},
+        404: {"model": ErrorResponse, "description": "Tài liệu không tồn tại"},
+    },
+)
+async def process_document(
+    document_id: Annotated[int, Path(ge=1, le=2**31 - 1)],
+    user: AdminUser,
+    service: Annotated[DocumentService, Depends(get_document_service)],
+) -> DocumentResponse:
+    """Xử lý đồng bộ, không gọi AI. Tài liệu ready được trả lại, không tạo đoạn trùng."""
+    document = await service.process(document_id)
+    return DocumentResponse(message=processing_message(document.status), document=document)
 
 
 @router.post(
@@ -86,6 +111,6 @@ async def upload(
         if len(form.getlist("topic_id")) != 1 or len(form.getlist("title")) != 1:
             raise invalid_field("body", "Vui lòng gửi đúng một chủ đề và một tiêu đề tài liệu.")
         document = await service.upload(topic_id=form.get("topic_id"), title=form.get("title"), file=file)
-        return DocumentResponse(message="Tải tài liệu thành công. Tài liệu đang chờ xử lý.", document=document)
+        return DocumentResponse(message=processing_message(document.status, uploaded=True), document=document)
     finally:
         await form.close()

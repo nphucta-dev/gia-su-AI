@@ -8,7 +8,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['application/pdf', 'text/plain'];
 const statusMeta = {
   ready: ['Sẵn sàng', 'success'],
-  pending: ['Đang xử lý', 'warning'],
+  pending: ['Chờ xử lý', 'warning'],
   error: ['Lỗi', 'error']
 };
 const formatSize = bytes => bytes < 1024 * 1024
@@ -59,6 +59,8 @@ export function renderAdmin() {
   let uploadTopics = topics;
   let documentsReady = !liveDocuments;
   let uploadPending = false;
+  let processingDocumentId = null;
+  const processingErrors = new Map();
   const pageHeading = heading(active === 'subjects' ? 'Quản lý môn học' : active === 'topics' ? 'Quản lý chủ đề' : 'Tài liệu nguồn', active === 'subjects' ? 'Cập nhật danh mục người học có thể truy cập.' : active === 'topics' ? 'Sắp xếp nội dung theo môn học và chương.' : 'Kiểm soát nguồn kiến thức được dùng trong câu trả lời AI.');
   root.prepend(pageHeading);
   const tabs = el('nav', { className: 'tabs', 'aria-label': 'Nhóm quản trị' });
@@ -91,7 +93,9 @@ export function renderAdmin() {
       id:item.id, topicId:item.topicId, name:item.title, fileName:item.fileName, topic:item.topicName,
       size:Number.isFinite(item.sizeBytes) ? formatSize(item.sizeBytes) : 'Chưa có kích thước',
       date:Number.isNaN(created.getTime()) ? '' : created.toLocaleDateString('vi-VN'),
-      status:item.status, active:item.isActive,
+      status:item.status, active:item.isActive, processedAt:item.processedAt,
+      chunkCount:Number.isInteger(item.chunkCount) ? item.chunkCount : 0,
+      error:item.status === 'error' ? 'Chưa thể trích xuất văn bản. Hãy kiểm tra tệp PDF/TXT rồi thử xử lý lại.' : '',
     };
   }
 
@@ -343,16 +347,43 @@ export function renderAdmin() {
     const results = el('div', { className: 'document-results', 'aria-live': 'polite' });
     const summary = el('p', { className: 'document-summary' });
 
+    async function processDocument(document) {
+      if (processingDocumentId !== null) return;
+      processingDocumentId = document.id;
+      processingErrors.delete(document.id);
+      renderList();
+      try {
+        const result = await api(`/admin/documents/${document.id}/process`, {method:'POST'});
+        if (!currentPage()) return;
+        if (result?.document?.id !== document.id || !['ready', 'error'].includes(result.document.status)) {
+          throw new Error('Chưa thể xác nhận kết quả xử lý. Vui lòng thử lại.');
+        }
+        const updated = serverDocument(result.document);
+        if (updated.status === 'error' && result.message) updated.error = result.message;
+        const index = documents.findIndex(item => item.id === document.id);
+        if (index !== -1) documents[index] = updated;
+        if (results.isConnected) toast(result.message || (updated.status === 'ready' ? 'Đã xử lý tài liệu.' : 'Xử lý tài liệu chưa thành công.'));
+      } catch (error) {
+        if (currentPage()) processingErrors.set(document.id, error.message || 'Chưa thể xử lý tài liệu. Vui lòng thử lại.');
+      } finally {
+        processingDocumentId = null;
+        if (currentPage() && results.isConnected) renderList();
+      }
+    }
+
     const makeRow = document => {
-      const [label, kind] = statusMeta[document.status] || statusMeta.pending;
+      const busy = processingDocumentId === document.id;
+      const [label, kind] = busy ? ['Đang xử lý', 'warning'] : statusMeta[document.status] || statusMeta.pending;
       const toggle = el('button', { type: 'button', className: `source-switch ${document.active ? 'active' : ''}`, role: 'switch', 'aria-checked': String(document.active), 'aria-label': `${document.active ? 'Tắt' : 'Bật'} nguồn ${document.name}`, disabled: liveDocuments || document.status !== 'ready' }, el('span', { 'aria-hidden': 'true' }));
       if (!liveDocuments) toggle.addEventListener('click', () => { document.active = !document.active; renderList(); toast(document.active ? 'Đã bật tài liệu trong bản xem trước.' : 'Đã tắt tài liệu trong bản xem trước.'); });
       const action = liveDocuments
-        ? el('span', {className:'document-waiting'}, document.status === 'pending' ? 'Chờ xử lý' : document.status === 'ready' ? 'Đã xử lý' : 'Xử lý lỗi')
+        ? document.status === 'ready' ? el('span', {className:'document-waiting'}, 'Đã xử lý') : button(busy ? 'Đang xử lý…' : document.status === 'error' ? 'Xử lý lại' : 'Xử lý', () => processDocument(document), 'ghost small document-action')
         : document.status === 'error' ? button('Thử lại', () => { document.status = 'pending'; document.error = ''; renderList(); toast('Đã đổi trạng thái minh họa sang chờ xử lý. Chưa gửi yêu cầu lên máy chủ.'); }, 'document-action') : document.status === 'pending' ? el('span', { className: 'document-waiting' }, 'Chờ xử lý') : button('Chi tiết', () => toast(`${document.name}: trạng thái sẵn sàng là dữ liệu minh họa.`), 'document-action');
-      return el('article', { className: 'document-row' },
+      if (liveDocuments && action.tagName === 'BUTTON') action.disabled = processingDocumentId !== null;
+      const error = busy ? '' : processingErrors.get(document.id) || document.error;
+      return el('article', { className: 'document-row', 'data-document-id':document.id, 'aria-busy':busy },
         el('div', { className: `document-icon ${kind}`, 'aria-hidden': 'true' }, document.status === 'error' ? '!' : '▤'),
-        el('div', { className: 'document-name' }, el('h3', {}, document.name), el('p', {}, `${document.fileName ? document.fileName + ' · ' : ''}${document.size} · ${document.date}`), document.error ? el('p', { className: 'document-error' }, document.error) : null),
+        el('div', { className: 'document-name' }, el('h3', {}, document.name), el('p', {}, `${document.fileName ? document.fileName + ' · ' : ''}${document.size} · ${document.date}`), liveDocuments && document.status === 'ready' ? el('p', {className:'document-chunks'}, `Đã trích xuất ${document.chunkCount} đoạn văn bản`) : null, error ? el('p', { className: 'document-error', role:'status' }, error) : null),
         el('div', { className: 'document-topic', 'data-label': 'Chủ đề' }, document.topic),
         el('div', { className: 'document-status', 'data-label': 'Xử lý' }, badge(label, kind)),
         el('div', { className: 'document-usage', 'data-label': 'Sử dụng' }, toggle),
@@ -368,7 +399,7 @@ export function renderAdmin() {
     [search, statusFilter, topicFilter].forEach(control => control.addEventListener(control === search ? 'input' : 'change', renderList));
     content.replaceChildren(el('div', { className: 'admin-documents' },
       el('div', { className: 'documents-heading' }, button('↑  Tải tài liệu', () => { uploadOpen = true; draw(); }, 'primary upload-document-button')),
-      el('aside', { className: 'document-rule' }, el('span', {}, 'Quy tắc phát hành nguồn'), el('strong', {}, 'Chỉ tài liệu đã xử lý xong và được bật mới được Gia sư AI sử dụng.'), el('p', {}, liveDocuments ? 'Tài liệu tải lên được lưu ở trạng thái chờ xử lý và chưa được bật làm nguồn.' : 'Quy tắc dự kiến khi kết nối backend. Thao tác tại đây chỉ cập nhật bản xem trước.')),
+      el('aside', { className: 'document-rule' }, el('span', {}, 'Quy tắc phát hành nguồn'), el('strong', {}, 'Chỉ tài liệu đã xử lý xong và được bật mới được Gia sư AI sử dụng.'), el('p', {}, liveDocuments ? 'Sau khi tải lên, tài liệu được trích xuất văn bản và chia đoạn; tài liệu vẫn ở trạng thái tắt.' : 'Quy tắc dự kiến khi kết nối backend. Thao tác tại đây chỉ cập nhật bản xem trước.')),
       el('section', { className: 'panel documents-panel', 'aria-labelledby': 'document-list-title' }, el('div', { className: 'documents-toolbar' }, el('h2', { id: 'document-list-title' }, 'Danh sách tài liệu'), el('div', { className: 'document-filters' }, search, statusFilter, topicFilter)), el('div', { className: 'document-table-head', 'aria-hidden': 'true' }, ...['Tài liệu', 'Chủ đề', 'Xử lý', 'Sử dụng', 'Thao tác'].map(label => el('span', {}, label))), results, summary)
     ));
     renderList();
@@ -423,7 +454,7 @@ export function renderAdmin() {
     const submit = el('button', { type: 'submit', className: 'button primary' }, 'Tải lên');
     const cancel = button('Hủy', closeUpload, 'ghost');
     const message = el('div', {role:'status', 'aria-live':'polite'});
-    const form = el('form', { className: 'upload-form', novalidate: true }, el('h2', {}, 'Thông tin tài liệu'), el('div', { className: 'upload-fields' }, field('Môn học', subject), field('Chủ đề', topic)), field('Tiêu đề tài liệu', title), el('div', { className: 'field' }, el('span', { className: 'field-label' }, 'Tệp tài liệu'), dropZone, feedback), el('aside', { id: 'file-rules', className: 'upload-warning' }, el('span', { 'aria-hidden': 'true' }, '△'), el('div', {}, el('strong', {}, 'PDF phải có lớp văn bản có thể sao chép.'), el('p', {}, 'Tài liệu được tải lên ở trạng thái tắt cho đến khi xử lý xong.'))), el('div', { className: 'upload-actions' }, cancel, submit), message);
+    const form = el('form', { className: 'upload-form', novalidate: true }, el('h2', {}, 'Thông tin tài liệu'), el('div', { className: 'upload-fields' }, field('Môn học', subject), field('Chủ đề', topic)), field('Tiêu đề tài liệu', title), el('div', { className: 'field' }, el('span', { className: 'field-label' }, 'Tệp tài liệu'), dropZone, feedback), el('aside', { id: 'file-rules', className: 'upload-warning' }, el('span', { 'aria-hidden': 'true' }, '△'), el('div', {}, el('strong', {}, 'PDF phải có lớp văn bản có thể sao chép.'), el('p', {}, 'Tài liệu được lưu ở trạng thái tắt và chỉ được dùng làm nguồn sau khi được bật.'))), el('div', { className: 'upload-actions' }, cancel, submit), message);
     setupValidation(form, [subject, topic, title, file]);
     form.addEventListener('submit', async event => {
       event.preventDefault();
@@ -435,7 +466,7 @@ export function renderAdmin() {
         const extension = selectedFile.name.match(/\.(pdf|txt)$/i)?.[0] || '';
         const cleanTitle = title.value.trim().replace(/\.(pdf|txt)$/i, '');
         documents.unshift({ name: `${cleanTitle}${extension}`, size: formatSize(selectedFile.size), date: new Intl.DateTimeFormat('vi-VN').format(new Date()), topic: topic.value, status: 'pending', active: false });
-        uploadOpen = false; draw(); toast('Đã thêm tài liệu vào bản xem trước với trạng thái đang xử lý.');
+        uploadOpen = false; draw(); toast('Đã thêm tài liệu vào bản xem trước với trạng thái chờ xử lý.');
         return;
       }
       const data = new FormData();
@@ -445,13 +476,15 @@ export function renderAdmin() {
       uploadPending = true;
       form.setAttribute('aria-busy', 'true');
       for (const control of [subject,topic,title,file,submit,cancel]) control.disabled = true;
-      submit.textContent = 'Đang tải lên…';
-      message.replaceChildren(el('p', {}, 'Đang lưu tài liệu…'));
+      submit.textContent = 'Đang tải và xử lý…';
+      message.replaceChildren(el('p', {}, 'Đang lưu tệp, trích xuất văn bản và chia đoạn…'));
       try {
         const result = await api('/admin/documents', {method:'POST', body:data});
         if (!currentPage() || !form.isConnected) return;
         if (!result?.document?.id) throw new Error('Phản hồi tài liệu chưa hợp lệ. Vui lòng tải lại danh sách.');
-        documents.unshift(serverDocument(result.document));
+        const document = serverDocument(result.document);
+        if (document.status === 'error' && result.message) document.error = result.message;
+        documents.unshift(document);
         uploadOpen = false;
         draw();
         toast(result.message || 'Tải tài liệu thành công.');
@@ -467,7 +500,7 @@ export function renderAdmin() {
         submit.textContent = 'Tải lên';
       }
     });
-    content.replaceChildren(el('div', { className: 'admin-upload-view' }, el('div', { className: 'upload-page-heading' }, button('←  Tài liệu nguồn', closeUpload, 'upload-back'), el('h2', {}, 'Thêm tài liệu nguồn'), el('p', {}, 'PDF có văn bản hoặc TXT, gắn với đúng chủ đề.')), panel('', form), !uploadSubjects.length ? notice('Chưa có môn học và chủ đề đang hoạt động để tải tài liệu.', 'warning') : null, el('p', { className: 'upload-process-note' }, liveDocuments ? 'Tài liệu được lưu trên máy chủ. Nội dung sẽ ở trạng thái chờ cho đến khi được xử lý.' : 'Bản xem trước chỉ thêm tên tệp và trạng thái chờ minh họa. Không upload hoặc xử lý nội dung tệp.')));
+    content.replaceChildren(el('div', { className: 'admin-upload-view' }, el('div', { className: 'upload-page-heading' }, button('←  Tài liệu nguồn', closeUpload, 'upload-back'), el('h2', {}, 'Thêm tài liệu nguồn'), el('p', {}, 'PDF có văn bản hoặc TXT, gắn với đúng chủ đề.')), panel('', form), !uploadSubjects.length ? notice('Chưa có môn học và chủ đề đang hoạt động để tải tài liệu.', 'warning') : null, el('p', { className: 'upload-process-note' }, liveDocuments ? 'Tệp được xử lý ngay sau khi lưu. Trạng thái Sẵn sàng và số đoạn văn bản sẽ xuất hiện khi hoàn tất; tệp lỗi có thể xử lý lại.' : 'Bản xem trước chỉ thêm tên tệp và trạng thái chờ minh họa. Không upload hoặc xử lý nội dung tệp.')));
   }
 
   root.append(tabs, content);

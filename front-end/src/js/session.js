@@ -112,26 +112,36 @@ function validateUser(body) {
   }
   return {id: user.id, name: user.name, email: user.email, role: user.role, createdAt: user.createdAt};
 }
-export async function restoreSession() {
+export async function restoreSession({ background = false } = {}) {
+  const previousState = state;
   const previousUser = state.user;
-  const attempt = ++generation;
   const token = getAccessToken();
+  const attempt = ++generation;
+  // Quay lại từ hộp chọn file/tab khác: giữ form của phiên đã xác minh.
+  const preserveView = background && previousState.status === 'authenticated' && state === previousState;
   const demo = readPreview();
-  if(!token && ['LEARNER','ADMIN'].includes(demo)) { publish('authenticated', previewUser(demo), '', 'preview'); return; }
+  if(!token && ['LEARNER','ADMIN'].includes(demo)) {
+    if (!preserveView) publish('authenticated', previewUser(demo), '', 'preview');
+    return;
+  }
   if (!token) { publish('anonymous', null, state.message, state.reason); return; }
-  publish('checking');
+  if (!preserveView) publish('checking');
   try {
     const user = validateUser(await request('/auth/me', {headers: {Authorization: 'Bearer ' + token}}));
     if (attempt === generation && getAccessToken() === token) {
-      if(previousUser && (previousUser.id !== user.id || previousUser.role !== user.role)) clearPrivateState();
-      publish('authenticated', user);
+      const accessChanged = previousUser && (previousUser.id !== user.id || previousUser.role !== user.role);
+      if (accessChanged) clearPrivateState();
+      if (preserveView && !accessChanged) {
+        // Không ghi đè hồ sơ vừa lưu trong lúc request kiểm tra phiên còn chạy.
+        if (state.user === previousUser) setCurrentUser(user, {notifyChange:false});
+      } else publish('authenticated', user);
     }
   } catch (error) {
     if (attempt !== generation || getAccessToken() !== token) return;
-    clearPrivateState();
     if (error.status === 401 || error.status === 403) {
       clearSession(error.status === 403 ? 'inactive' : 'expired');
-    } else {
+    } else if (!preserveView) {
+      clearPrivateState();
       // Keep the credential for a retry, but never expose private views before verification.
       publish('error', null, error.message);
     }

@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Protocol
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.models.document import Document as DocumentModel
+from app.models.document_chunk import DocumentChunk
 from app.models.subject import Subject as SubjectModel
 from app.models.topic import Topic as TopicModel
 from app.utils.errors import AppError
@@ -62,6 +63,8 @@ class DocumentRecord:
     created_at: str
     subject_name: str
     topic_name: str
+    processed_at: str | None = None
+    chunk_count: int = 0
 
 
 def missing_topic_error() -> AppError:
@@ -77,6 +80,10 @@ class DocumentRepository(Protocol):
     async def list_documents(self) -> list[DocumentRecord]: ...
 
     async def create(self, *, topic_id: int, title: str, file_path: str) -> DocumentRecord: ...
+
+    async def find_document(self, document_id: int) -> DocumentRecord | None: ...
+
+    async def finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None: ...
 
 
 ProtocolDocumentRepository = DocumentRepository
@@ -94,6 +101,7 @@ class InMemoryDocumentRepository:
         self._subjects = {subject.id: subject for subject in subjects}
         self._topics = {topic.id: topic for topic in topics}
         self._documents: dict[int, DocumentRecord] = {}
+        self._chunks: dict[int, tuple[str, ...]] = {}
         self._next_id = 1
 
     async def list_subjects(self) -> list[UploadSubject]:
@@ -142,6 +150,27 @@ class InMemoryDocumentRepository:
         self._next_id += 1
         return document
 
+    async def find_document(self, document_id: int) -> DocumentRecord | None:
+        return self._documents.get(document_id)
+
+    async def finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None:
+        document = self._documents.get(document_id)
+        if document is None:
+            return None
+        if document.status == "ready" and document.chunk_count:
+            return document
+        if chunks is not None and (not chunks or any(not part.strip() for part in chunks)):
+            raise ValueError("Tài liệu sẵn sàng phải có các đoạn văn bản không rỗng.")
+        saved_chunks = tuple(chunks or ())
+        result = replace(
+            document, status="ready" if chunks is not None else "error", is_active=False,
+            processed_at=datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+            chunk_count=len(saved_chunks),
+        )
+        self._chunks[document_id] = saved_chunks
+        self._documents[document_id] = result
+        return result
+
 
 class SqlAlchemyDocumentRepository:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
@@ -158,6 +187,12 @@ class SqlAlchemyDocumentRepository:
 
     async def create(self, *, topic_id: int, title: str, file_path: str) -> DocumentRecord:
         return await asyncio.to_thread(self._create, topic_id=topic_id, title=title, file_path=file_path)
+
+    async def find_document(self, document_id: int) -> DocumentRecord | None:
+        return await asyncio.to_thread(self._find_document, document_id)
+
+    async def finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None:
+        return await asyncio.to_thread(self._finish_processing, document_id, chunks=chunks)
 
     def _list_subjects(self) -> list[UploadSubject]:
         with self._sessions() as db:
@@ -197,13 +232,47 @@ class SqlAlchemyDocumentRepository:
 
     def _list_documents(self) -> list[DocumentRecord]:
         with self._sessions() as db:
-            rows = db.execute(
-                select(DocumentModel, TopicModel.name, SubjectModel.name)
-                .join(TopicModel, TopicModel.id == DocumentModel.topic_id)
-                .join(SubjectModel, SubjectModel.id == TopicModel.subject_id)
-                .order_by(DocumentModel.created_at.desc(), DocumentModel.id.desc())
-            )
-            return [self._to_record(document, topic_name, subject_name) for document, topic_name, subject_name in rows]
+            rows = db.execute(self._document_query().order_by(DocumentModel.created_at.desc(), DocumentModel.id.desc()))
+            return [self._to_record(document, topic, subject, count) for document, topic, subject, count in rows]
+
+    @staticmethod
+    def _document_query():
+        count = select(func.count(DocumentChunk.id)).where(DocumentChunk.document_id == DocumentModel.id).scalar_subquery()
+        return (
+            select(DocumentModel, TopicModel.name, SubjectModel.name, count)
+            .join(TopicModel, TopicModel.id == DocumentModel.topic_id)
+            .join(SubjectModel, SubjectModel.id == TopicModel.subject_id)
+        )
+
+    def _find_document(self, document_id: int) -> DocumentRecord | None:
+        with self._sessions() as db:
+            row = db.execute(self._document_query().where(DocumentModel.id == document_id)).first()
+            return self._to_record(*row) if row is not None else None
+
+    def _finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None:
+        if chunks is not None and (not chunks or any(not part.strip() for part in chunks)):
+            raise ValueError("Tài liệu sẵn sàng phải có các đoạn văn bản không rỗng.")
+        with self._sessions.begin() as db:
+            # Khóa bản ghi cha: các lần xử lý đồng thời không tạo trùng chunk_index.
+            document = db.get(DocumentModel, document_id, with_for_update=True)
+            if document is None:
+                return None
+            count = db.scalar(select(func.count(DocumentChunk.id)).where(DocumentChunk.document_id == document_id))
+            topic = db.get(TopicModel, document.topic_id)
+            subject = db.get(SubjectModel, topic.subject_id)
+            if document.status == "ready" and count:
+                return self._to_record(document, topic.name, subject.name, count)
+            db.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document_id))
+            db.add_all([
+                DocumentChunk(document_id=document_id, chunk_index=index, content=content)
+                for index, content in enumerate(chunks or ())
+            ])
+            document.status = "ready" if chunks is not None else "error"
+            document.is_active = False
+            document.processed_at = datetime.now(timezone.utc)
+            # Chunks và trạng thái cùng commit; lỗi ghi sẽ rollback toàn bộ.
+            db.flush()
+            return self._to_record(document, topic.name, subject.name, len(chunks or ()))
 
     def _create(self, *, topic_id: int, title: str, file_path: str) -> DocumentRecord:
         with self._sessions.begin() as db:
@@ -220,7 +289,7 @@ class SqlAlchemyDocumentRepository:
         return saved
 
     @staticmethod
-    def _to_record(document: DocumentModel, topic_name: str, subject_name: str) -> DocumentRecord:
+    def _to_record(document: DocumentModel, topic_name: str, subject_name: str, chunk_count: int = 0) -> DocumentRecord:
         created_at = document.created_at
         if created_at.tzinfo is None:
             created_at = created_at.replace(tzinfo=timezone.utc)
@@ -234,4 +303,9 @@ class SqlAlchemyDocumentRepository:
             created_at=created_at.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             subject_name=subject_name,
             topic_name=topic_name,
+            processed_at=(
+                document.processed_at.replace(tzinfo=timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+                if document.processed_at is not None else None
+            ),
+            chunk_count=chunk_count,
         )

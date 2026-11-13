@@ -91,10 +91,13 @@ async def test_upload_options_only_include_active_subjects_and_topics(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "filename,content,mime",
-    [("lesson.txt", "Hàm số và đạo hàm".encode(), "text/plain"), ("lesson.pdf", b"%PDF-1.4\nexample", "application/pdf")],
+    "filename,content,mime,status",
+    [
+        ("lesson.txt", "Hàm số và đạo hàm".encode(), "text/plain", "ready"),
+        ("lesson.pdf", b"%PDF-1.4\nexample", "application/pdf", "error"),
+    ],
 )
-async def test_upload_saves_private_file_and_lists_persisted_pending_document(tmp_path, filename, content, mime):
+async def test_upload_saves_private_file_and_lists_final_processing_status(tmp_path, filename, content, mime, status):
     async with api(tmp_path) as state:
         response = await state.client.post(
             URL, headers=state.admin_headers,
@@ -105,7 +108,9 @@ async def test_upload_saves_private_file_and_lists_persisted_pending_document(tm
         assert result["id"] == 1 and result["topicId"] == 1
         assert result["title"] == "Tài liệu học"
         assert result["subjectName"] == "Toán học" and result["topicName"] == "Hàm số"
-        assert result["status"] == "pending" and result["isActive"] is False
+        assert result["status"] == status and result["isActive"] is False
+        assert result["processedAt"].endswith("Z")
+        assert result["chunkCount"] == (1 if status == "ready" else 0)
         assert result["sizeBytes"] == len(content)
         assert result["fileName"] == "Tài liệu học" + Path(filename).suffix
         assert result["createdAt"].endswith("Z")

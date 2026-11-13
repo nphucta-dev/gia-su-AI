@@ -69,6 +69,11 @@ def create_browser_app():
                 role=role,
                 password_hash=fast_hasher("MatKhau@123"),
             )
+        # Mô phỏng tài liệu đã upload trước khi có tính năng trích văn bản.
+        storage = Path(os.environ["BROWSER_UPLOAD_DIR"])
+        storage.mkdir(parents=True, exist_ok=True)
+        (storage / "pending-source.txt").write_text("Nội dung tài liệu chờ xử lý. Hàm số bậc hai.", encoding="utf-8")
+        await documents.create(topic_id=quadratic, title="Tài liệu chờ xử lý", file_path="pending-source.txt")
         async with original_lifespan(current_app):
             yield
 

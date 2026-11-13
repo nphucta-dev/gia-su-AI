@@ -1,4 +1,4 @@
-import { getSession, subscribeSession, restoreSession, logout, isAdmin, cancelPendingLogin } from './session.js';
+import { getSession, getAccessToken, subscribeSession, restoreSession, logout, isAdmin, cancelPendingLogin } from './session.js';
 import { renderHome, renderDashboard } from './pages/learning.js';
 import { renderAuth, renderProfile } from './pages/account.js';
 import { renderChat } from './pages/chat.js';
@@ -192,10 +192,13 @@ subscribeSession(session => {
  render();
 });
 window.addEventListener('hashchange', () => {
- if(getSession().status === 'authenticated') restoreSession(); else { cancelPendingLogin(); render(); }
+ cancelPendingLogin();
+ getAccessToken();
+ render();
 });
-window.addEventListener('pageshow', event => { if(event.persisted) restoreSession(); });
+// Quay lại tab/cửa sổ chỉ kiểm tra thời hạn token, giữ nguyên giao diện đang thao tác.
+window.addEventListener('pageshow', event => { if(event.persisted) getAccessToken(); });
 document.addEventListener('visibilitychange', () => {
- if(document.visibilityState === 'visible' && getSession().status === 'authenticated') restoreSession();
+ if(document.visibilityState === 'visible') getAccessToken();
 });
 render(); restoreSession();

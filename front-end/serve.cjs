@@ -62,7 +62,7 @@ function createServer({ backendUrl = process.env.BACKEND_URL || 'http://127.0.0.
     }
     fs.readFile(file, (error, data) => {
       if (error) { res.writeHead(404); return res.end('Not found'); }
-      res.writeHead(200, { 'Content-Type': types[path.extname(file)], 'X-Content-Type-Options': 'nosniff' });
+      res.writeHead(200, { 'Content-Type': types[path.extname(file)], 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' });
       res.end(req.method === 'HEAD' ? undefined : data);
     });
   });

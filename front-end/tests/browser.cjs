@@ -4,6 +4,7 @@ const { runLoginChecks } = require('./login.cjs');
 const { runProfileUploadChecks } = require('./profile-upload.cjs');
 const { runCatalogChecks } = require('./catalog.cjs');
 const { runAdminCatalogChecks } = require('./admin-catalog.cjs');
+const { runSessionRefreshChecks } = require('./session-refresh.cjs');
 
 async function runBrowserChecks(application) {
   await runLoginChecks(application);
@@ -45,6 +46,7 @@ async function runBrowserChecks(application) {
   await runCatalogChecks(application);
   await runAdminCatalogChecks(application);
   await runProfileUploadChecks(application);
+  await runSessionRefreshChecks(application);
 
   // Backend dừng phải hiện lỗi và giữ trạng thái khách, không giả lập đăng nhập thành công.
   await stopBackend();

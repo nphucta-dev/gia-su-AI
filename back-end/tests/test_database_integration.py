@@ -9,7 +9,7 @@ import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import delete, func, inspect, select
+from sqlalchemy import delete, event, func, inspect, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy_utils import create_database, drop_database
@@ -127,17 +127,112 @@ async def test_admin_upload_persists_file_and_document_in_mysql(database, tmp_pa
         assert response.status_code == 201
         saved = response.json()["document"]
         assert isinstance(saved["id"], int) and saved["topicId"] == topic_id
-        assert saved["status"] == "pending" and saved["isActive"] is False
+        assert saved["status"] == "ready" and saved["isActive"] is False
+        assert saved["chunkCount"] == 1 and saved["processedAt"].endswith("Z")
         listing = await client.get("/api/admin/documents", headers=headers)
         assert any(row["id"] == saved["id"] for row in listing.json()["documents"])
     with sessions() as db:
         stored = db.get(Document, saved["id"])
         assert stored.title == "Tài liệu MySQL" and stored.topic_id == topic_id
-        assert stored.status == "pending" and not stored.is_active
+        assert stored.status == "ready" and not stored.is_active and stored.processed_at is not None
+        chunks = db.scalars(select(DocumentChunk).where(DocumentChunk.document_id == stored.id)).all()
+        assert len(chunks) == 1 and chunks[0].chunk_index == 0
+        assert chunks[0].content == content.decode("utf-8") and chunks[0].embedding is None
         assert Path(stored.file_path).name == stored.file_path
         stored_file = upload_dir / stored.file_path
         assert stored_file.resolve().parent == upload_dir.resolve()
         assert stored_file.read_bytes() == content
+
+
+@pytest.mark.anyio
+async def test_document_processing_retry_concurrency_and_persistence_in_mysql(database, tmp_path):
+    _, sessions = database
+    with sessions.begin() as db:
+        admin, _, topic = make_catalog(db)
+        admin.role = "ADMIN"
+        pending = Document(topic_id=topic.id, title="Tài liệu cũ", file_path="legacy.txt")
+        retry = Document(topic_id=topic.id, title="Tài liệu cần thử lại", file_path="retry.txt", status="error")
+        db.add_all([pending, retry])
+        db.flush()
+        db.add(DocumentChunk(document_id=retry.id, chunk_index=0, content="Đoạn cũ chưa hợp lệ"))
+        admin_id, pending_id, retry_id = admin.id, pending.id, retry.id
+    content = "\n\n".join(f"Bài học {index}: Hàm số bậc hai có đồ thị là parabol." for index in range(160))
+    (tmp_path / "legacy.txt").write_text(content, encoding="utf-8")
+    (tmp_path / "retry.txt").write_bytes(b"\xff\xfe")
+    settings = Settings(jwt_secret="mysql-processing-integration-" + "x" * 40)
+    app = create_app(session_factory=sessions, upload_dir=tmp_path, settings=settings)
+    token = app.state.token_service.create_access_token(admin_id).access_token
+    headers = {"Authorization": f"Bearer {token}"}
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test", headers=headers,
+    ) as client:
+        path = f"/api/admin/documents/{pending_id}/process"
+        first, second = await asyncio.gather(client.post(path), client.post(path))
+        assert first.status_code == second.status_code == 200
+        saved = first.json()["document"]
+        assert saved["status"] == "ready" and saved["chunkCount"] > 1
+        assert second.json()["document"]["chunkCount"] == saved["chunkCount"]
+        failed = await client.post(f"/api/admin/documents/{retry_id}/process")
+        assert failed.status_code == 200
+        error = failed.json()["document"]
+        assert error["status"] == "error" and error["chunkCount"] == 0
+        assert error["processedAt"] and not error["isActive"]
+        with sessions() as db:
+            rows = db.scalars(select(DocumentChunk).where(DocumentChunk.document_id == pending_id).order_by(DocumentChunk.chunk_index)).all()
+            chunk_ids = [row.id for row in rows]
+            assert [row.chunk_index for row in rows] == list(range(saved["chunkCount"]))
+            assert all(row.content.strip() and len(row.content) <= 1000 and row.embedding is None for row in rows)
+            assert "Bài học 0:" in rows[0].content and "Bài học 159:" in rows[-1].content
+            assert db.scalar(select(func.count(DocumentChunk.id)).where(DocumentChunk.document_id == retry_id)) == 0
+        repeated = await client.post(path)
+        assert repeated.status_code == 200 and repeated.json()["document"] == saved
+        (tmp_path / "retry.txt").write_text("Nội dung đã khôi phục.", encoding="utf-8")
+        restored = await client.post(f"/api/admin/documents/{retry_id}/process")
+        assert restored.json()["document"]["status"] == "ready"
+        assert restored.json()["document"]["chunkCount"] == 1
+    # Một app mới đọc đúng kết quả đã commit, không dựa vào bộ nhớ của tiến trình cũ.
+    app = create_app(session_factory=sessions, upload_dir=tmp_path, settings=settings)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test", headers=headers) as client:
+        listing = (await client.get("/api/admin/documents")).json()["documents"]
+        assert next(item for item in listing if item["id"] == pending_id) == saved
+    with sessions() as db:
+        rows = db.scalars(select(DocumentChunk).where(DocumentChunk.document_id == pending_id).order_by(DocumentChunk.chunk_index)).all()
+        assert [row.id for row in rows] == chunk_ids
+
+
+@pytest.mark.anyio
+async def test_processing_chunk_write_failure_rolls_back_status_in_mysql(database, tmp_path):
+    _, sessions = database
+    with sessions.begin() as db:
+        admin, _, topic = make_catalog(db)
+        admin.role = "ADMIN"
+        document = Document(topic_id=topic.id, title="Giao dịch cần nguyên vẹn", file_path="atomic.txt")
+        db.add(document)
+        db.flush()
+        admin_id, document_id = admin.id, document.id
+    (tmp_path / "atomic.txt").write_text("Văn bản phải lưu đủ cùng trạng thái ready.", encoding="utf-8")
+    app = create_app(session_factory=sessions, upload_dir=tmp_path, settings=Settings(jwt_secret="mysql-atomic-processing-" + "x" * 40))
+    token = app.state.token_service.create_access_token(admin_id).access_token
+
+    def fail_chunk_write(db, *_):
+        if any(isinstance(item, DocumentChunk) and item.document_id == document_id for item in db.new):
+            raise RuntimeError("test-only chunk write failure")
+
+    event.listen(sessions.class_, "before_flush", fail_chunk_write)
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test",
+            headers={"Authorization": f"Bearer {token}"},
+        ) as client:
+            failed = await client.post(f"/api/admin/documents/{document_id}/process")
+            assert failed.status_code == 500 and "test-only" not in failed.text
+    finally:
+        event.remove(sessions.class_, "before_flush", fail_chunk_write)
+    with sessions() as db:
+        stored = db.get(Document, document_id)
+        assert stored.status == "pending" and stored.processed_at is None
+        assert db.scalar(select(func.count(DocumentChunk.id)).where(DocumentChunk.document_id == document_id)) == 0
+    assert (tmp_path / "atomic.txt").is_file()
 
 
 @pytest.mark.anyio

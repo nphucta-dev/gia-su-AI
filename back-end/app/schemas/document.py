@@ -14,6 +14,8 @@ class DocumentInfo(BaseModel):
     created_at: str = Field(serialization_alias="createdAt")
     size_bytes: int | None = Field(serialization_alias="sizeBytes")
     file_name: str = Field(serialization_alias="fileName")
+    processed_at: str | None = Field(default=None, serialization_alias="processedAt")
+    chunk_count: int = Field(default=0, serialization_alias="chunkCount")
 
 
 class DocumentResponse(BaseModel):

@@ -36,7 +36,7 @@ Nếu dùng Live Server thay cho `serve.cjs`, đặt meta `api-base` trong `inde
 - Menu hiển thị tên người dùng, hồ sơ và đăng xuất. LEARNER không có mục quản trị; trang quản trị còn kiểm tra `/api/admin/access` ở backend.
 - ADMIN thêm, sửa, bật/tắt môn và chủ đề qua `GET/POST/PATCH /api/admin/subjects` và `/api/admin/topics`. Form chủ đề chọn môn theo ID, có chương và mô tả; thay đổi được lưu trong MySQL và giữ sau khi tải lại trang.
 - Hồ sơ gọi `GET /api/profile`, lưu họ tên/năm sinh bằng `PATCH /api/profile`; thay đổi giữ được sau khi tải lại trang. Email và vai trò chỉ hiển thị, không cho sửa.
-- ADMIN mở Tài liệu nguồn để tải PDF/TXT qua `POST /api/admin/documents`; form lấy môn/chủ đề thật từ `/api/admin/documents/options`, danh sách lấy từ `/api/admin/documents`. File và metadata được lưu ở backend/MySQL.
+- ADMIN mở Tài liệu nguồn để tải PDF/TXT qua `POST /api/admin/documents`; form lấy môn/chủ đề thật từ `/api/admin/documents/options`, danh sách lấy từ `/api/admin/documents`. Backend tự trích văn bản và lưu các đoạn; giao diện hiển thị sẵn sàng/lỗi và số đoạn. Tài liệu cũ có nút **Xử lý**, tài liệu lỗi có **Xử lý lại**, gọi `POST /api/admin/documents/{id}/process`.
 - Đăng xuất hoặc token hết hạn xóa phiên phía trình duyệt. Sai thông tin đăng nhập không tạo phiên. Không lưu mật khẩu vào storage.
 - Lỗi mạng, backend ngừng chạy và lỗi server có thông báo; form chống gửi nhiều lần khi đang xử lý.
 
@@ -87,7 +87,7 @@ Form tài khoản dùng `src/js/pages/auth-screen.js`, `auth-templates.js` và `
 
 ADMIN vào `#admin?tab=subjects` sau khi đăng nhập. Sidebar và menu mobile có ba mục Môn học, Chủ đề, Tài liệu nguồn, tương ứng với `#admin?tab=subjects`, `#admin?tab=topics`, `#admin?tab=documents`. Hồ sơ quản trị hiển thị thông tin tài khoản từ server. CSS quản trị nằm trong `admin-shell.css` và `admin.css`.
 
-Thêm, sửa, bật/tắt môn/chủ đề của ADMIN đăng nhập thật dùng API và MySQL. Môn mới chưa có chủ đề đang bật sẽ chưa xuất hiện ở danh sách học. Tắt môn/chủ đề không xóa tài liệu hay lịch sử cũ. Tab tài liệu dùng file đã tải qua API; tải lại trang vẫn có tài liệu. File mới ở trạng thái chờ xử lý, chưa bật làm nguồn. Nút bật/tắt tài liệu và thử xử lý cần API xử lý nội dung ở bước tiếp theo.
+Thêm, sửa, bật/tắt môn/chủ đề của ADMIN đăng nhập thật dùng API và MySQL. Môn mới chưa có chủ đề đang bật sẽ chưa xuất hiện ở danh sách học. Tắt môn/chủ đề không xóa tài liệu hay lịch sử cũ. Tab tài liệu lưu file và các đoạn văn bản thật; tải lại trang vẫn có kết quả xử lý. Trạng thái chờ chỉ dành cho tài liệu cũ chưa chạy xử lý. Các nút xử lý giữ nguyên bộ lọc/tìm kiếm và báo lỗi nếu API thất bại. Nguồn vẫn tắt sau xử lý; API bật/tắt tài liệu thuộc bước tiếp theo.
 
 Trên localhost/127.0.0.1, trang đăng nhập có nút xem thử giao diện LEARNER và ADMIN. Chế độ này có banner nhận diện, dùng dữ liệu mẫu và không tạo token API. Đăng xuất xóa chế độ xem thử; hostname khác không bật các nút này.
 

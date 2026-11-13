@@ -14,6 +14,7 @@ from starlette.datastructures import UploadFile
 from app.repositories.document_repository import DocumentRecord, DocumentRepository, missing_topic_error
 from app.repositories.user_repository import parse_user_id
 from app.schemas.document import DocumentInfo, UploadSubjectInfo, UploadTopicInfo
+from app.services.document_text import DocumentTextError, extract_document_text, split_document_text
 from app.utils.errors import AppError
 
 MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
@@ -103,7 +104,31 @@ class DocumentService:
             # Chỉ xóa đúng file vừa tạo khi transaction metadata không thành công.
             await asyncio.to_thread(saved_path.unlink, missing_ok=True)
             raise
-        return self._public_document(record)
+        return await self.process(record.id)
+
+    async def process(self, document_id: int) -> DocumentInfo:
+        record = await self.repository.find_document(document_id)
+        if record is None:
+            raise AppError(404, "DOCUMENT_NOT_FOUND", "Tài liệu không tồn tại.")
+        if record.status == "ready" and record.chunk_count:
+            return await asyncio.to_thread(self._public_document, record)
+        try:
+            chunks = await asyncio.to_thread(self._extract_chunks, record.file_path)
+        except (DocumentTextError, OSError):
+            chunks = None
+        saved = await self.repository.finish_processing(document_id, chunks=chunks)
+        if saved is None:
+            raise AppError(404, "DOCUMENT_NOT_FOUND", "Tài liệu không tồn tại.")
+        return await asyncio.to_thread(self._public_document, saved)
+
+    def _extract_chunks(self, file_path: str) -> list[str]:
+        relative = Path(file_path)
+        if relative.is_absolute() or relative.name != file_path:
+            raise DocumentTextError("Đường dẫn tài liệu không hợp lệ.")
+        path = self.upload_dir / relative
+        if path.is_symlink() or path.resolve().parent != self.upload_dir or not path.is_file():
+            raise DocumentTextError("Không tìm thấy tệp tài liệu trong kho lưu trữ.")
+        return split_document_text(extract_document_text(path))
 
     def _save_file(self, path: Path, payload: bytearray) -> None:
         self.upload_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -144,4 +169,6 @@ class DocumentService:
             created_at=record.created_at,
             size_bytes=size,
             file_name=display_name,
+            processed_at=record.processed_at,
+            chunk_count=record.chunk_count,
         )
