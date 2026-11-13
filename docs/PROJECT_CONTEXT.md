@@ -214,4 +214,10 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   Cần kiểm tra từng phần trước khi đánh dấu TK xong.
 - Venv mặc định ở `back-end/venv`; các lệnh chạy ở README hiện hành. Không tự chạy migration,
   seed, sửa database hay gọi LLM chỉ vì đang đọc các bước trong tài liệu.
+- TK-030 đã có system prompt và bộ tạo messages cho lượt đầu trong `back-end/app/prompts/`;
+  chạy thử offline bằng `python -m app.prompts`. Phần này ưu tiên gợi mở/hint 1 và chưa cung cấp
+  lời giải đầy đủ; dữ liệu học tập chỉ nằm trong user JSON. Có các ô cấu hình tùy chọn
+  `LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL` nhưng chưa có adapter gọi model hoặc API chat thật.
+  Đọc `docs/SOCRATIC_PROMPT.md` để biết phạm vi, giới hạn kiểm thử offline và các tình huống
+  cần đánh giá khi có model; chưa đánh dấu hoàn thành điều phối gợi ý, PII, RAG hay chất lượng model.
 

@@ -43,6 +43,10 @@ class Settings:
     access_token_minutes: int = DEFAULT_ACCESS_TOKEN_MINUTES
     database_url: str = field(default=DEFAULT_DATABASE_URL, repr=False)
     upload_dir: Path = DEFAULT_UPLOAD_DIR
+    # Tùy chọn, dành cho bước tích hợp nhà cung cấp LLM sau khi có model.
+    llm_api_key: str = field(default="", repr=False)
+    llm_api_url: str = field(default="", repr=False)
+    llm_model: str = field(default="", repr=False)
 
 
 def _load_jwt_secret() -> str:
@@ -113,4 +117,7 @@ def load_settings() -> Settings:
         access_token_minutes=_load_access_token_minutes(),
         database_url=load_database_url(),
         upload_dir=upload_dir,
+        llm_api_key=os.environ.get("LLM_API_KEY", "").strip(),
+        llm_api_url=os.environ.get("LLM_API_URL", "").strip(),
+        llm_model=os.environ.get("LLM_MODEL", "").strip(),
     )

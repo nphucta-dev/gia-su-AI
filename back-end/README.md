@@ -295,6 +295,16 @@ Các đoạn được lưu vào `document_chunks` theo `chunk_index` bắt đầ
 
 Middleware giữ giới hạn 10 KB cho JSON; riêng POST upload nhận tối đa 10 MiB cộng 64 KiB multipart. Service vẫn kiểm tra giới hạn file riêng, kể cả request chunked. CORS cho phép PATCH. Phản hồi tài khoản, hồ sơ và tài liệu quản trị có `Cache-Control: no-store`.
 
+## Prompt Socratic (TK-030)
+
+Prompt lượt đầu nằm ở `app/prompts/socratic_system.txt`; `build_first_turn_messages()` tạo messages độc lập với nhà cung cấp/model. Prompt ưu tiên một câu hỏi gợi mở hoặc gợi ý mức 1, giữ lời giải đầy đủ cho luồng xác nhận riêng. Xem thử offline từ `back-end/`:
+
+```powershell
+.\venv\Scripts\python.exe -m app.prompts
+```
+
+`LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL` đã có trong `.env.example` và `Settings`, cho phép để trống. Chưa có lời gọi model hoặc luồng chat thật; khi biết nhà cung cấp cần triển khai adapter/API chat. Xem [cách dùng và các tình huống đánh giá prompt](../docs/SOCRATIC_PROMPT.md).
+
 ## Việc cần làm tiếp
 
 - Các API ghi danh mục, chat và quiz sử dụng model trong `app/models/` và session transaction của `app/db/database.py`; kiểm tra chủ sở hữu và quy tắc nghiệp vụ theo tài liệu SRS trước khi lưu dữ liệu.
