@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import secrets
 from dataclasses import dataclass, field
@@ -47,6 +48,7 @@ class Settings:
     llm_api_key: str = field(default="", repr=False)
     llm_api_url: str = field(default="", repr=False)
     llm_model: str = field(default="", repr=False)
+    llm_timeout_seconds: float = 30.0
 
 
 def _load_jwt_secret() -> str:
@@ -75,6 +77,19 @@ def _load_access_token_minutes() -> int:
     if minutes <= 0:
         raise ValueError("ACCESS_TOKEN_MINUTES phải là số nguyên dương.")
     return minutes
+
+
+def _load_llm_timeout() -> float:
+    raw = os.environ.get("LLM_TIMEOUT_SECONDS", "").strip()
+    if not raw:
+        return 30.0
+    try:
+        timeout = float(raw)
+    except ValueError:
+        raise ValueError("LLM_TIMEOUT_SECONDS phải là số từ 1 đến 120.") from None
+    if not math.isfinite(timeout) or not 1 <= timeout <= 120:
+        raise ValueError("LLM_TIMEOUT_SECONDS phải là số từ 1 đến 120.")
+    return timeout
 
 
 def normalize_database_url(database_url: str) -> str:
@@ -120,4 +135,5 @@ def load_settings() -> Settings:
         llm_api_key=os.environ.get("LLM_API_KEY", "").strip(),
         llm_api_url=os.environ.get("LLM_API_URL", "").strip(),
         llm_model=os.environ.get("LLM_MODEL", "").strip(),
+        llm_timeout_seconds=_load_llm_timeout(),
     )

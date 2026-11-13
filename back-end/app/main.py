@@ -24,6 +24,8 @@ from app.error_handlers import register_error_handlers
 from app.middlewares.body_limit import BodySizeLimitMiddleware
 from app.middlewares.security_headers import SecurityHeadersMiddleware
 from app.repositories.catalog_repository import InMemoryCatalogRepository
+from app.repositories.chat_repository import ChatRepository, InMemoryChatRepository
+from app.repositories.sqlalchemy_chat_repository import SqlAlchemyChatRepository
 from app.repositories.sqlalchemy_catalog_repository import SqlAlchemyCatalogRepository
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.repositories.document_repository import DocumentRepository, SqlAlchemyDocumentRepository
@@ -31,12 +33,15 @@ from app.repositories.user_repository import User
 from app.routes.auth import router as auth_router
 from app.routes.admin_catalog import router as admin_catalog_router
 from app.routes.catalog import router as catalog_router
+from app.routes.chat import router as chat_router
 from app.routes.me import router as me_router
 from app.routes.profile import router as profile_router
 from app.routes.documents import router as documents_router
 from app.services.auth_service import AuthService, UserRepository
 from app.services.admin_catalog_service import AdminCatalogService
 from app.services.catalog_service import CatalogRepository, CatalogService
+from app.services.chat_service import ChatService
+from app.services.llm_client import ChatCompletionsClient, LLMClient
 from app.services.token_service import TokenService
 from app.utils.password import hash_password
 from app.utils.errors import AppError
@@ -53,6 +58,8 @@ def create_app(
     session_factory: sessionmaker[Session] | None = None,
     document_repository: DocumentRepository | None = None,
     upload_dir: Path | str | None = None,
+    chat_repository: ChatRepository | None = None,
+    llm_client: LLMClient | None = None,
 ) -> FastAPI:
     """Tạo ứng dụng. Các phụ thuộc được truyền vào để dễ thay kho dữ liệu (ví dụ CSDL
     thật) và để test độc lập, không cần mở cổng thật."""
@@ -93,6 +100,13 @@ def create_app(
     app.state.auth_service = AuthService(repository, password_hasher or hash_password)
     app.state.catalog_service = CatalogService(catalog)
     app.state.admin_catalog_service = AdminCatalogService(catalog)
+    chat = chat_repository
+    if chat is None:
+        chat = (
+            SqlAlchemyChatRepository(session_factory) if session_factory is not None
+            else InMemoryChatRepository(catalog if isinstance(catalog, InMemoryCatalogRepository) else None)
+        )
+    app.state.chat_service = ChatService(chat, llm_client or ChatCompletionsClient(settings), settings)
     app.state.token_service = token_service or TokenService(
         secret=settings.jwt_secret,
         issuer=settings.jwt_issuer,
@@ -103,6 +117,7 @@ def create_app(
     app.include_router(auth_router)
     app.include_router(me_router)
     app.include_router(catalog_router)
+    app.include_router(chat_router)
     app.include_router(admin_catalog_router)
     app.include_router(profile_router)
     app.include_router(documents_router)

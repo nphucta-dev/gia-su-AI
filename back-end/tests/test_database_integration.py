@@ -1,6 +1,7 @@
 """Chạy với TEST_DATABASE_URL; mỗi lần chạy dùng một database tạm riêng."""
 
 import asyncio
+import json
 import os
 from pathlib import Path
 from uuid import uuid4
@@ -33,6 +34,9 @@ from app.models import (
     User,
 )
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
+from app.repositories.chat_repository import ChatChangedError
+from app.repositories.sqlalchemy_chat_repository import SqlAlchemyChatRepository
+from app.services.llm_client import LLMReply
 from app.utils.password import hash_password, verify_password
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -67,6 +71,142 @@ def make_catalog(db):
     db.add_all([user, topic])
     db.flush()
     return user, subject, topic
+
+
+class RecordingChatModel:
+    def __init__(self, content="Bạn nhớ điều kiện của phương trình này như thế nào?"):
+        self.content = content
+        self.requests = []
+
+    async def generate(self, messages):
+        self.requests.append(messages)
+        return LLMReply(self.content, token_count=11)
+
+
+@pytest.mark.anyio
+async def test_chat_api_history_hints_and_private_context_in_mysql(database):
+    _, sessions = database
+    with sessions.begin() as db:
+        learner, _, topic = make_catalog(db)
+        learner.full_name = "Nguyễn Văn An"
+        other = User(email=f"other-{uuid4().hex}@example.com", full_name="Người khác", password_hash="other-hash")
+        db.add(other)
+        db.flush()
+        learner_id, other_id, topic_id = learner.id, other.id, topic.id
+        name, email, password_hash = learner.full_name, learner.email, learner.password_hash
+    provider_key = "mysql-chat-provider-key-private"
+    model = RecordingChatModel(f"Gợi ý cho {name}, {email}: {provider_key}. Bạn nhớ công thức nào?")
+    settings = Settings(jwt_secret="mysql-chat-api-key-" + "x" * 40, llm_api_key=provider_key)
+    app = create_app(session_factory=sessions, settings=settings, llm_client=model)
+    token = app.state.token_service.create_access_token(learner_id).access_token
+    other_token = app.state.token_service.create_access_token(other_id).access_token
+    question = f"Tôi tên {name}, email {email}, mật khẩu: MatKhauRieng@123. Giải x² − 5x + 6 = 0; {password_hash}."
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test",
+        headers={"Authorization": f"Bearer {token}"},
+    ) as client:
+        created = await client.post("/api/chat/sessions", json={"topicId": topic_id})
+        assert created.status_code == 201, created.text
+        session_id = created.json()["session"]["id"]
+        sent = await client.post(f"/api/chat/sessions/{session_id}/messages", json={"content": question})
+        assert sent.status_code == 201, sent.text
+        first = sent.json()
+        assert first["userMessage"]["content"] == question
+        assert first["assistantMessage"]["hintLevel"] == 1
+        assert first["assistantMessage"]["tokenCount"] == 11
+        assert not first["assistantMessage"]["isFullSolution"]
+        assert sent.headers["cache-control"] == "no-store"
+        for level in (2, 3):
+            response = await client.post(f"/api/chat/sessions/{session_id}/hints")
+            assert response.status_code == 201
+            assert response.json()["assistantMessage"]["hintLevel"] == level
+        exhausted = await client.post(f"/api/chat/sessions/{session_id}/hints")
+        assert exhausted.status_code == 409 and exhausted.json()["error"]["code"] == "HINT_LIMIT_REACHED"
+        assert len(model.requests) == 3
+        new_question = await client.post(f"/api/chat/sessions/{session_id}/messages", json={"content": "Em muốn kiểm tra lại cách phân tích nhân tử."})
+        assert new_question.status_code == 201
+        assert new_question.json()["assistantMessage"]["hintLevel"] == 1
+        raw_payloads = json.dumps(model.requests, ensure_ascii=False)
+        for private in (name, email, password_hash, "MatKhauRieng@123", provider_key):
+            assert private not in raw_payloads
+            assert private not in first["assistantMessage"]["content"]
+        assert (await client.get(f"/api/chat/sessions/{session_id}/messages", headers={"Authorization": f"Bearer {other_token}"})).status_code == 404
+        other_history = await client.get("/api/chat/sessions", headers={"Authorization": f"Bearer {other_token}"})
+        assert session_id not in {item["id"] for item in other_history.json()["sessions"]}
+    # Đọc lại từ app mới, chứng minh phiên và tin nhắn đã lưu trong MySQL.
+    restored = create_app(session_factory=sessions, settings=settings, llm_client=model)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=restored), base_url="http://test", headers={"Authorization": f"Bearer {token}"}) as client:
+        history = await client.get(f"/api/chat/sessions/{session_id}/messages", params={"limit": 2})
+        assert history.status_code == 200 and history.json()["hasMore"] is True
+        assert [item["role"] for item in history.json()["messages"]] == ["user", "assistant"]
+    with sessions() as db:
+        rows = db.scalars(select(ChatMessage).where(ChatMessage.session_id == session_id).order_by(ChatMessage.id)).all()
+        assert len(rows) == 6 and rows[0].content == question
+        assert [row.hint_level for row in rows if row.role == "assistant"] == [1, 2, 3, 1]
+        assert all(not row.is_full_solution and row.created_at.utcoffset() is not None for row in rows)
+        parent = db.get(ChatSession, session_id)
+        assert parent.updated_at >= parent.created_at
+
+
+@pytest.mark.anyio
+async def test_chat_missing_model_and_failed_assistant_write_preserve_question_in_mysql(database):
+    _, sessions = database
+    with sessions.begin() as db:
+        learner, _, topic = make_catalog(db)
+        learner_id, topic_id = learner.id, topic.id
+    settings = Settings(jwt_secret="mysql-chat-recovery-" + "x" * 40)
+    app = create_app(session_factory=sessions, settings=settings)
+    token = app.state.token_service.create_access_token(learner_id).access_token
+    headers = {"Authorization": f"Bearer {token}"}
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test", headers=headers) as client:
+        created = await client.post("/api/chat/sessions", json={"topicId": topic_id})
+        session_id = created.json()["session"]["id"]
+        failed = await client.post(f"/api/chat/sessions/{session_id}/messages", json={"content": "Câu hỏi cần giữ lại khi model chưa sẵn sàng."})
+        assert failed.status_code == 503 and failed.json()["error"]["code"] == "LLM_NOT_CONFIGURED"
+        rows = (await client.get(f"/api/chat/sessions/{session_id}/messages")).json()["messages"]
+        assert len(rows) == 1 and rows[0]["role"] == "user"
+        user_message_time = rows[0]["createdAt"]
+    app = create_app(session_factory=sessions, settings=settings, llm_client=RecordingChatModel())
+
+    def fail_reply_write(db, *_):
+        if any(isinstance(item, ChatMessage) and item.session_id == session_id and item.role == "assistant" for item in db.new):
+            raise RuntimeError("test-only assistant write failure")
+
+    event.listen(sessions.class_, "before_flush", fail_reply_write)
+    try:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test", headers=headers) as client:
+            failed = await client.post(f"/api/chat/sessions/{session_id}/hints")
+            assert failed.status_code == 500 and "test-only" not in failed.text
+    finally:
+        event.remove(sessions.class_, "before_flush", fail_reply_write)
+    with sessions() as db:
+        assert db.scalar(select(func.count(ChatMessage.id)).where(ChatMessage.session_id == session_id)) == 1
+        assert db.get(ChatSession, session_id).updated_at.isoformat(timespec="microseconds").replace("+00:00", "Z") == user_message_time
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test", headers=headers) as client:
+        recovered = await client.post(f"/api/chat/sessions/{session_id}/hints")
+        assert recovered.status_code == 201 and recovered.json()["assistantMessage"]["hintLevel"] == 1
+
+
+@pytest.mark.anyio
+async def test_chat_assistant_compare_and_swap_is_atomic_in_mysql(database):
+    _, sessions = database
+    with sessions.begin() as db:
+        learner, _, topic = make_catalog(db)
+        learner_id, topic_id = learner.id, topic.id
+    repository = SqlAlchemyChatRepository(sessions)
+    session = await repository.create_session(learner_id, topic_id)
+    question = await repository.append_user_message(learner_id, session.id, "Câu hỏi xử lý đồng thời")
+
+    async def answer():
+        return await repository.append_assistant_message(learner_id, session.id, "Một gợi ý", hint_level=1, token_count=3, expected_last_id=question.id)
+
+    replies = await asyncio.gather(answer(), answer(), return_exceptions=True)
+    assert sum(isinstance(item, ChatChangedError) for item in replies) == 1
+    assert sum(not isinstance(item, Exception) for item in replies) == 1
+    with sessions() as db:
+        rows = db.scalars(select(ChatMessage).where(ChatMessage.session_id == session.id).order_by(ChatMessage.id)).all()
+        assert [item.role for item in rows] == ["user", "assistant"]
+        assert rows[-1].hint_level == 1
 
 
 @pytest.mark.anyio

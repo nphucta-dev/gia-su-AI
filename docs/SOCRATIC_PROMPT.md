@@ -54,16 +54,18 @@ LLM_MODEL=
 
 Đặt chúng trong `back-end/.env`. `LLM_API_URL` là địa chỉ API do nhà cung cấp đưa;
 `LLM_MODEL` là tên/ID model nếu API yêu cầu. Không đặt key ở frontend hay commit `.env`.
-Các giá trị này được ẩn khỏi `repr(Settings)` và chưa được dùng để gọi mạng.
+Các giá trị này được ẩn khỏi `repr(Settings)`; backend dùng chúng khi gửi tin qua adapter model.
 
-**Điền cấu hình chưa tự làm chat hoạt động.** Phần gọi API model (TK-020) và nối
-luồng chat cần được triển khai khi đã biết nhà cung cấp, giao thức và model.
-TK-030 này chưa làm lưu phiên/lịch sử, điều phối ba mức gợi ý, API xem lời giải,
-truy xuất nguồn hoặc lưu các cờ của tin nhắn. Frontend chat hiện vẫn là giao diện minh họa.
+Backend hiện đã có phiên/lịch sử, điều phối ba mức gợi ý và adapter API tương thích
+Chat Completions; xem [cách cấu hình và thử backend chat](CHAT_BACKEND.md). Sau khi
+điền cấu hình phù hợp và khởi động lại backend, API chat có thể gọi model. Frontend
+chat hiện vẫn là giao diện minh họa, chưa nối các API đó. API xem lời giải đầy đủ,
+truy xuất nguồn và các luồng ngoài phạm vi này chưa được thực hiện.
 
-Bộ tạo prompt chỉ nhận ngữ cảnh học tập, không tự lấy `User`, email, mật khẩu hay
-API key. Đây chưa phải bộ lọc PII của câu hỏi tự do (TK-084); phần đó cần được nối
-trước khi đưa dữ liệu thật sang dịch vụ model.
+Bộ tạo prompt lượt đầu chỉ nhận ngữ cảnh học tập, không tự lấy `User`, email, mật
+khẩu hay API key. Luồng API chat dùng `chat_context.py` để lọc thông tin tài khoản
+đã biết và các mẫu PII/bí mật trước khi gọi bộ tạo prompt hoặc model. Nếu gọi trực
+tiếp builder, cần dùng bộ lọc tương tự; xem giới hạn nhận diện trong tài liệu backend chat.
 
 ## Những gì đã kiểm tra offline
 

@@ -209,7 +209,7 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   thành công `ready`, lỗi `error`, cập nhật `processed_at` và trả `chunkCount`/`processedAt`.
   ADMIN có `POST /api/admin/documents/{id}/process` để xử lý pending cũ hoặc thử lại lỗi; UI có nút tương ứng.
   Chunks và trạng thái được ghi cùng transaction, xử lý ready không tạo đoạn trùng. Nguồn vẫn inactive;
-  chưa triển khai bật nguồn hoặc retrieval. Chat, quiz, dashboard
+  chưa triển khai bật nguồn hoặc retrieval. Frontend chat, quiz, dashboard
   còn phần minh họa. Chế độ xem thử localhost tiếp tục dùng dữ liệu mẫu.
   Cần kiểm tra từng phần trước khi đánh dấu TK xong.
 - Venv mặc định ở `back-end/venv`; các lệnh chạy ở README hiện hành. Không tự chạy migration,
@@ -217,7 +217,11 @@ Các quy tắc service không được thay thế bằng giả định schema đ
 - TK-030 đã có system prompt và bộ tạo messages cho lượt đầu trong `back-end/app/prompts/`;
   chạy thử offline bằng `python -m app.prompts`. Phần này ưu tiên gợi mở/hint 1 và chưa cung cấp
   lời giải đầy đủ; dữ liệu học tập chỉ nằm trong user JSON. Có các ô cấu hình tùy chọn
-  `LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL` nhưng chưa có adapter gọi model hoặc API chat thật.
-  Đọc `docs/SOCRATIC_PROMPT.md` để biết phạm vi, giới hạn kiểm thử offline và các tình huống
-  cần đánh giá khi có model; chưa đánh dấu hoàn thành điều phối gợi ý, PII, RAG hay chất lượng model.
+  `LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL`. Backend đã có adapter model và các API chat/gợi ý
+  (TK-018/021/023/025/032/081/084) theo yêu cầu bổ sung: `/api/chat/sessions`, tin nhắn và hints;
+  ngữ cảnh có giới hạn và lọc PII, giữ câu hỏi khi model thiếu cấu hình/lỗi. Chưa có key thật
+  thì không sinh câu trả lời giả. Không mở rộng yêu cầu sang audit sở hữu toàn bộ dữ liệu,
+  kiểm tra/lưu quiz hay các task frontend. Đọc `docs/CHAT_BACKEND.md` và `docs/SOCRATIC_PROMPT.md`
+  để biết hợp đồng API, cấu hình, giới hạn PII và kiểm thử. RAG, quota và chất lượng model
+  thực tế chưa được nghiệm thu; frontend chat vẫn chưa nối các API backend mới.
 

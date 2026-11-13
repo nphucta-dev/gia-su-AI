@@ -303,11 +303,15 @@ Prompt lượt đầu nằm ở `app/prompts/socratic_system.txt`; `build_first_
 .\venv\Scripts\python.exe -m app.prompts
 ```
 
-`LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL` đã có trong `.env.example` và `Settings`, cho phép để trống. Chưa có lời gọi model hoặc luồng chat thật; khi biết nhà cung cấp cần triển khai adapter/API chat. Xem [cách dùng và các tình huống đánh giá prompt](../docs/SOCRATIC_PROMPT.md).
+`LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL` có trong `.env.example` và `Settings`, cho phép để trống. Backend chat đã có adapter cho API tương thích Chat Completions; xem [API chat, cấu hình và gợi ý](../docs/CHAT_BACKEND.md). Xem thêm [cách dùng và các tình huống đánh giá prompt](../docs/SOCRATIC_PROMPT.md).
+
+## API hội thoại và gợi ý
+
+Backend có tạo phiên, gửi/lưu tin nhắn, lịch sử có phân trang, ngữ cảnh gần nhất và thang gợi ý 1–3 tại `/api/chat`. Lọc thông tin cá nhân được áp dụng cho bản sao payload gửi model. Chưa cấu hình model thì API gửi tin trả 503 và giữ lại câu hỏi; tạo phiên/lấy lịch sử vẫn hoạt động. Frontend chat hiện chưa nối các API này. Chi tiết và cách thử trên Swagger: [CHAT_BACKEND.md](../docs/CHAT_BACKEND.md).
 
 ## Việc cần làm tiếp
 
 - Các API ghi danh mục, chat và quiz sử dụng model trong `app/models/` và session transaction của `app/db/database.py`; kiểm tra chủ sở hữu và quy tắc nghiệp vụ theo tài liệu SRS trước khi lưu dữ liệu.
 - Chưa có refresh token và đăng xuất thu hồi token: token đã phát hành vẫn dùng được đến khi hết hạn. Nếu cần thu hồi ngay, thêm danh sách token bị thu hồi hoặc số phiên bản token theo người dùng.
 - Giới hạn số lần gọi theo IP cho `/api/auth/register` (mỗi lần băm tốn CPU và 32 MiB bộ nhớ).
-- Danh sách và quản lý môn/chủ đề, hồ sơ, upload/liệt kê/xử lý tài liệu đã dùng API thật. Nội dung chat, quiz và dashboard còn phần minh họa; bật/tắt nguồn và truy xuất tài liệu cho AI chưa triển khai.
+- Danh sách và quản lý môn/chủ đề, hồ sơ, upload/liệt kê/xử lý tài liệu đã dùng API thật. Backend chat/gợi ý có API riêng và adapter model; frontend chat, quiz và dashboard còn phần minh họa. Bật/tắt nguồn và truy xuất tài liệu cho AI chưa triển khai.
