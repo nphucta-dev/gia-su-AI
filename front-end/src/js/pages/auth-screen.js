@@ -1,5 +1,4 @@
-import { getSession, login, previewAvailable, startPreview, setLoginHint, takeLoginHint } from '../session.js';
-import { api } from '../api.js';
+import { getSession, login, previewAvailable, startPreview } from '../session.js';
 import { el, button } from '../components/ui.js';
 import { authTemplates } from './auth-templates.js';
 
@@ -10,13 +9,10 @@ export function renderAccountScreen(register = false) {
   const layout = el('div', {className: main.className});
   layout.append(...Array.from(main.childNodes, node => document.importNode(node, true)));
   const screen = el('div', {className: 'account-screen'}, layout);
-  const form = screen.querySelector('form');
-  setupForm(form);
+  setupForm(screen.querySelector('form'));
   const message = screen.querySelector('[data-form-message]');
-  const hint = register ? null : takeLoginHint();
-  if (hint?.email) form.elements.email.value = hint.email;
-  message.textContent = hint?.message || getSession().message;
-  if (hint?.kind === 'error' || (!hint && getSession().status === 'error')) message.classList.add('is-error');
+  message.textContent = getSession().message;
+  if (getSession().status === 'error') message.classList.add('is-error');
   if(!register && previewAvailable) {
     screen.querySelector('.auth-card').append(el('section', {className:'preview-login', 'aria-label':'Xem thử giao diện'},
       el('h2', {}, 'Xem thử giao diện'),
@@ -156,32 +152,22 @@ export function renderAccountScreen(register = false) {
         return;
       }
 
-      const register = form.dataset.authForm === 'register';
+      if(form.dataset.authForm !== 'login') {
+        message.textContent = 'Biểu mẫu đã hợp lệ. Chức năng gửi chưa được kết nối.';
+        message.classList.remove('is-error');
+        message.focus({preventScroll:true});
+        return;
+      }
       const submit = form.querySelector('[type="submit"]');
       const label = submit.textContent;
       submit.disabled = true;
       form.setAttribute('aria-busy', 'true');
-      submit.textContent = register ? 'Đang tạo tài khoản…' : 'Đang đăng nhập…';
+      submit.textContent = 'Đang đăng nhập…';
       message.classList.remove('is-error');
-      message.textContent = register ? 'Đang tạo tài khoản…' : 'Đang xác thực tài khoản…';
+      message.textContent = 'Đang xác thực tài khoản…';
       try {
-        if (register) {
-          const result = await api('/auth/register', {method: 'POST', auth: false, body: {
-            name: form.elements.name.value,
-            email: form.elements.email.value,
-            password: form.elements.password.value,
-            confirmPassword: form.elements.confirmPassword.value,
-            consent: form.elements.consent.checked,
-          }});
-          if (!form.isConnected) return;
-          form.elements.password.value = '';
-          form.elements.confirmPassword.value = '';
-          setLoginHint({email: result.user?.email || form.elements.email.value.trim(), message: 'Đăng ký thành công. Bạn có thể đăng nhập ngay.'});
-          location.hash = 'login';
-        } else {
-          const completed = await login(form.elements.email.value, form.elements.password.value);
-          if (completed !== false) form.elements.password.value = '';
-        }
+        await login(form.elements.email.value, form.elements.password.value);
+        form.elements.password.value = '';
       } catch(error) {
         if(!form.isConnected) return;
         message.textContent = error.message;
