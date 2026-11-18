@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gia Sư AI - Đăng ký</title>
+  <link rel="stylesheet" href="auth.css">
+  <style>
+    .account-screen .auth-layout { grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.88fr); }
+    @media (max-width: 47.99rem) { .account-screen .auth-layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body class="account-screen">
+  <a class="skip-link" href="#register-form">Bỏ qua đến biểu mẫu</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="Gia Sư AI">
+        <span class="brand-mark" aria-hidden="true">✦</span><span>Gia Sư AI</span>
+      </a>
+      <span class="header-note">Học theo cách bạn hiểu</span>
+    </div>
+  </header>
+
+  <main class="auth-layout auth-layout--register">
+    <section class="auth-card" aria-labelledby="page-title">
+      <nav class="auth-tabs" aria-label="Tài khoản">
+        <a class="auth-tab" href="#">Đăng nhập</a>
+        <a class="auth-tab is-active" href="#register" aria-current="page">Đăng ký</a>
+      </nav>
+      <div class="card-heading">
+        <p class="eyebrow">Bắt đầu học</p>
+        <h1 id="page-title">Tạo tài khoản</h1>
+        <p>Điền thông tin bên dưới để chuẩn bị tài khoản học tập.</p>
+      </div>
+      <form id="register-form" class="auth-form" novalidate>
+        <div class="form-message" data-form-message role="status" aria-live="polite" tabindex="-1"></div>
+        <div class="form-field">
+          <label for="register-name">Họ tên</label>
+          <input id="register-name" name="name" type="text" autocomplete="name" maxlength="120" required>
+          <p class="field-error" data-error-for="name"></p>
+        </div>
+        <div class="form-field">
+          <label for="register-email">Email</label>
+          <input id="register-email" name="email" type="email" inputmode="email" autocomplete="username" maxlength="255" required placeholder="ban@example.com">
+          <p class="field-error" data-error-for="email"></p>
+        </div>
+        <div class="form-field">
+          <label for="register-password">Mật khẩu</label>
+          <div class="password-field">
+            <input id="register-password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required aria-describedby="password-hint password-error">
+            <button class="password-toggle" type="button" data-password-toggle aria-controls="register-password" aria-pressed="false">Hiện</button>
+          </div>
+          <p class="field-hint" id="password-hint">Sử dụng từ 8 đến 128 ký tự. Khoảng trắng trong mật khẩu được giữ nguyên.</p>
+          <p class="field-error" id="password-error" data-error-for="password"></p>
+        </div>
+        <div class="form-field">
+          <label for="register-confirm-password">Nhập lại mật khẩu</label>
+          <div class="password-field">
+            <input id="register-confirm-password" name="confirmPassword" type="password" autocomplete="new-password" required>
+            <button class="password-toggle" type="button" data-password-toggle aria-controls="register-confirm-password" aria-pressed="false">Hiện</button>
+          </div>
+          <p class="field-error" data-error-for="confirmPassword"></p>
+        </div>
+        <div class="consent-field">
+          <input id="register-consent" name="consent" type="checkbox" required>
+          <div>
+            <label for="register-consent">Tôi đồng ý với quy định sử dụng cho người học từ đủ 18 tuổi.</label>
+            <p class="field-error" data-error-for="consent"></p>
+          </div>
+        </div>
+        <button class="primary-button" type="submit">Tạo tài khoản</button>
+      </form>
+      <p class="account-switch">Đã có tài khoản? <a href="#">Đăng nhập</a></p>
+    </section>
+    <aside class="product-intro" aria-labelledby="intro-title">
+      <p class="intro-label">Gia sư gợi mở</p>
+      <h2 id="intro-title">Học theo cách bạn hiểu.</h2>
+      <p>Hỏi từng bước, tự tìm lời giải và nhìn thấy sự tiến bộ sau mỗi bài học.</p>
+      <ul class="learning-points" aria-label="Lợi ích của Gia Sư AI">
+        <li><span aria-hidden="true">01</span> Gợi ý thay vì làm hộ</li>
+        <li><span aria-hidden="true">02</span> Luyện tập theo chủ đề</li>
+        <li><span aria-hidden="true">03</span> Phản hồi dễ hiểu</li>
+      </ul>
+    </aside>
+  </main>
+  <footer class="site-footer"><span>© Gia Sư AI</span><span>Bản xem trước trang đăng ký</span></footer>
+  <script src="register.js"></script>
+</body>
+</html>
