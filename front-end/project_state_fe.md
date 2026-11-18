@@ -1,6 +1,6 @@
 # Trạng thái Frontend — Gia Sư AI
 
-Ngày cập nhật: 16/11/2026
+Ngày cập nhật: 18/11/2026
 Phạm vi: trạng thái frontend sau khi đối chiếu `git diff` hiện tại với các task T2/T3 trong `docs/reference/task-assignments.json`. Đây là đánh giá code trong working tree; file phân công chỉ dùng để tra task, không dùng trạng thái trong file làm bằng chứng nghiệm thu.
 
 ## Kết luận từ git diff
@@ -48,7 +48,7 @@ Các mục trên chỉ xác nhận phần UI hoặc client behavior; task nghi�
 | TK-054 | Cảnh báo câu chưa trả lời | Có phần UI; chưa nối submit thật |
 | TK-057 | Gửi đáp án quiz | Chưa xong; chỉ giữ đáp án trong state trình duyệt |
 | TK-060 | Trang kết quả quiz | Chưa xong; tính điểm từ dữ liệu mẫu |
-| TK-068 | Trang quản trị môn/chủ đề | Chưa xong và đang bị hồi quy; diff bỏ CRUD API, chỉ còn preview |
+| TK-068 | Trang quản trị môn/chủ đề | Đã nối API CRUD cho môn học/chủ đề và trạng thái active; có loading, lỗi/thử lại, validation, tìm kiếm và responsive 360px. Preview vẫn tách riêng, không ghi API. |
 | TK-069 | Trang quản trị tài liệu | Chưa xong và đang bị hồi quy; upload/trạng thái/bật tắt chỉ ở preview |
 | TK-076 | UI hiển thị quota | Chưa xong; chưa có quota API thật |
 | TK-083 | Nhãn cảnh báo nội dung AI | Có phần UI |
