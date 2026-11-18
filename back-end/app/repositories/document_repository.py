@@ -67,6 +67,17 @@ class DocumentRecord:
     chunk_count: int = 0
 
 
+@dataclass(frozen=True)
+class DocumentChunkRecord:
+    id: int
+    document_id: int
+    document_title: str
+    topic_id: int
+    chunk_index: int
+    content: str
+    source_url: str | None = None
+
+
 def missing_topic_error() -> AppError:
     message = "Chủ đề không tồn tại hoặc môn/chủ đề đã bị vô hiệu hóa."
     return AppError(404, "TOPIC_NOT_FOUND", message, {"topic_id": message})
@@ -84,6 +95,8 @@ class DocumentRepository(Protocol):
     async def find_document(self, document_id: int) -> DocumentRecord | None: ...
 
     async def finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None: ...
+
+    async def list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]: ...
 
 
 ProtocolDocumentRepository = DocumentRepository
@@ -171,6 +184,29 @@ class InMemoryDocumentRepository:
         self._documents[document_id] = result
         return result
 
+    async def list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]:
+        eligible_docs = sorted(
+            (
+                doc for doc in self._documents.values()
+                if doc.topic_id == topic_id and doc.status == "ready" and doc.is_active is True
+            ),
+            key=lambda item: item.id,
+        )
+        results: list[DocumentChunkRecord] = []
+        chunk_id = 1
+        for doc in eligible_docs:
+            for index, content in enumerate(self._chunks.get(doc.id, ())):
+                results.append(DocumentChunkRecord(
+                    id=chunk_id,
+                    document_id=doc.id,
+                    document_title=doc.title,
+                    topic_id=doc.topic_id,
+                    chunk_index=index,
+                    content=content,
+                ))
+                chunk_id += 1
+        return results
+
 
 class SqlAlchemyDocumentRepository:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
@@ -193,6 +229,9 @@ class SqlAlchemyDocumentRepository:
 
     async def finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None:
         return await asyncio.to_thread(self._finish_processing, document_id, chunks=chunks)
+
+    async def list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]:
+        return await asyncio.to_thread(self._list_eligible_chunks, topic_id)
 
     def _list_subjects(self) -> list[UploadSubject]:
         with self._sessions() as db:
@@ -273,6 +312,31 @@ class SqlAlchemyDocumentRepository:
             # Chunks và trạng thái cùng commit; lỗi ghi sẽ rollback toàn bộ.
             db.flush()
             return self._to_record(document, topic.name, subject.name, len(chunks or ()))
+
+    def _list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]:
+        with self._sessions() as db:
+            rows = db.execute(
+                select(DocumentChunk, DocumentModel.title, DocumentModel.topic_id, DocumentModel.source_url)
+                .join(DocumentModel, DocumentModel.id == DocumentChunk.document_id)
+                .where(
+                    DocumentModel.topic_id == topic_id,
+                    DocumentModel.status == "ready",
+                    DocumentModel.is_active.is_(True),
+                )
+                .order_by(DocumentModel.id, DocumentChunk.chunk_index)
+            )
+            return [
+                DocumentChunkRecord(
+                    id=chunk.id,
+                    document_id=chunk.document_id,
+                    document_title=title,
+                    topic_id=doc_topic_id,
+                    chunk_index=chunk.chunk_index,
+                    content=chunk.content,
+                    source_url=source_url,
+                )
+                for chunk, title, doc_topic_id, source_url in rows
+            ]
 
     def _create(self, *, topic_id: int, title: str, file_path: str) -> DocumentRecord:
         with self._sessions.begin() as db:
