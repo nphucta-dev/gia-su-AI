@@ -1,9 +1,27 @@
-import { el, button, heading, notice, confirmDialog } from '../components/ui.js';
-import { topics } from '../data.js';
+import { el, button, heading, notice, confirmDialog, link } from '../components/ui.js';
+import { loadCatalog, flattenTopics } from '../catalog.js';
 import {setupValidation,validateFields} from '../components/validation.js';
+
 export function renderChat() {
- const selectedId = new URLSearchParams(location.hash.split('?')[1]).get('topic');
- const topic = topics.find(t => t.id === selectedId) || topics[0];
+ const root = el('div', {}, el('div', { role: 'status' }, 'Đang tải chủ đề…'));
+ const showError = (title, text, retry) => root.replaceChildren(heading(title, text), retry ? button('Thử lại', retry, 'primary') : null, link('Về trang học', '#home'));
+ (async function open() {
+  try {
+   const topics = flattenTopics(await loadCatalog());
+   if (!root.isConnected) return;
+   if (!topics.length) return showError('Chưa có chủ đề', 'Hiện chưa có chủ đề nào được mở để học.');
+   const selectedId = new URLSearchParams(location.hash.split('?')[1]).get('topic');
+   const topic = selectedId ? topics.find(t => String(t.id) === selectedId) : topics[0];
+   if (!topic) return showError('Chủ đề không khả dụng', 'Chủ đề này không tồn tại hoặc đã được tắt.');
+   root.replaceChildren(buildChat(topics, topic));
+  } catch (error) {
+   if (root.isConnected) showError('Chưa tải được chủ đề', error.message, open);
+  }
+ })();
+ return root;
+}
+
+function buildChat(topics, topic) {
  const messages = el('div', { className: 'messages', 'aria-live': 'polite', 'aria-label': 'Nội dung hội thoại' });
  let hintLevel = 0;
  const add = (text, role = 'assistant') => { const message = el('div', { className: `message ${role}` }, el('p', {}, text)); messages.append(message); message.scrollIntoView({ block: 'nearest' }); return message; };

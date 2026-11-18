@@ -1,15 +1,20 @@
-import { getSession, subscribeSession, restoreSession, logout, isAdmin, cancelPendingLogin } from './session.js';
+import { getSession, getAccessToken, subscribeSession, restoreSession, logout, isAdmin, cancelPendingLogin } from './session.js';
 import { renderHome, renderDashboard } from './pages/learning.js';
 import { renderAuth, renderProfile } from './pages/account.js';
 import { renderChat } from './pages/chat.js';
 import { renderPractice, renderResults } from './pages/practice.js';
 import { renderAdmin } from './pages/admin.js';
 import { renderHistory, renderIntro } from './pages/history.js';
-import { el, heading, link, button } from './components/ui.js';
+import { el, heading, link, notice, button } from './components/ui.js';
+import { api } from './api.js';
+import { setCurrentUser, loginDestination } from './session.js';
+
 const routes = { intro: renderIntro, history: renderHistory, home: renderHome, chat: renderChat, practice: renderPractice, results: renderResults, dashboard: renderDashboard, profile: renderProfile, admin: renderAdmin, login: () => renderAuth(false), register: () => renderAuth(true) };
-const titles = { intro:'Giới thiệu',history:'Lịch sử học tập',home: 'Trang học', chat: 'Hỏi gia sư', practice: 'Luyện tập', results: 'Kết quả', dashboard: 'Tiến độ', profile: 'Hồ sơ', admin: 'Quản trị', login: 'Đăng nhập', register: 'Đăng ký' };
+const titles = { intro: 'Giới thiệu', history: 'Lịch sử học tập', home: 'Trang học', chat: 'Hỏi gia sư', practice: 'Luyện tập', results: 'Kết quả', dashboard: 'Tiến độ', profile: 'Hồ sơ', admin: 'Quản trị', login: 'Đăng nhập', register: 'Đăng ký' };
+const protectedRoutes = new Set(['home', 'chat', 'practice', 'results', 'dashboard', 'profile', 'history', 'admin']);
 const menu = document.querySelector('.mobile-menu-button');
 const accountMenu = document.querySelector('.account-menu');
+let renderVersion = 0;
 accountMenu.addEventListener('click', e => { if(e.target.closest('a, button')) accountMenu.open = false; });
 document.addEventListener('click', e => { if(!accountMenu.contains(e.target)) accountMenu.open = false; });
 const sidebarToggle = document.querySelector('.admin-sidebar-toggle');
@@ -39,7 +44,6 @@ function setNavigationOpen(open, restoreFocus = false) {
 menu.addEventListener('click', () => setNavigationOpen(menu.getAttribute('aria-expanded') !== 'true'));
 navBackdrop.addEventListener('click', () => setNavigationOpen(false, true));
 window.addEventListener('resize', () => { if(matchMedia('(min-width:1100px)').matches) setNavigationOpen(false); });
-const protectedRoutes = new Set(['dashboard', 'profile', 'history', 'chat', 'practice', 'results', 'admin']);
 function updateAccountMenu() {
  const session = getSession();
  const banner = document.querySelector('#preview-banner');
@@ -58,6 +62,7 @@ function updateAccountMenu() {
  }
  if(!isAdmin()) items.push(link('Giới thiệu', '#intro', ''));
  nav.replaceChildren(...items);
+ accountMenu.querySelector('summary').textContent = session.user?.name || 'Tài khoản';
  const authenticated = session.status === 'authenticated';
  const brand = document.querySelector('.brand');
  brand.href = authenticated ? (isAdmin() ? '#admin?tab=subjects' : '#home') : '#intro';
@@ -117,7 +122,8 @@ document.addEventListener('keydown', event => {
   setNavigationOpen(false, menu.getAttribute('aria-expanded') === 'true');
  }
 });
-function render() {
+async function render() {
+ const version = ++renderVersion;
  const session = getSession();
  const requestedRoute = location.hash.slice(1).split('?')[0];
  const route = requestedRoute || (session.status === 'authenticated' ? (isAdmin() ? 'admin' : 'home') : 'intro');
@@ -134,7 +140,7 @@ function render() {
    main.replaceChildren(el('div', {}, heading(session.status === 'checking' ? 'Đang kiểm tra phiên…' : 'Chưa xác minh được phiên', session.message), retry));
    return;
   }
-  if(session.status !== 'authenticated') { replaceRoute('login'); return; }
+  if(session.status !== 'authenticated') { replaceRoute('login?next=' + encodeURIComponent(location.hash.slice(1) || route)); return; }
   if(route === 'admin' && !isAdmin()) {
    main.replaceChildren(el('div', {}, heading('Không có quyền truy cập', 'Khu vực quản trị chỉ dành cho quản trị viên.'), link('Về tiến độ học tập', '#dashboard')));
    document.title = 'Không có quyền truy cập · Gia Sư AI';
@@ -144,7 +150,27 @@ function render() {
   }
  }
  if(isAdmin() && ['intro','home','chat','practice','results','dashboard','history'].includes(route)) { replaceRoute('admin?tab=subjects'); return; }
- if(session.status === 'authenticated' && ['login','register'].includes(route)) { replaceRoute(isAdmin() ? 'admin' : 'dashboard'); return; }
+ if(session.status === 'authenticated' && ['login','register'].includes(route)) { replaceRoute(loginDestination()); return; }
+ if(route === 'admin' && session.reason !== 'preview') {
+  main.replaceChildren(el('div', {role:'status'}, 'Đang kiểm tra quyền truy cập…'));
+  try {
+   const result = await api('/auth/me');
+   if(version !== renderVersion) return;
+   if(!result?.user?.id) throw new Error('Chưa thể xác thực tài khoản. Vui lòng thử lại.');
+   setCurrentUser(result.user, {notifyChange:false});
+   updateAccountMenu();
+   if(result.user.role !== 'ADMIN') {
+    main.replaceChildren(el('div', {}, heading('Không có quyền truy cập', 'Khu vực quản trị chỉ dành cho quản trị viên.'), link('Về trang học', '#home')));
+    return;
+   }
+   await api('/admin/access');
+   if(version !== renderVersion) return;
+  } catch(error) {
+   if(version !== renderVersion) return;
+   main.replaceChildren(el('div', {}, heading(error.status === 403 ? 'Không có quyền truy cập' : 'Chưa thể mở trang quản trị', ''), notice(error.message, 'error'), button('Thử lại', render, 'primary'), link('Về trang học', '#home')));
+   return;
+  }
+ }
  document.querySelector('#toast-region').replaceChildren();
  accountMenu.open = false;
  main.replaceChildren(routes[route] ? routes[route]() : el('div', {}, heading('Không tìm thấy trang', 'Đường dẫn này chưa có trong bản giao diện.'), link('Về trang học', '#home')));
@@ -166,10 +192,13 @@ subscribeSession(session => {
  render();
 });
 window.addEventListener('hashchange', () => {
- if(getSession().status === 'authenticated') restoreSession(); else { cancelPendingLogin(); render(); }
+ cancelPendingLogin();
+ getAccessToken();
+ render();
 });
-window.addEventListener('pageshow', event => { if(event.persisted) restoreSession(); });
+// Quay lại tab/cửa sổ chỉ kiểm tra thời hạn token, giữ nguyên giao diện đang thao tác.
+window.addEventListener('pageshow', event => { if(event.persisted) getAccessToken(); });
 document.addEventListener('visibilitychange', () => {
- if(document.visibilityState === 'visible' && getSession().status === 'authenticated') restoreSession();
+ if(document.visibilityState === 'visible') getAccessToken();
 });
 render(); restoreSession();

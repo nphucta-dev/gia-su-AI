@@ -24,3 +24,12 @@ export function setupValidation(form, inputs) {
  form.noValidate = true;
  inputs.forEach(input => { input.addEventListener('input', () => clearError(input)); input.addEventListener('change', () => clearError(input)); });
 }
+
+export function showServerErrors(fields, inputs) {
+ let first = null;
+ for (const [name, message] of Object.entries(fields || {})) {
+  const input = inputs[name];
+  if (input && typeof message === 'string') { showError(input, message); first ||= input; }
+ }
+ first?.focus();
+}

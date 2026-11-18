@@ -4,21 +4,25 @@ HTML/CSS/JavaScript thuần dùng ES modules. Mã giao diện thống nhất tro
 
 ## Chạy
 
-Từ front-end/: chạy node serve.cjs rồi mở http://127.0.0.1:4173. Có thể đặt biến môi trường PORT để đổi cổng. Không mở index.html bằng file://.
+Chạy backend bằng Uvicorn trên cổng 8000 theo README gốc của dự án. Từ `front-end/`, chạy `node serve.cjs` rồi mở http://127.0.0.1:4173. Không mở `index.html` bằng `file://`.
+
+Server frontend chuyển tiếp `/api` tới `http://127.0.0.1:8000`. Có thể đặt `PORT` để đổi cổng frontend hoặc `BACKEND_URL` để đổi địa chỉ backend. Backend cần kết nối MySQL và đã tạo schema để các chức năng lưu dữ liệu hoạt động.
 
 ## Tài khoản và phân quyền
 
 - src/js/session.js quản lý trạng thái checking, anonymous, authenticated và error.
 - Menu lấy trạng thái phiên chung: khách thấy Đăng nhập/Đăng ký; LEARNER thấy Hồ sơ/Lịch sử/Đăng xuất; ADMIN có thêm Quản trị nội dung.
-- Các route chat, practice, results, dashboard, profile, history cần phiên được xác minh; admin cần role ADMIN. Role không nhận diện được bị từ chối.
+- Các route home, chat, practice, results, dashboard, profile, history cần phiên được xác minh; admin cần role ADMIN. Role không nhận diện được bị từ chối.
 - Hồ sơ hiển thị tên/email/role từ máy chủ; không hard-code sinh viên hoặc quyền quản trị.
-- Mỗi lần tải lại, đổi hash hoặc quay lại tab, token được kiểm tra qua GET /api/auth/me trước khi render nội dung cá nhân. Lỗi mạng giữ token để thử lại, nhưng không mở nội dung cá nhân. HTTP 401/403 xóa phiên phía trình duyệt.
-- POST /api/auth/login gửi JSON email/password theo hợp đồng ở origin/feature/auth-and-database (routes/auth.py, schemas/auth.py). Frontend chỉ cấp quyền sau khi GET /api/auth/me xác minh lại người dùng; không tin role trong payload login hoặc localStorage.
-- Base URL cấu hình trong meta api-base ở index.html, mặc định http://localhost:8000. Backend phải cho phép CORS đúng origin frontend.
+- Khi tải trang, token được kiểm tra qua GET /api/auth/me. Chuyển tab/cửa sổ chỉ kiểm tra thời hạn token tại trình duyệt, giữ nguyên form đang nhập và file đang chọn. API tiếp tục kiểm tra token và quyền cho từng yêu cầu; phản hồi 401 hoặc /auth/me trả 403 sẽ xóa phiên.
+- POST /api/auth/register tạo tài khoản; POST /api/auth/login gửi JSON email/password. Frontend chỉ cấp quyền sau khi GET /api/auth/me xác minh lại người dùng; không tin role trong payload login hoặc localStorage.
+- Base URL cấu hình trong meta api-base ở index.html, mặc định `/api`. Nếu dùng URL backend trực tiếp, giá trị phải bao gồm `/api` và backend phải cho phép CORS đúng origin frontend.
 - Token Bearer lưu trong sessionStorage của tab, không lưu mật khẩu. Khi storage bị chặn, phiên chỉ tồn tại trong bộ nhớ. Dữ liệu người dùng không được lưu riêng ở localStorage.
 - Đăng xuất xóa token, trạng thái người dùng, kết quả luyện tập trong bộ nhớ và nội dung dialog rồi về #login. Đây là đăng xuất trên tab hiện tại; không thu hồi token trên máy chủ hoặc đăng xuất thiết bị/tab khác. Backend hiện chưa có hợp đồng thu hồi token/logout.
 
-**Giới hạn backend hiện tại:** Nhánh tích hợp này có đăng ký và /me nhưng chưa có /login. Cần tích hợp backend đăng nhập đã có trên nhánh feature/auth-and-database để đăng nhập thật; lỗi 404 hiển thị thông báo cụ thể, không tạo phiên giả. Đăng ký vẫn chỉ kiểm tra form tại trình duyệt. Các trang học tập và quản trị dùng nội dung minh họa trong bộ nhớ, chưa gọi API dữ liệu. Bảo vệ router chỉ phục vụ điều hướng; API quản trị tương lai phải dùng dependency require_roles ở backend.
+**Phạm vi đã kết nối:** đăng ký/đăng nhập, hồ sơ GET/PATCH, danh mục môn/chủ đề theo cấp học, quản trị môn/chủ đề và tải/liệt kê/xử lý tài liệu gọi API thật. Backend kiểm tra phân quyền độc lập với router frontend.
+
+**Giới hạn giao diện:** hội thoại, bài quiz, kết quả, lịch sử học tập và dashboard còn dùng nội dung minh họa. Chat và luyện tập đã lấy danh mục chủ đề từ API nhưng chưa nối luồng chat hoặc lưu quiz; không coi dữ liệu mẫu là kết quả AI hay dữ liệu đã lưu. TK-052 là phần kiểm tra/lưu quiz ở backend, không đồng nghĩa frontend quiz đã tích hợp.
 
 ## Cấu trúc
 
@@ -32,16 +36,15 @@ Từ front-end/: chạy node serve.cjs rồi mở http://127.0.0.1:4173. Có th�
 
 ## Kiểm thử
 
-Khởi động server rồi chạy từ front-end/:
+Cài `back-end/requirements-dev.txt` trong venv backend và dependencies frontend. Từ `front-end/` trên PowerShell:
 
-    node tests/browser.cjs
-    node tests/login.cjs
-    node tests/auth.cjs
-    node tests/session.cjs
+    npm.cmd install
+    npm.cmd test
+    npm.cmd run test:login
 
-Đặt BASE_URL nếu server dùng cổng khác, ví dụ http://127.0.0.1:4183. Test hiện dùng đường dẫn Playwright runtime và Edge theo máy phát triển. Các phản hồi đăng nhập, /me và role trong test được giả lập bằng Playwright route; fixture chỉ tồn tại trong tests/, không được import bởi ứng dụng. Kết quả này không chứng minh backend đăng nhập đã được tích hợp hoặc token đã bị thu hồi trên máy chủ.
+Bộ test tự mở frontend/backend trên cổng tạm, dùng repository trong bộ nhớ và đóng server khi xong; không cần bật server 4173/8000, không ghi database dự án. Playwright lấy từ dependencies của dự án. Trên Windows mặc định dùng Edge; có thể đặt `PLAYWRIGHT_CHANNEL` hoặc `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` để chọn trình duyệt đã cài.
 
-Bộ session kiểm tra khách, LEARNER/ADMIN, role thiếu/sai, role login không đáng tin, URL quản trị trực tiếp, bàn phím/mobile, logout/Back/reload/relogin, backend thiếu endpoint, sai mật khẩu, phiên hết hạn, lỗi mạng/thử lại và yêu cầu đăng nhập hoàn tất sau khi đã chuyển trang. Ảnh kiểm tra tài khoản lưu trong tests/test-output/ (Git bỏ qua).
+`npm.cmd test` kiểm tra đăng ký/đăng nhập thật với API fixture, JWT, quyền, layout, danh mục/cấp học, quản trị, hồ sơ, upload/xử lý tài liệu, giữ form khi chuyển tab, hết hạn phiên và lỗi backend. `test:login` chỉ chạy nhóm tài khoản. Kiểm thử này không xác nhận kết nối MySQL thật hoặc chất lượng phản hồi model AI.
 
 ## Đăng nhập thử giao diện trên localhost
 
@@ -51,9 +54,9 @@ Tại #login, dùng “Vào thử tài khoản sinh viên” hoặc “Vào th�
 
 Theo SRS FR-05/FR-08, ADMIN quản lý môn học, chủ đề và tài liệu nguồn. Điều hướng ADMIN gồm ba mục riêng trong sidebar tối trên desktop và menu thu gọn trên mobile, menu tài khoản chỉ có Hồ sơ quản trị và Đăng xuất. URL chuẩn là #admin?tab=subjects, #admin?tab=topics, #admin?tab=documents. Tab không hợp lệ trở về subjects. Back/Forward/reload đồng bộ mục đang chọn. Các URL học tập được đưa về quản trị khi role ADMIN; LEARNER vẫn bị chặn trước khi render admin.
 
-Hồ sơ quản trị chỉ hiển thị tên/email/role từ session, chưa hỗ trợ lưu hồ sơ lên API. Danh mục minh họa giữ trong bộ nhớ qua các lần chuyển tab, reset khi reload, đăng xuất hoặc thay đổi người dùng/role. Đổi tên môn/chủ đề cập nhật tham chiếu liên quan; tạo chủ đề dùng danh sách môn thực tế. Upload chỉ kiểm tra tệp và thêm bản ghi chờ minh họa; retry/bật tắt không gọi backend. Backend hiện chưa có API quản trị nên kết quả test chỉ xác minh UI và bảo vệ route, không khẳng định API trả 403.
+Với tài khoản thật, hồ sơ quản trị lưu qua API hồ sơ; tạo/sửa/bật tắt môn và chủ đề gọi API quản trị theo ID. Upload PDF/TXT được backend kiểm tra, trích văn bản và tách đoạn; tài liệu pending/error có thao tác xử lý/thử lại. Nguồn sau xử lý vẫn chưa được bật tự động; bật nguồn và retrieval chưa nối giao diện. LEARNER gọi API quản trị nhận 403.
 
-Kiểm tra thêm: node tests/admin.cjs và node tests/preview.cjs. Test admin bao phủ điều hướng/hồ sơ theo role, ba tab ở 360/390/768/1440px, URL/Back/Forward/reload, thêm/sửa/bật tắt, liên kết môn/chủ đề, lọc và upload/retry tài liệu minh họa, logout/Back. Ảnh kiểm tra ở tests/test-output/admin-*.png (Git bỏ qua).
+Với chế độ xem thử, thay đổi danh mục và tài liệu chỉ nằm trong bộ nhớ; tải lại hoặc đăng xuất sẽ đặt lại dữ liệu. Bộ `npm.cmd test` bao gồm kiểm tra tách biệt chế độ này với các thao tác ghi API thật.
 
 ### Thiết kế ADMIN từ Figma
 

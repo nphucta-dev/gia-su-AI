@@ -142,8 +142,10 @@ class TokenService:
         user_id = claims.get("sub")
         if claims.get("type") != TOKEN_TYPE_ACCESS or not isinstance(user_id, str) or not user_id:
             raise invalid_token_error()
-        return TokenPayload(
-            user_id=user_id,
-            issued_at=datetime.fromtimestamp(claims["iat"], tz=timezone.utc),
-            expires_at=datetime.fromtimestamp(claims["exp"], tz=timezone.utc),
-        )
+        try:
+            issued_at = datetime.fromtimestamp(claims["iat"], tz=timezone.utc)
+            expires_at = datetime.fromtimestamp(claims["exp"], tz=timezone.utc)
+        except (OverflowError, OSError, ValueError, TypeError):
+            # NumericDate có thể vượt miền datetime dù chữ ký và kiểm tra hạn đã hợp lệ.
+            raise invalid_token_error() from None
+        return TokenPayload(user_id=user_id, issued_at=issued_at, expires_at=expires_at)

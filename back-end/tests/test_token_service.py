@@ -181,6 +181,12 @@ def test_token_phat_hanh_o_tuong_lai_bi_tu_choi():
     assert_invalid(make_service(), token)
 
 
+@pytest.mark.parametrize("date_claim,value", [("iat", -(10**30)), ("exp", 10**30)])
+def test_timestamp_vuot_mien_datetime_bi_tu_choi_thay_vi_loi_may_chu(date_claim, value):
+    token = jwt.encode(claims(**{date_claim: value}), SECRET, algorithm="HS256")
+    assert_invalid(make_service(), token)
+
+
 def test_thong_bao_loi_khong_tiet_lo_nguyen_nhan_cu_the():
     service = make_service()
     forged = jwt.encode(claims(), "mot-khoa-khac-" + "y" * 30, algorithm="HS256")

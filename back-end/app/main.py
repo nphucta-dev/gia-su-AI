@@ -25,7 +25,9 @@ from app.middlewares.body_limit import BodySizeLimitMiddleware
 from app.middlewares.security_headers import SecurityHeadersMiddleware
 from app.repositories.catalog_repository import InMemoryCatalogRepository
 from app.repositories.chat_repository import ChatRepository, InMemoryChatRepository
+from app.repositories.quiz_repository import QuizRepository, InMemoryQuizRepository
 from app.repositories.sqlalchemy_chat_repository import SqlAlchemyChatRepository
+from app.repositories.sqlalchemy_quiz_repository import SqlAlchemyQuizRepository
 from app.repositories.sqlalchemy_catalog_repository import SqlAlchemyCatalogRepository
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.repositories.document_repository import DocumentRepository, SqlAlchemyDocumentRepository
@@ -41,6 +43,7 @@ from app.services.auth_service import AuthService, UserRepository
 from app.services.admin_catalog_service import AdminCatalogService
 from app.services.catalog_service import CatalogRepository, CatalogService
 from app.services.chat_service import ChatService
+from app.services.quiz_service import QuizService
 from app.services.llm_client import ChatCompletionsClient, LLMClient
 from app.services.token_service import TokenService
 from app.utils.password import hash_password
@@ -60,6 +63,7 @@ def create_app(
     upload_dir: Path | str | None = None,
     chat_repository: ChatRepository | None = None,
     llm_client: LLMClient | None = None,
+    quiz_repository: QuizRepository | None = None,
 ) -> FastAPI:
     """Tạo ứng dụng. Các phụ thuộc được truyền vào để dễ thay kho dữ liệu (ví dụ CSDL
     thật) và để test độc lập, không cần mở cổng thật."""
@@ -107,6 +111,13 @@ def create_app(
             else InMemoryChatRepository(catalog if isinstance(catalog, InMemoryCatalogRepository) else None)
         )
     app.state.chat_service = ChatService(chat, llm_client or ChatCompletionsClient(settings), settings)
+    quiz = quiz_repository
+    if quiz is None:
+        quiz = (
+            SqlAlchemyQuizRepository(session_factory) if session_factory is not None
+            else InMemoryQuizRepository(catalog if isinstance(catalog, InMemoryCatalogRepository) else None)
+        )
+    app.state.quiz_service = QuizService(quiz)
     app.state.token_service = token_service or TokenService(
         secret=settings.jwt_secret,
         issuer=settings.jwt_issuer,

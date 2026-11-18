@@ -1,14 +1,26 @@
 import { onSessionCleared } from '../session.js';
 import { el, button, link, heading, panel, field, badge, confirmDialog, notice } from '../components/ui.js';
 import { questions } from '../data.js';
+import { loadCatalog, flattenTopics } from '../catalog.js';
 let lastResult = null;
 onSessionCleared(() => { lastResult = null; });
 export function renderPractice() {
  const root = el('div', {}, heading('Luyện tập kiến thức', '5 câu hỏi. Tự kiểm tra mức hiểu bài và xem giải thích sau khi nộp.'));
  const difficulty = el('select', { className: 'select' }, ...['Dễ', 'Vừa', 'Khó'].map(s => el('option', {}, s)));
- const topic=el('select',{className:'select'},el('option',{},'Phương trình bậc hai'));
- const start = panel('Tạo bài luyện tập', el('p', {}, 'Chọn chủ đề và mức độ để bắt đầu.'),el('div',{className:'form-grid'},field('Chủ đề',topic), field('Mức độ', difficulty), button('Bắt đầu luyện tập', () => openQuiz(), 'primary')));
+ const topic = el('select', { className: 'select', disabled: true }, el('option', { value: '' }, 'Đang tải chủ đề…'));
+ const startButton = button('Bắt đầu luyện tập', () => openQuiz(), 'primary');
+ startButton.disabled = true;
+ const status = el('div', { role: 'status' });
+ const start = panel('Tạo bài luyện tập', el('p', {}, 'Chọn chủ đề và mức độ để bắt đầu.'), status, el('div', { className: 'form-grid' }, field('Chủ đề', topic), field('Mức độ', difficulty), startButton));
  root.append(start);
+ loadCatalog().then(subjects => {
+  if (!root.isConnected) return;
+  const items = flattenTopics(subjects);
+  if (!items.length) { topic.replaceChildren(el('option', { value: '' }, 'Chưa có chủ đề')); status.replaceChildren(notice('Hiện chưa có chủ đề nào được mở.', 'warning')); return; }
+  const wanted = new URLSearchParams(location.hash.split('?')[1]).get('topic');
+  topic.replaceChildren(...items.map(t => el('option', { value: t.id, selected: String(t.id) === wanted }, `${t.subjectName} · ${t.name}`)));
+  topic.disabled = false; startButton.disabled = false;
+ }).catch(error => { if (root.isConnected) status.replaceChildren(notice(error.message, 'error')); });
  function openQuiz() {
   const answers = Array(questions.length).fill(null); let index = 0;
   const questionArea = el('div', {}); const navigation = el('div', { className: 'question-nav', 'aria-label': 'Chuyển câu hỏi' }); const count = el('p', { className: 'helper', role: 'status' });

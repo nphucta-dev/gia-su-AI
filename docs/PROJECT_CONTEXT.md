@@ -220,8 +220,14 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   `LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL`. Backend đã có adapter model và các API chat/gợi ý
   (TK-018/021/023/025/032/081/084) theo yêu cầu bổ sung: `/api/chat/sessions`, tin nhắn và hints;
   ngữ cảnh có giới hạn và lọc PII, giữ câu hỏi khi model thiếu cấu hình/lỗi. Chưa có key thật
-  thì không sinh câu trả lời giả. Không mở rộng yêu cầu sang audit sở hữu toàn bộ dữ liệu,
-  kiểm tra/lưu quiz hay các task frontend. Đọc `docs/CHAT_BACKEND.md` và `docs/SOCRATIC_PROMPT.md`
+  thì không sinh câu trả lời giả. Không mở rộng yêu cầu sang audit sở hữu toàn bộ dữ liệu
+  hay các task frontend. Đọc `docs/CHAT_BACKEND.md` và `docs/SOCRATIC_PROMPT.md`
   để biết hợp đồng API, cấu hình, giới hạn PII và kiểm thử. RAG, quota và chất lượng model
   thực tế chưa được nghiệm thu; frontend chat vẫn chưa nối các API backend mới.
+- Theo yêu cầu bổ sung ngày 18/11/2026, TK-052 có `app.state.quiz_service.save_generated_quiz`:
+  kiểm tra đủ 5 câu, bốn lựa chọn A–D, đáp án và giải thích trước khi lưu quiz/câu hỏi cùng
+  transaction MySQL. Phản hồi dành cho người học không chứa đáp án/giải thích. Đây là tầng
+  backend để luồng sinh quiz gọi; chưa triển khai TK-051 gọi model hay nối frontend quiz.
+  Xem `docs/QUIZ_BACKEND.md`. Phần tích hợp frontend đã bị merge ghi đè được khôi phục;
+  giữ nguyên giao diện và các luồng chat/quiz minh họa.
 
