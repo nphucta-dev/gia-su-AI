@@ -36,6 +36,9 @@ function renderStoredMessage(message) {
  if (!message || !Number.isSafeInteger(Number(message.id)) || !['user', 'assistant'].includes(message.role) || typeof message.content !== 'string') {
   throw new ApiError('Dữ liệu tin nhắn từ máy chủ chưa hợp lệ.', 0, 'INVALID_RESPONSE');
  }
+ if (message.hintLevel != null && (message.role !== 'assistant' || !Number.isInteger(message.hintLevel) || message.hintLevel < 1 || message.hintLevel > 3)) {
+  throw new ApiError('Mức gợi ý từ máy chủ chưa hợp lệ.', 0, 'INVALID_RESPONSE');
+ }
  const isUser = message.role === 'user';
  const sentAt = formatSessionTime(message.createdAt);
  const details = [isUser ? 'Bạn' : 'Gia sư AI', sentAt.label];
@@ -43,6 +46,7 @@ function renderStoredMessage(message) {
  if (!isUser && message.isFullSolution) details.push('Lời giải đầy đủ');
  return el('article', {
   className: `message ${message.role}`,
+  'data-hint-level': !isUser && Number.isInteger(message.hintLevel) ? message.hintLevel : null,
   'aria-label': `${isUser ? 'Tin nhắn của bạn' : 'Phản hồi của gia sư'}, ${sentAt.label}`,
  },
  el('p', { className: 'message-meta' }, details.join(' · ')),
@@ -153,6 +157,9 @@ function renderChatHistory() {
  let loadingSessions = false;
  let sessionsFailed = false;
  let selectedSession = null;
+ let selectedMessages = [];
+ let hintPending = false;
+ let hintLockedCode = '';
 
  const sidebarStatus = el('div', { className: 'chat-sidebar-status', role: 'status', 'aria-live': 'polite' });
  const sessionList = el('nav', { className: 'session-list', 'aria-label': 'Các phiên chat đã lưu' });
@@ -163,13 +170,109 @@ function renderChatHistory() {
 
  const chatTitle = el('h2', {}, 'Nội dung phiên chat');
  const chatDescription = el('p', { className: 'helper' }, 'Chọn một phiên trong lịch sử để xem lại nội dung đã lưu.');
+ const hintButton = button('Chọn một phiên để xin gợi ý', () => requestHint(), 'secondary');
+ hintButton.disabled = true;
+ const hintStatus = el('div', { className: 'chat-hint-status', role: 'status', 'aria-live': 'polite' });
+ const hintControls = el('div', { className: 'chat-hint-controls' }, hintButton, hintStatus);
  const messages = el('div', { className: 'messages chat-history-messages', 'aria-label': 'Nội dung phiên chat', 'aria-live': 'polite', 'aria-busy': 'false' },
   el('div', { className: 'empty-state' }, 'Chọn một phiên để xem lại hội thoại.'));
- const main = el('section', { className: 'chat-main' }, el('div', { className: 'chat-header' }, chatTitle, chatDescription), messages);
+ const main = el('section', { className: 'chat-main' }, el('div', { className: 'chat-header chat-session-header' },
+  el('div', { className: 'chat-session-copy' }, chatTitle, chatDescription), hintControls), messages);
  const root = el('div', {}, heading('Lịch sử trò chuyện', 'Mở lại những phiên học đã lưu trong tài khoản của bạn.'),
   el('div', { className: 'chat-layout chat-history-layout' }, sidebar, main));
 
  function isCurrent() { return !controller.signal.aborted && root.isConnected; }
+
+ function hintState() {
+  if (!selectedSession) return { disabled: true, label: 'Chọn một phiên để xin gợi ý' };
+  if (hintLockedCode === 'TOPIC_CLOSED') return { disabled: true, label: 'Chủ đề đã đóng' };
+  if (hintLockedCode === 'HINT_LIMIT_REACHED') return { disabled: true, label: 'Đã nhận đủ 3 mức gợi ý' };
+  if (hintLockedCode === 'CHAT_QUESTION_REQUIRED') return { disabled: true, label: 'Hãy gửi câu hỏi trước' };
+  let questionIndex = -1;
+  for (let index = selectedMessages.length - 1; index >= 0; index--) {
+   if (selectedMessages[index].role === 'user') { questionIndex = index; break; }
+  }
+  if (questionIndex < 0) return { disabled: true, label: 'Hãy gửi câu hỏi trước' };
+  const levels = selectedMessages.slice(questionIndex + 1)
+   .filter(item => item.role === 'assistant' && Number.isInteger(item.hintLevel) && item.hintLevel >= 1 && item.hintLevel <= 3)
+   .map(item => item.hintLevel);
+  const highest = Math.max(0, ...levels);
+  if (highest >= 3) return { disabled: true, label: 'Đã nhận đủ 3 mức gợi ý', nextLevel: 4 };
+  const nextLevel = highest + 1;
+  return { disabled: false, nextLevel, label: nextLevel === 1 ? 'Nhận gợi ý mức 1' : `Gợi ý tiếp · Mức ${nextLevel}` };
+ }
+
+ function drawHintControl() {
+  const state = hintState();
+  hintButton.textContent = hintPending && state.nextLevel ? `Đang lấy gợi ý mức ${state.nextLevel}…` : state.label;
+  hintButton.disabled = hintPending || state.disabled;
+  hintButton.setAttribute('aria-label', hintButton.textContent);
+  if (hintPending) hintControls.setAttribute('aria-busy', 'true');
+  else hintControls.removeAttribute('aria-busy');
+ }
+
+ function showHintError(error, sessionId) {
+  if (error instanceof ApiError && error.code === 'HINT_LIMIT_REACHED') {
+   hintLockedCode = error.code;
+   hintStatus.replaceChildren(notice('Bạn đã nhận đủ 3 mức gợi ý cho câu hỏi này.', 'warning'));
+  } else if (error instanceof ApiError && error.code === 'CHAT_QUESTION_REQUIRED') {
+   hintLockedCode = error.code;
+   hintStatus.replaceChildren(notice('Hãy gửi một câu hỏi trước khi xin gợi ý.', 'warning'));
+  } else if (error instanceof ApiError && error.code === 'TOPIC_CLOSED') {
+   hintLockedCode = error.code;
+   hintStatus.replaceChildren(notice('Chủ đề đã đóng. Bạn vẫn có thể xem lại lịch sử nhưng không thể xin gợi ý mới.', 'warning'));
+  } else if (error instanceof ApiError && error.code === 'CHAT_CHANGED') {
+   hintStatus.replaceChildren(notice('Phiên chat vừa thay đổi. Hãy tải lại nội dung trước khi xin gợi ý tiếp.', 'error'),
+    button('Tải lại phiên', () => loadMessages(sessionId), 'secondary small'));
+  } else if (error instanceof ApiError && error.status === 404) {
+   showMessageError(error, sessionId);
+  } else {
+   const message = error instanceof ApiError && error.code === 'CHAT_BUSY'
+    ? 'Phiên đang xử lý một yêu cầu khác. Vui lòng thử lại sau.'
+    : (error?.message || 'Chưa thể lấy gợi ý. Vui lòng thử lại.');
+   hintStatus.replaceChildren(notice(message, 'error'), button('Thử lại', () => requestHint(), 'secondary small'));
+  }
+  drawHintControl();
+ }
+
+ async function requestHint() {
+  const state = hintState();
+  const sessionId = Number(selectedSession?.id);
+  if (hintPending || state.disabled || !Number.isSafeInteger(sessionId)) return;
+  hintPending = true;
+  hintStatus.replaceChildren(el('p', { className: 'helper' }, `Đang lấy gợi ý mức ${state.nextLevel}…`));
+  drawHintControl();
+  try {
+   const result = await api(`/chat/sessions/${sessionId}/hints`, { method: 'POST', signal: controller.signal });
+   if (!isCurrent() || requestedSessionId().id !== sessionId) return;
+   const assistant = result?.assistantMessage;
+   if (!result?.session || Number(result.session.id) !== sessionId || result.userMessage != null
+    || !assistant || Number(assistant.sessionId) !== sessionId || assistant.role !== 'assistant'
+    || !Number.isInteger(assistant.hintLevel) || assistant.hintLevel < 1 || assistant.hintLevel > 3) {
+    throw new ApiError('Phản hồi gợi ý từ máy chủ chưa hợp lệ. Vui lòng thử lại.', 0, 'INVALID_RESPONSE');
+   }
+   const messageNode = renderStoredMessage(assistant);
+   const duplicate = selectedMessages.some(item => Number(item.id) === Number(assistant.id));
+   if (!duplicate) {
+    selectedMessages.push(assistant);
+    messages.append(messageNode);
+   }
+   selectedSession = result.session;
+   const sessionIndex = sessions.findIndex(item => Number(item.id) === sessionId);
+   if (sessionIndex >= 0) sessions[sessionIndex] = result.session;
+   hintLockedCode = '';
+   chatTitle.textContent = sessionTitle(result.session);
+   chatDescription.textContent = [result.session.subjectName, result.session.chapterName, result.session.topicName].filter(Boolean).join(' · ') || 'Phiên chat đã lưu';
+   hintStatus.replaceChildren(el('p', { className: 'helper' }, `Đã nhận gợi ý mức ${assistant.hintLevel}.`));
+   drawSessions();
+   requestAnimationFrame(() => { if (isCurrent()) messages.scrollTop = messages.scrollHeight; });
+  } catch (error) {
+   if (error.name !== 'AbortError' && isCurrent() && requestedSessionId().id === sessionId) showHintError(error, sessionId);
+  } finally {
+   hintPending = false;
+   if (isCurrent()) drawHintControl();
+  }
+ }
 
  function showSidebarError(error, append) {
   const text = append ? 'Chưa tải thêm được phiên. Danh sách hiện tại vẫn được giữ.' : (error?.message || 'Chưa tải được lịch sử phiên.');
@@ -250,6 +353,11 @@ function renderChatHistory() {
 
  function showMessageError(error, id) {
   const missing = error instanceof ApiError && error.status === 404 && error.code === 'CHAT_SESSION_NOT_FOUND';
+  selectedSession = null;
+  selectedMessages = [];
+  hintLockedCode = '';
+  hintStatus.replaceChildren();
+  drawHintControl();
   chatTitle.textContent = missing ? 'Không tìm thấy phiên chat' : 'Chưa tải được phiên chat';
   chatDescription.textContent = missing ? 'Phiên này không tồn tại hoặc không thuộc tài khoản của bạn.' : 'Bạn có thể thử tải lại mà không ảnh hưởng đến danh sách phiên.';
   const retry = Number.isSafeInteger(id) ? button('Thử lại', () => loadMessages(id), 'secondary') : null;
@@ -257,11 +365,15 @@ function renderChatHistory() {
  }
 
  async function loadMessages(id) {
+  selectedSession = null;
+  selectedMessages = [];
+  hintLockedCode = '';
+  hintStatus.replaceChildren();
+  drawHintControl();
   messages.setAttribute('aria-busy', 'true');
   messages.replaceChildren(el('div', { className: 'empty-state' }, 'Đang tải nội dung phiên…'));
   chatTitle.textContent = 'Đang mở phiên chat…';
   chatDescription.textContent = 'Nội dung đã lưu đang được tải từ tài khoản của bạn.';
-  selectedSession = null;
   drawSessions();
   try {
    const stored = [];
@@ -287,15 +399,18 @@ function renderChatHistory() {
    }
    if (!isCurrent() || requestedSessionId().id !== id) return;
    selectedSession = currentSession;
+   selectedMessages = stored;
    chatTitle.textContent = sessionTitle(currentSession);
    chatDescription.textContent = [currentSession.subjectName, currentSession.chapterName, currentSession.topicName].filter(Boolean).join(' · ') || 'Phiên chat đã lưu';
    messages.replaceChildren(...stored.map(renderStoredMessage));
    if (!stored.length) messages.append(el('div', { className: 'empty-state' }, 'Phiên này chưa có tin nhắn.'));
    drawSessions();
+   drawHintControl();
    requestAnimationFrame(() => { if (isCurrent()) messages.scrollTop = messages.scrollHeight; });
   } catch (error) {
    if (error.name === 'AbortError' || !isCurrent() || requestedSessionId().id !== id) return;
    selectedSession = null;
+   selectedMessages = [];
    showMessageError(error, id);
    drawSessions();
   } finally {
@@ -304,6 +419,7 @@ function renderChatHistory() {
  }
 
  loadSessions();
+ drawHintControl();
  if (request.invalid) {
   showMessageError(new ApiError('Mã phiên chat trên đường dẫn không hợp lệ.', 404, 'CHAT_SESSION_NOT_FOUND'), null);
  } else if (request.id !== null) loadMessages(request.id);

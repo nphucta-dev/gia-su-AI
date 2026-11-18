@@ -49,11 +49,22 @@
 .message.user .message-meta { color: #e0e7ff; }
 .message-meta { font-variant-numeric: tabular-nums; }
 
+/* TK-031: progressive, server-authoritative hint control for stored chat sessions. */
+.chat-session-header { display: grid; gap: 16px; }
+.chat-session-copy { min-width: 0; overflow-wrap: anywhere; }
+.chat-hint-controls { display: grid; gap: 10px; min-width: 0; }
+.chat-hint-controls > .button { width: 100%; white-space: normal; }
+.chat-hint-status:empty { display: none; }
+.chat-hint-status p, .chat-hint-status .notice { margin: 0; overflow-wrap: anywhere; }
+.message.assistant[data-hint-level] .message-meta { color: var(--teal); font-weight: 750; }
+
 @media (min-width: 768px) {
  .chat-sidebar-header { grid-template-columns: 1fr; }
  .chat-history-layout .session-list { max-height: 520px; overflow-y: auto; overflow-x: hidden; }
  .chat-history-layout .session-button { min-width: 0; max-width: none; width: 100%; }
  .empty-state.compact { min-width: 0; }
+ .chat-session-header { grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); align-items: start; }
+ .chat-hint-controls > .button { justify-self: end; }
 }
 
 /* TK-050: active catalog selection before opening the fixed quiz preview. */
