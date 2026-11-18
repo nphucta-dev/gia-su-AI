@@ -56,7 +56,7 @@ const base=process.env.BASE_URL || 'http://127.0.0.1:4173';
   await page.getByRole('button',{name:'↑ Tải tài liệu',exact:true}).click();
   await page.locator('#app').getByLabel('Môn học',{exact:true}).selectOption('Hóa học cập nhật');await page.locator('#app').getByLabel('Chủ đề',{exact:true}).selectOption('Nguyên tử');
   await page.locator('#document-file').setInputFiles({name:'nguyen-tu.txt',mimeType:'text/plain',buffer:Buffer.from('demo')});
-  await page.getByRole('button',{name:'Tải lên',exact:true}).click();await page.locator('.document-row').filter({hasText:'nguyen-tu.txt'}).waitFor();
+  await page.getByRole('button',{name:'Thêm vào bản xem trước',exact:true}).click();await page.locator('.document-row').filter({hasText:'nguyen-tu.txt'}).waitFor();
   await page.goto(base+'/#profile');await page.getByRole('heading',{name:'Hồ sơ quản trị',exact:true}).waitFor();await page.getByText(user.email,{exact:true}).waitFor();
   assert.equal(await page.locator('#app').getByText('Lịch sử học tập',{exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Lưu thông tin'}).count(),0);
   for(const route of ['home','chat','practice','results','dashboard','history','intro']){await page.goto(base+'/#'+route);await page.waitForURL('**/#admin?tab=subjects');await page.locator('.admin-page').waitFor();}

@@ -71,3 +71,15 @@
 }
 .admin-page .catalog-group{margin:0;padding:18px 22px 12px;background:#f8fafc;font-size:14px;border-bottom:1px solid var(--admin-border)}
 .admin-page .document-action{min-height:44px}
+
+/* TK-040 upload controls and long filenames. */
+.admin-upload-view, .upload-form, .upload-form .field, .upload-dropzone { min-width: 0; }
+.upload-dropzone > strong, .upload-feedback, .document-name { overflow-wrap: anywhere; min-width: 0; max-width: 100%; }
+.upload-file-actions, .upload-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.upload-file-actions .button { min-height: 44px; }
+.upload-file-actions .button:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+
+@media (max-width: 600px) {
+  .upload-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .upload-actions .primary { grid-column: 1 / -1; }
+}
