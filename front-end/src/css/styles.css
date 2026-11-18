@@ -77,6 +77,9 @@
 .quiz-setup .error-text:empty { display: none; }
 .quiz-topic { color: var(--muted); font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
 .quiz-layout > .panel .button { width: 100%; margin-top: 12px; }
+.quiz-layout > * { min-width: 0; }
+.quiz-submission-status:empty { display: none; }
+.quiz-submission-status .notice { margin: 14px 0 4px; overflow-wrap: anywhere; }
 
 @media (min-width: 768px) {
  .quiz-setup-fields { grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr); }

@@ -99,7 +99,7 @@ async function run() {
     await openPreview.click();
     await success.page.getByText('Toán học · Chương 2 · Đạo hàm và ứng dụng nâng cao', { exact: true }).waitFor();
     await success.page.getByText('Độ khó: Khó', { exact: true }).waitFor();
-    await success.page.getByText(/Chưa có yêu cầu sinh hoặc lưu quiz nào/).waitFor();
+    await success.page.getByText(/API nộp bài chỉ được kiểm chứng bằng mock/).waitFor();
     assert.equal(success.requests.some(request => request.method !== 'GET'), false);
     await success.page.getByRole('button', { name: 'Đổi chủ đề hoặc độ khó', exact: true }).click();
     assert.equal(await topic.inputValue(), '11');

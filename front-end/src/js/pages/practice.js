@@ -1,7 +1,8 @@
 import { onSessionCleared } from '../session.js';
 import { el, button, link, heading, panel, field, badge, confirmDialog, notice } from '../components/ui.js';
-import { questions } from '../data.js';
+import { questions, quizPreviewId } from '../data.js';
 import { loadCatalog, flattenTopics } from '../catalog.js';
+import { submitQuizAnswers } from '../quiz-submission.js';
 
 let lastResult = null;
 let lastSelection = null;
@@ -46,6 +47,9 @@ export function renderPractice() {
 
  let items = [];
  let loadVersion = 0;
+ let submitController = null;
+
+ window.addEventListener('hashchange', () => submitController?.abort(), { once: true });
 
  function selectedPayload() {
   const topicId = Number(topic.value);
@@ -132,20 +136,81 @@ export function renderPractice() {
  function openQuiz(selection) {
   const selectedTopic = items.find(item => item.id === selection.topicId);
   if (!selectedTopic || !difficultyLabels[selection.difficulty]) return;
-  const answers = Array(questions.length).fill(null);
+  const answers = new Map();
   let index = 0;
+  let confirming = false;
+  let submitting = false;
+  let submitted = false;
   const questionArea = el('div', {});
   const navigation = el('div', { className: 'question-nav', 'aria-label': 'Chuyển câu hỏi' });
   const count = el('p', { className: 'helper', role: 'status' });
-  const submit = button('Nộp bài', async () => {
-   const missing = answers.filter(answer => answer === null).length;
-   if (!(await confirmDialog(
-    'Nộp bài luyện tập?',
-    missing ? `Còn ${missing} câu chưa trả lời. Những câu này được tính là chưa đúng.` : 'Sau khi nộp, bạn có thể xem đáp án và giải thích.',
-    'Nộp bài'))) return;
-   lastResult = { answers: [...answers], difficulty: selection.difficulty };
-   location.hash = 'results';
-  }, 'primary');
+  const submissionStatus = el('div', { className: 'quiz-submission-status', role: 'status', 'aria-live': 'polite' });
+  const submit = button('Nộp đáp án', handleSubmit, 'primary');
+
+  function setSubmitState(label, disabled) {
+   submit.textContent = label;
+   submit.disabled = disabled;
+  }
+
+  function submissionMessage(error) {
+   if (error?.status === 403 || error?.status === 404) return 'Không tìm thấy bài luyện tập thuộc tài khoản này. Hãy mở lại bài rồi thử lại.';
+   if (error?.status === 409) return 'Bài luyện tập này đã được nộp và không thể nộp lại.';
+   if (error?.status === 422) return error.message || 'Dữ liệu đáp án chưa hợp lệ. Hãy kiểm tra lại trước khi nộp.';
+   return error?.message || 'Chưa thể gửi đáp án. Đáp án của bạn vẫn được giữ để thử lại.';
+  }
+
+  async function handleSubmit() {
+   if (confirming || submitting || submitted) return;
+   const missing = questions.filter(question => !answers.has(question.id));
+   if (missing.length) {
+    index = questions.indexOf(missing[0]);
+    draw();
+    submissionStatus.replaceChildren(notice(
+     `Còn ${missing.length} câu chưa trả lời. Hãy hoàn thành đủ 5 câu trước khi nộp.`,
+     'warning'));
+    requestAnimationFrame(() => questionArea.querySelector('input[type="radio"]')?.focus());
+    return;
+   }
+
+   confirming = true;
+   setSubmitState('Đang chờ xác nhận…', true);
+   const confirmed = await confirmDialog(
+    'Nộp đáp án bài luyện tập?',
+    'Bạn đã trả lời đủ 5 câu. Sau khi gửi, bài này không thể nộp lại trong phiên hiện tại.',
+    'Xác nhận nộp');
+   confirming = false;
+   if (!root.isConnected || submitted) return;
+   if (!confirmed) {
+    setSubmitState('Nộp đáp án', false);
+    submit.focus({ preventScroll: true });
+    return;
+   }
+
+   submitting = true;
+   submitController?.abort();
+   submitController = new AbortController();
+   setSubmitState('Đang nộp bài…', true);
+   submissionStatus.replaceChildren(notice('Đang gửi 5 đáp án. Vui lòng chờ…'));
+   try {
+    const result = await submitQuizAnswers(quizPreviewId, questions, answers, { signal: submitController.signal });
+    if (!root.isConnected || submitController.signal.aborted) return;
+    submitted = true;
+    questionArea.querySelectorAll('input[type="radio"]').forEach(input => { input.disabled = true; });
+    submissionStatus.replaceChildren(notice(
+     result.mode === 'mock'
+      ? 'API mock đã tiếp nhận đủ 5 đáp án. Đây chỉ là kiểm thử frontend; backend chưa chấm hoặc lưu bài.'
+      : 'Đã gửi đủ 5 đáp án. Kết quả chỉ hiển thị sau khi backend chấm bài.',
+     'success'));
+    setSubmitState('Đã nộp đáp án', true);
+   } catch (error) {
+    if (error?.name === 'AbortError' || !root.isConnected) return;
+    submissionStatus.replaceChildren(notice(submissionMessage(error), 'error'));
+    setSubmitState('Thử nộp lại', false);
+    submit.focus({ preventScroll: true });
+   } finally {
+    submitting = false;
+   }
+  }
 
   function draw() {
    const question = questions[index];
@@ -157,21 +222,24 @@ export function renderPractice() {
     el('fieldset', {},
      el('legend', {}, question.text),
      el('div', { className: 'answer-list' }, ...question.options.map((text, optionIndex) => {
+      const key = 'ABCD'[optionIndex];
       const radio = el('input', {
        type: 'radio',
-       name: 'answer',
-       value: optionIndex,
-       checked: answers[index] === optionIndex,
+       name: `answer-${question.id}`,
+       value: key,
+       checked: answers.get(question.id) === key,
+       disabled: submitted,
       });
       radio.addEventListener('change', () => {
-       answers[index] = optionIndex;
+       if (!submitted && radio.checked) answers.set(question.id, key);
+       submissionStatus.replaceChildren();
        drawNav();
       });
       return el('label', { className: 'answer-option' }, radio, `${'ABCD'[optionIndex]}. ${text}`);
      }))),
     el('div', { className: 'page-actions section-gap' },
      button('Câu trước', () => { index = Math.max(0, index - 1); draw(); }, 'ghost'),
-     button('Câu tiếp', () => { index = Math.min(4, index + 1); draw(); }, 'secondary')));
+     button('Câu tiếp', () => { index = Math.min(questions.length - 1, index + 1); draw(); }, 'secondary')));
    drawNav();
   }
 
@@ -180,12 +248,12 @@ export function renderPractice() {
     const control = button(String(questionIndex + 1), () => {
      index = questionIndex;
      draw();
-    }, `question-dot ${index === questionIndex ? 'selected' : ''} ${answers[questionIndex] !== null ? 'answered' : ''}`);
-    control.setAttribute('aria-label', `Câu ${questionIndex + 1}, ${answers[questionIndex] === null ? 'chưa trả lời' : 'đã trả lời'}`);
+    }, `question-dot ${index === questionIndex ? 'selected' : ''} ${answers.has(questions[questionIndex].id) ? 'answered' : ''}`);
+    control.setAttribute('aria-label', `Câu ${questionIndex + 1}, ${answers.has(questions[questionIndex].id) ? 'đã trả lời' : 'chưa trả lời'}`);
     if (questionIndex === index) control.setAttribute('aria-current', 'step');
     return control;
    }));
-   count.textContent = `Đã trả lời ${answers.filter(answer => answer !== null).length}/5 câu`;
+   count.textContent = `Đã trả lời ${answers.size}/${questions.length} câu`;
   }
 
   const changeSelection = button('Đổi chủ đề hoặc độ khó', () => {
@@ -193,10 +261,10 @@ export function renderPractice() {
    topic.focus({ preventScroll: true });
   }, 'ghost');
   const layout = el('div', {},
-   notice('Bản xem thử dùng câu hỏi cố định để kiểm tra giao diện. Chưa có yêu cầu sinh hoặc lưu quiz nào được gửi tới backend.', 'warning'),
+   notice('Bản xem thử dùng quiz #57001 và mã câu hỏi fixture. API nộp bài chỉ được kiểm chứng bằng mock; backend chưa chấm hoặc lưu quiz.', 'warning'),
    el('div', { className: 'quiz-layout' },
     el('section', { className: 'question-card' }, questionArea),
-    panel('Tiến độ bài', navigation, count, submit, changeSelection)));
+    panel('Tiến độ bài', navigation, count, submissionStatus, submit, changeSelection)));
   start.replaceWith(layout);
   draw();
  }
