@@ -55,3 +55,19 @@
  .chat-history-layout .session-button { min-width: 0; max-width: none; width: 100%; }
  .empty-state.compact { min-width: 0; }
 }
+
+/* TK-050: active catalog selection before opening the fixed quiz preview. */
+.quiz-setup { max-width: 800px; }
+.quiz-setup-form { display: grid; gap: 20px; }
+.quiz-setup-fields { display: grid; gap: 20px; }
+.quiz-setup-fields > * { min-width: 0; }
+.quiz-setup-actions { display: flex; justify-content: flex-end; }
+.quiz-setup-actions .button { width: 100%; }
+.quiz-setup .error-text:empty { display: none; }
+.quiz-topic { color: var(--muted); font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
+.quiz-layout > .panel .button { width: 100%; margin-top: 12px; }
+
+@media (min-width: 768px) {
+ .quiz-setup-fields { grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr); }
+ .quiz-setup-actions .button { width: auto; }
+}

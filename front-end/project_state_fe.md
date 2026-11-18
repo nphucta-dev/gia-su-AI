@@ -44,6 +44,7 @@ Các mục trên chỉ xác nhận phần UI hoặc client behavior; task nghi�
 | TK-033 | Đơn giản hơn/Cho ví dụ | Một phần; nội dung đang hard-code |
 | TK-035 | Modal xác nhận lời giải | Một phần; modal có nhưng chưa gọi API lời giải |
 | TK-048 | Hiển thị nguồn tham khảo | Chưa xong; chỉ có nguồn minh họa |
+| TK-050 | Chọn chủ đề và độ khó quiz | Hoàn thành FE: lấy chủ đề active từ API catalog, hỗ trợ topic trên URL, chọn easy/medium/hard, validation, loading/empty/error/retry và responsive 360px. Chưa gọi API sinh quiz; phần đó thuộc task sau. |
 | TK-053 | Giao diện làm quiz | Một phần; có UI nhưng câu hỏi lấy từ dữ liệu mẫu |
 | TK-054 | Cảnh báo câu chưa trả lời | Có phần UI; chưa nối submit thật |
 | TK-057 | Gửi đáp án quiz | Chưa xong; chỉ giữ đáp án trong state trình duyệt |
