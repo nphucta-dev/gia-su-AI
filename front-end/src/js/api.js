@@ -1,7 +1,8 @@
 import { getAccessToken, clearSession } from './session.js';
 
 const configuredBase = document.querySelector('meta[name="api-base"]')?.content.trim();
-const API_BASE = (configuredBase || '/api').replace(/\/$/, '');
+const base = (configuredBase || '/api').replace(/\/$/, '');
+const API_BASE = /^https?:\/\/[^/]+$/.test(base) ? `${base}/api` : base;
 
 export class ApiError extends Error {
   constructor(message, status = 0, code = 'NETWORK_ERROR', fields = {}) {

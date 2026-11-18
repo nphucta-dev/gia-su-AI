@@ -24,3 +24,34 @@
 /* Personal profile: contain long account values at every viewport. */
 .profile-page .grid-2>*{min-width:0}.profile-page .input{max-width:100%;min-width:0}.profile-page .panel{overflow-wrap:anywhere}.profile-page .form-grid{display:grid;gap:16px}.profile-page .form-grid p{margin-bottom:0}
 .profile-page .field{min-height:120px}.profile-page .field-error{margin-bottom:0}
+
+/* TK-024: account-backed chat history with resilient list and message states. */
+.chat-history-layout > *, .chat-sidebar-header > * { min-width: 0; }
+.chat-sidebar-header { display: grid; gap: 12px; }
+.chat-sidebar-header h2 { margin: 0; }
+.chat-history-layout .session-list { align-items: stretch; padding: 2px 2px 8px; scrollbar-color: var(--border) transparent; }
+.chat-history-layout .session-button { display: grid; gap: 3px; flex: 0 0 auto; min-width: min(260px, 78vw); max-width: min(300px, 82vw); padding: 12px; border: 1px solid transparent; text-decoration: none; white-space: normal; overflow-wrap: anywhere; }
+.chat-history-layout .session-button:hover { background: var(--bg); color: var(--hover); }
+.chat-history-layout .session-button.active { border-color: var(--primary); }
+.session-title { color: var(--ink); font-weight: 700; line-height: 1.35; }
+.session-topic, .session-time { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.session-current { width: fit-content; margin-top: 5px; color: var(--hover); font-size: 12px; font-weight: 750; }
+.chat-sidebar-status { margin-top: 14px; }
+.chat-sidebar-status:empty { display: none; }
+.chat-sidebar-status p { margin-bottom: 8px; }
+.chat-sidebar-status .notice { margin-bottom: 10px; overflow-wrap: anywhere; }
+.session-pagination { margin-top: 14px; }
+.session-pagination .helper { margin-bottom: 0; }
+.empty-state.compact { min-width: min(250px, 74vw); padding: 24px 16px; }
+.chat-history-messages .empty-state { margin: auto 0; }
+.chat-history-messages[aria-busy="true"] { cursor: progress; }
+.chat-history-messages .notice { align-self: stretch; max-width: none; }
+.message.user .message-meta { color: #e0e7ff; }
+.message-meta { font-variant-numeric: tabular-nums; }
+
+@media (min-width: 768px) {
+ .chat-sidebar-header { grid-template-columns: 1fr; }
+ .chat-history-layout .session-list { max-height: 520px; overflow-y: auto; overflow-x: hidden; }
+ .chat-history-layout .session-button { min-width: 0; max-width: none; width: 100%; }
+ .empty-state.compact { min-width: 0; }
+}
