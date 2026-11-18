@@ -7,7 +7,7 @@ Phạm vi: trạng thái frontend sau khi đối chiếu `git diff` hiện tại
 
 Diff hiện tại chủ yếu thay đổi giao diện, luồng preview và bộ test frontend. Một số phần tích hợp API có trong phiên bản trước đã bị loại khỏi working tree:
 
-- `src/js/pages/admin.js` bỏ các import `api`, `invalidateCatalog` và toàn bộ luồng tải CRUD/tài liệu từ backend; trang quản trị hiện hiển thị preview trong bộ nhớ.
+- `src/js/pages/admin.js` đã giữ riêng preview trong bộ nhớ và luồng quản trị thật dùng API cho CRUD môn học/chủ đề, trạng thái active và tài liệu.
 - `src/js/pages/learning.js` bỏ `loadCatalog()` và quay lại `src/js/data.js`; trang học và dashboard dùng dữ liệu mẫu.
 - `src/js/pages/chat.js` bỏ `loadCatalog()` và API chat; tin nhắn, hints, lời giải, feedback và nguồn đều là nội dung minh họa.
 - `src/js/pages/practice.js` bỏ tải danh mục và dùng câu hỏi từ `src/js/data.js`; submit chỉ lưu state cục bộ.
@@ -16,7 +16,7 @@ Diff hiện tại chủ yếu thay đổi giao diện, luồng preview và bộ 
 - `src/js/app.js` bỏ kiểm tra quyền ADMIN qua API; `src/js/session.js` thay đổi cách khôi phục phiên và bỏ xử lý thời hạn token ở client. Cần kiểm tra lại với backend hiện tại trước khi merge.
 - Có thêm ảnh output và test frontend, nhưng ảnh/test không thay thế bằng chứng UI đã nối API thật.
 
-Vì vậy diff hiện tại tạo hồi quy tích hợp ở các task TK-009, TK-068 và TK-069, đồng thời làm các task chat/quiz/dashboard trở lại trạng thái demo.
+Vì vậy TK-068 đã có thể kiểm thử độc lập ở frontend; các nhận định về TK-009, TK-069 và các task chat/quiz/dashboard vẫn cần được xử lý trong phạm vi riêng.
 
 ## Đã có trong diff hoặc code hiện tại
 
@@ -56,7 +56,7 @@ Các mục trên chỉ xác nhận phần UI hoặc client behavior; task nghi�
 
 ## Việc cần ưu tiên sau diff
 
-1. Khôi phục tích hợp API thật trong `admin.js`, `learning.js`, `account.js`, `chat.js`, `practice.js` và `history.js`.
+1. Khôi phục tích hợp API thật trong `learning.js`, `account.js`, `chat.js`, `practice.js` và `history.js`; tiếp tục xử lý phần tài liệu quản trị ở task TK-069 riêng.
 2. Kiểm tra lại `api-base`, đường dẫn `/api`, khôi phục kiểm tra quyền ADMIN và xác thực session thống nhất với backend.
 3. Nối chat session, message, lịch sử, hints, loading, retry, citation và feedback.
 4. Nối quiz create, submit một lần, result và cập nhật tiến độ.
