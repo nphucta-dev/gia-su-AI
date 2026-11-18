@@ -26,8 +26,10 @@ from app.middlewares.security_headers import SecurityHeadersMiddleware
 from app.repositories.catalog_repository import InMemoryCatalogRepository
 from app.repositories.chat_repository import ChatRepository, InMemoryChatRepository
 from app.repositories.quiz_repository import QuizRepository, InMemoryQuizRepository
+from app.repositories.progress_repository import ProgressRepository, InMemoryProgressRepository
 from app.repositories.sqlalchemy_chat_repository import SqlAlchemyChatRepository
 from app.repositories.sqlalchemy_quiz_repository import SqlAlchemyQuizRepository
+from app.repositories.sqlalchemy_progress_repository import SqlAlchemyProgressRepository
 from app.repositories.sqlalchemy_catalog_repository import SqlAlchemyCatalogRepository
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.repositories.document_repository import DocumentRepository, SqlAlchemyDocumentRepository
@@ -36,6 +38,8 @@ from app.routes.auth import router as auth_router
 from app.routes.admin_catalog import router as admin_catalog_router
 from app.routes.catalog import router as catalog_router
 from app.routes.chat import router as chat_router
+from app.routes.quiz import router as quiz_router
+from app.routes.progress import router as progress_router
 from app.routes.me import router as me_router
 from app.routes.profile import router as profile_router
 from app.routes.documents import router as documents_router
@@ -44,6 +48,7 @@ from app.services.admin_catalog_service import AdminCatalogService
 from app.services.catalog_service import CatalogRepository, CatalogService
 from app.services.chat_service import ChatService
 from app.services.quiz_service import QuizService
+from app.services.progress_service import ProgressService
 from app.services.llm_client import ChatCompletionsClient, LLMClient
 from app.services.token_service import TokenService
 from app.utils.password import hash_password
@@ -64,6 +69,7 @@ def create_app(
     chat_repository: ChatRepository | None = None,
     llm_client: LLMClient | None = None,
     quiz_repository: QuizRepository | None = None,
+    progress_repository: ProgressRepository | None = None,
 ) -> FastAPI:
     """Tạo ứng dụng. Các phụ thuộc được truyền vào để dễ thay kho dữ liệu (ví dụ CSDL
     thật) và để test độc lập, không cần mở cổng thật."""
@@ -118,6 +124,10 @@ def create_app(
             else InMemoryQuizRepository(catalog if isinstance(catalog, InMemoryCatalogRepository) else None)
         )
     app.state.quiz_service = QuizService(quiz)
+    progress = progress_repository
+    if progress is None:
+        progress = SqlAlchemyProgressRepository(session_factory) if session_factory is not None else InMemoryProgressRepository()
+    app.state.progress_service = ProgressService(progress)
     app.state.token_service = token_service or TokenService(
         secret=settings.jwt_secret,
         issuer=settings.jwt_issuer,
@@ -129,6 +139,8 @@ def create_app(
     app.include_router(me_router)
     app.include_router(catalog_router)
     app.include_router(chat_router)
+    app.include_router(quiz_router)
+    app.include_router(progress_router)
     app.include_router(admin_catalog_router)
     app.include_router(profile_router)
     app.include_router(documents_router)

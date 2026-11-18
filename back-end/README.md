@@ -2,6 +2,10 @@
 
 API Python 3.10+ dùng FastAPI. Có đăng ký, đăng nhập, xác thực JWT, hồ sơ cá nhân, quản lý môn/chủ đề và tải tài liệu cho ADMIN; lưu dữ liệu trong MySQL.
 
+TK-082 bảo vệ dữ liệu theo tài khoản: chat, `GET /api/quizzes/{id}`,
+`GET /api/progress` và `GET /api/progress/{id}`. Xem [quyền sở hữu dữ liệu](../docs/OWNERSHIP.md)
+để biết quy tắc truy cập và kiểm thử. Các API tiến độ đọc dữ liệu đã lưu; chưa thêm luồng chấm quiz.
+
 Schema hiện tại dùng `INT AUTO_INCREMENT` cho ID của 11 bảng; API trả `id` dạng số. Database cũ đang dùng UUID cần chạy migration `0002_integer_ids` sau khi dừng server và sao lưu, theo [hướng dẫn chuyển ID](../database/README.md#chuyển-database-cũ-từ-uuid-sang-id-tự-tăng).
 
 Xem [hướng dẫn database](../database/README.md) để kết nối MySQL, cấu hình `.env`, tạo đủ 11 bảng bằng migration và seed dữ liệu.

@@ -1,4 +1,4 @@
-"""Atomic quiz creation contract and an in-memory implementation for tests."""
+"""Atomic quiz creation and owner-scoped reads, including each quiz's questions."""
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -37,6 +37,8 @@ class QuizOwnerUnavailableError(Exception):
 class QuizRepository(Protocol):
     async def create_quiz(self, user_id: int, topic_id: int, difficulty: QuizDifficulty, generated: GeneratedQuiz) -> QuizRecord | None: ...
 
+    async def find_quiz(self, user_id: int, quiz_id: int) -> QuizRecord | None: ...
+
 
 class InMemoryQuizRepository:
     def __init__(self, catalog_repository: InMemoryCatalogRepository | None = None) -> None:
@@ -44,6 +46,10 @@ class InMemoryQuizRepository:
         self._quizzes: dict[int, QuizRecord] = {}
         self._next_id = 1
         self._next_question_id = 1
+
+    async def find_quiz(self, user_id: int, quiz_id: int) -> QuizRecord | None:
+        record = self._quizzes.get(quiz_id)
+        return record if record is not None and record.user_id == user_id else None
 
     async def create_quiz(self, user_id: int, topic_id: int, difficulty: QuizDifficulty, generated: GeneratedQuiz) -> QuizRecord | None:
         topic = self._catalog._topics.get(topic_id)

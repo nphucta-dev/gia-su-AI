@@ -220,8 +220,7 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   `LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL`. Backend đã có adapter model và các API chat/gợi ý
   (TK-018/021/023/025/032/081/084) theo yêu cầu bổ sung: `/api/chat/sessions`, tin nhắn và hints;
   ngữ cảnh có giới hạn và lọc PII, giữ câu hỏi khi model thiếu cấu hình/lỗi. Chưa có key thật
-  thì không sinh câu trả lời giả. Không mở rộng yêu cầu sang audit sở hữu toàn bộ dữ liệu
-  hay các task frontend. Đọc `docs/CHAT_BACKEND.md` và `docs/SOCRATIC_PROMPT.md`
+  thì không sinh câu trả lời giả. Đọc `docs/CHAT_BACKEND.md` và `docs/SOCRATIC_PROMPT.md`
   để biết hợp đồng API, cấu hình, giới hạn PII và kiểm thử. RAG, quota và chất lượng model
   thực tế chưa được nghiệm thu; frontend chat vẫn chưa nối các API backend mới.
 - Theo yêu cầu bổ sung ngày 18/11/2026, TK-052 có `app.state.quiz_service.save_generated_quiz`:
@@ -230,4 +229,11 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   backend để luồng sinh quiz gọi; chưa triển khai TK-051 gọi model hay nối frontend quiz.
   Xem `docs/QUIZ_BACKEND.md`. Phần tích hợp frontend đã bị merge ghi đè được khôi phục;
   giữ nguyên giao diện và các luồng chat/quiz minh họa.
+- TK-082 bổ sung đọc quiz/tiến độ theo chủ sở hữu lấy từ token: `GET /api/quizzes/{id}`,
+  `GET /api/progress`, `GET /api/progress/{id}`. Các truy vấn SQL lọc `user_id`, câu hỏi
+  được lấy qua quiz đã lọc owner; ADMIN cũng không được đọc dữ liệu học tập của tài khoản
+  khác. ID thiếu/khác chủ cùng trả 404; phản hồi riêng tư có `Cache-Control: no-store`.
+  Kiểm thử bao phủ đọc/ghi chat trái phép, không gọi model/không thay đổi dữ liệu,
+  quiz không lộ đáp án, giả mạo `user_id` và phân trang tiến độ. Xem `docs/OWNERSHIP.md`.
+  Không triển khai nộp/chấm quiz, tính tiến độ hoặc giao diện mới trong task này.
 

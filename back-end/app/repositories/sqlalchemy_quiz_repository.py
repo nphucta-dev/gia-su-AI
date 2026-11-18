@@ -22,6 +22,31 @@ class SqlAlchemyQuizRepository:
     async def create_quiz(self, user_id: int, topic_id: int, difficulty: QuizDifficulty, generated: GeneratedQuiz) -> QuizRecord | None:
         return await asyncio.to_thread(self._create_quiz, user_id, topic_id, difficulty, generated)
 
+    async def find_quiz(self, user_id: int, quiz_id: int) -> QuizRecord | None:
+        return await asyncio.to_thread(self._find_quiz, user_id, quiz_id)
+
+    def _find_quiz(self, user_id: int, quiz_id: int) -> QuizRecord | None:
+        with self._sessions() as db:
+            quiz = db.scalar(select(Quiz).where(Quiz.id == quiz_id, Quiz.user_id == user_id))
+            if quiz is None:
+                return None
+            # Scope child rows through their parent in SQL; child IDs never grant access.
+            questions = db.scalars(
+                select(QuizQuestion).join(Quiz, Quiz.id == QuizQuestion.quiz_id)
+                .where(Quiz.id == quiz_id, Quiz.user_id == user_id)
+                .order_by(QuizQuestion.position)
+            )
+            return QuizRecord(
+                id=quiz.id, user_id=quiz.user_id, topic_id=quiz.topic_id, difficulty=quiz.difficulty,
+                status=quiz.status, created_at=utc_timestamp(quiz.created_at), questions=tuple(
+                    QuizQuestionRecord(
+                        id=question.id, position=question.position, question_text=question.question_text,
+                        options=dict(question.options), correct_answer=question.correct_answer,
+                        explanation=question.explanation,
+                    ) for question in questions
+                ),
+            )
+
     def _create_quiz(self, user_id: int, topic_id: int, difficulty: QuizDifficulty, generated: GeneratedQuiz) -> QuizRecord | None:
         with self._sessions.begin() as db:
             owner = db.scalar(select(User.id).where(User.id == user_id, User.is_active.is_(True)).with_for_update())

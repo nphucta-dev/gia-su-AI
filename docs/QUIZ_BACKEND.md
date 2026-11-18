@@ -44,6 +44,10 @@ chuẩn từ trình duyệt, chưa nối giao diện luyện tập và chưa ch�
 quiz sau này gọi service này sau khi nhận dữ liệu model; không cần đổi bộ kiểm tra
 hay cách lưu. Không tạo bài giả khi chưa cấu hình model.
 
+TK-082 bổ sung `GET /api/quizzes/{quiz_id}` để đọc quiz và câu hỏi của tài khoản
+đang đăng nhập, giữ response không chứa đáp án/giải thích. ID khác chủ và ID thiếu
+cùng trả 404, kể cả với ADMIN; xem [quyền sở hữu](OWNERSHIP.md).
+
 Kiểm thử offline:
 
 ```powershell
