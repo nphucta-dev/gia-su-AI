@@ -1,6 +1,6 @@
 # Trạng thái Frontend — Gia Sư AI
 
-Ngày cập nhật: 16/11/2026
+Ngày cập nhật: 18/11/2026
 Phạm vi: trạng thái frontend sau khi đối chiếu `git diff` hiện tại với các task T2/T3 trong `docs/reference/task-assignments.json`. Đây là đánh giá code trong working tree; file phân công chỉ dùng để tra task, không dùng trạng thái trong file làm bằng chứng nghiệm thu.
 
 ## Kết luận từ git diff
@@ -38,7 +38,7 @@ Các mục trên chỉ xác nhận phần UI hoặc client behavior; task nghi�
 | TK-007 | Đăng xuất phía client | Có |
 | TK-009 | Trang hồ sơ cá nhân | Chưa xong; diff chuyển về bản nháp cục bộ, không gọi API profile |
 | TK-022 | Trạng thái chờ phản hồi | Chưa xong; chỉ có selector xem trước, chưa gắn request chat |
-| TK-024 | Sidebar lịch sử chat | Chưa xong; đang liệt kê topic mẫu, chưa lấy session thật |
+| TK-024 | Sidebar lịch sử chat | Đã tích hợp sidebar lịch sử chat với API; mở lại đúng nội dung phiên theo tài khoản. |
 | TK-026 | Chặn câu hỏi rỗng UI | Có |
 | TK-031 | Nút gợi ý 3 mức | Một phần; có UI nhưng chưa gọi API hints |
 | TK-033 | Đơn giản hơn/Cho ví dụ | Một phần; nội dung đang hard-code |
