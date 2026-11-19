@@ -67,8 +67,8 @@ class ChatRepository(Protocol):
     async def append_user_message(self, user_id: int, session_id: int, content: str) -> ChatMessageRecord | None: ...
 
     async def append_assistant_message(
-        self, user_id: int, session_id: int, content: str, *, hint_level: int,
-        token_count: int | None, expected_last_id: int,
+        self, user_id: int, session_id: int, content: str, *, hint_level: int | None = None,
+        is_full_solution: bool = False, token_count: int | None, expected_last_id: int,
     ) -> ChatMessageRecord | None: ...
 
 
@@ -145,12 +145,12 @@ class InMemoryChatRepository:
 
     def _append(
         self, session: ChatSessionRecord, content: str, *, role: str,
-        hint_level: int | None = None, token_count: int | None = None,
+        hint_level: int | None = None, is_full_solution: bool = False, token_count: int | None = None,
     ) -> ChatMessageRecord:
         now = self._timestamp()
         message = ChatMessageRecord(
             id=self._next_message_id, session_id=session.id, role=role, content=content,
-            created_at=now, hint_level=hint_level, token_count=token_count,
+            created_at=now, hint_level=hint_level, is_full_solution=is_full_solution, token_count=token_count,
         )
         title = session.title
         if title is None and role == "user":
@@ -165,8 +165,8 @@ class InMemoryChatRepository:
         return self._append(session, content, role="user") if session is not None else None
 
     async def append_assistant_message(
-        self, user_id: int, session_id: int, content: str, *, hint_level: int,
-        token_count: int | None, expected_last_id: int,
+        self, user_id: int, session_id: int, content: str, *, hint_level: int | None = None,
+        is_full_solution: bool = False, token_count: int | None, expected_last_id: int,
     ) -> ChatMessageRecord | None:
         session = self._find_session(user_id, session_id)
         if session is None:
@@ -175,4 +175,7 @@ class InMemoryChatRepository:
         last_id = messages[-1].id if messages else 0
         if last_id != expected_last_id:
             raise ChatChangedError()
-        return self._append(session, content, role="assistant", hint_level=hint_level, token_count=token_count)
+        return self._append(
+            session, content, role="assistant", hint_level=hint_level,
+            is_full_solution=is_full_solution, token_count=token_count,
+        )

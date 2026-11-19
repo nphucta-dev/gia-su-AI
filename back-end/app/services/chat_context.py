@@ -30,6 +30,12 @@ HINT_INSTRUCTIONS = {
     3: "Ứng dụng chọn gợi ý mức 3: hướng dẫn cụ thể hơn một bước tiếp theo từ chỗ người học đang vướng, để họ tự thực hiện phần còn lại; vẫn không đưa lời giải đầy đủ hay đáp án cuối cùng.",
 }
 
+FULL_SOLUTION_INSTRUCTION = (
+    "Ứng dụng xác nhận người học đã chọn xem lời giải đầy đủ. "
+    "Hãy trình bày lời giải chi tiết từng bước, rõ ràng, dễ hiểu bằng tiếng Việt cho câu hỏi gần nhất, "
+    "kèm đáp án cuối cùng và một ghi chú ngắn giúp người học tự kiểm tra lại."
+)
+
 _MASKS = re.compile(r"(\[(?:NAME|EMAIL|SECRET)\])")
 _EMAIL = re.compile(r"(?<![\w.+-])[\w.!#$%&'*+/=?^`{|}~-]+@(?:[\w-]+\.)+[\w-]{2,}(?![\w-])", re.UNICODE)
 _JWT = re.compile(r"(?<![\w-])eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?![\w-])")
@@ -193,6 +199,35 @@ def build_chat_messages(
     request = {"role": "user", "content": json.dumps({
         "type": "learning_request", "hintLevel": hint_level,
         "action": "respond_to_latest_question" if clean[-1]["role"] == "user" else "continue_hint",
+    }, ensure_ascii=False)}
+    characters = MAX_CONTEXT_CHARS - sum(len(message["content"]) for message in [*prefix, request])
+    if characters <= 0:
+        raise ValueError("Ngữ cảnh môn vượt quá giới hạn gửi model.")
+    selected = _bounded_history(clean, question_index=question_index, slots=MAX_CONTEXT_MESSAGES - 3, characters=characters)
+    return [*prefix, *selected, request]
+
+
+def build_full_solution_messages(
+    *, topic: SocraticTopic, history: Sequence[dict[str, str]],
+    known_name: str = "", known_email: str = "", secret_values: Sequence[str] = (),
+) -> list[dict[str, str]]:
+    """Tạo payload gửi model cho lời giải đầy đủ sau khi backend đã xác nhận cờ confirmed=true."""
+    def redact(value: str) -> str:
+        return redact_sensitive_text(value, known_name=known_name, known_email=known_email, secret_values=secret_values)
+
+    clean = _history(history, redact)
+    safe_topic = _safe_topic(topic, redact)
+    question_index = max(index for index, message in enumerate(clean) if message["role"] == "user")
+    first = build_first_turn_messages(question=clean[question_index]["content"], topic=safe_topic)
+    topic_data = json.loads(first[1]["content"])["topic"]
+    prefix = [
+        {"role": "system", "content": CONVERSATION_SYSTEM_PROMPT + "\n\n" + FULL_SOLUTION_INSTRUCTION},
+        {"role": "user", "content": json.dumps({"type": "academic_context", "topic": topic_data}, ensure_ascii=False)},
+    ]
+    request = {"role": "user", "content": json.dumps({
+        "type": "learning_request",
+        "action": "provide_full_solution",
+        "confirmed": True,
     }, ensure_ascii=False)}
     characters = MAX_CONTEXT_CHARS - sum(len(message["content"]) for message in [*prefix, request])
     if characters <= 0:

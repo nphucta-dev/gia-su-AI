@@ -10,7 +10,7 @@ from app.routes.auth import require_json
 from app.schemas.auth import ErrorResponse
 from app.schemas.chat import (
     ChatMessageListResponse, ChatReplyResponse, ChatSessionListResponse, ChatSessionResponse,
-    CreateChatSessionRequest, SendChatMessageRequest,
+    CreateChatSessionRequest, RequestFullSolutionRequest, SendChatMessageRequest,
 )
 from app.services.chat_service import ChatService
 
@@ -55,3 +55,16 @@ async def send_message(session_id: SessionId, payload: SendChatMessageRequest, u
 @router.post("/sessions/{session_id}/hints", status_code=201, response_model=ChatReplyResponse, summary="Gợi ý tiếp theo; server quyết định mức 1–3")
 async def next_hint(session_id: SessionId, user: CurrentUser, service: Service) -> ChatReplyResponse:
     return await service.next_hint(user, session_id)
+
+
+@router.post(
+    "/sessions/{session_id}/solution",
+    status_code=201,
+    response_model=ChatReplyResponse,
+    dependencies=[Depends(require_json)],
+    summary="Xem lời giải đầy đủ sau khi người học xác nhận",
+)
+async def request_full_solution(
+    session_id: SessionId, payload: RequestFullSolutionRequest, user: CurrentUser, service: Service,
+) -> ChatReplyResponse:
+    return await service.request_full_solution(user, session_id, confirmed=payload.confirmed)

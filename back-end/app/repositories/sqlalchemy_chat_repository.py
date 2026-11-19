@@ -36,12 +36,13 @@ class SqlAlchemyChatRepository:
         return await asyncio.to_thread(self._append_message, user_id, session_id, content, role="user")
 
     async def append_assistant_message(
-        self, user_id: int, session_id: int, content: str, *, hint_level: int,
-        token_count: int | None, expected_last_id: int,
+        self, user_id: int, session_id: int, content: str, *, hint_level: int | None = None,
+        is_full_solution: bool = False, token_count: int | None, expected_last_id: int,
     ) -> ChatMessageRecord | None:
         return await asyncio.to_thread(
             self._append_message, user_id, session_id, content, role="assistant",
-            hint_level=hint_level, token_count=token_count, expected_last_id=expected_last_id,
+            hint_level=hint_level, is_full_solution=is_full_solution, token_count=token_count,
+            expected_last_id=expected_last_id,
         )
 
     @staticmethod
@@ -121,7 +122,7 @@ class SqlAlchemyChatRepository:
 
     def _append_message(
         self, user_id: int, session_id: int, content: str, *, role: str,
-        hint_level: int | None = None, token_count: int | None = None,
+        hint_level: int | None = None, is_full_solution: bool = False, token_count: int | None = None,
         expected_last_id: int | None = None,
     ) -> ChatMessageRecord | None:
         with self._sessions.begin() as db:
@@ -137,7 +138,7 @@ class SqlAlchemyChatRepository:
             now = db.scalar(select(func.utc_timestamp(6)))
             message = ChatMessage(
                 session_id=session_id, role=role, content=content, created_at=now,
-                hint_level=hint_level, token_count=token_count, is_full_solution=False,
+                hint_level=hint_level, token_count=token_count, is_full_solution=is_full_solution,
             )
             if session.title is None and role == "user":
                 session.title = " ".join(content.split())[:120] or None

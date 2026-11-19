@@ -16,6 +16,11 @@ class SendChatMessageRequest(BaseModel):
     content: str = Field(strict=True, min_length=1, max_length=4000)
 
 
+class RequestFullSolutionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confirmed: bool = Field(strict=True)
+
+
 class ChatSessionItem(BaseModel):
     id: int
     topic_id: int = Field(serialization_alias="topicId")
