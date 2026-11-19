@@ -32,6 +32,9 @@ class SqlAlchemyChatRepository:
     async def recent_messages(self, user_id: int, session_id: int, *, limit: int = 12) -> list[ChatMessageRecord]:
         return await asyncio.to_thread(self._recent_messages, user_id, session_id, limit=limit)
 
+    async def find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None:
+        return await asyncio.to_thread(self._find_message, user_id, message_id)
+
     async def append_user_message(self, user_id: int, session_id: int, content: str) -> ChatMessageRecord | None:
         return await asyncio.to_thread(self._append_message, user_id, session_id, content, role="user")
 
@@ -77,7 +80,9 @@ class SqlAlchemyChatRepository:
         return ChatMessageRecord(
             id=message.id, session_id=message.session_id, role=message.role, content=message.content,
             created_at=utc_timestamp(message.created_at), hint_level=message.hint_level,
-            is_full_solution=message.is_full_solution, token_count=message.token_count,
+            is_full_solution=message.is_full_solution,
+            source_refs=[dict(item) for item in (message.source_refs or [])],
+            token_count=message.token_count,
         )
 
     def _create_session(self, user_id: int, topic_id: int, title: str | None) -> ChatSessionRecord | None:
@@ -119,6 +124,15 @@ class SqlAlchemyChatRepository:
         with self._sessions() as db:
             rows = list(db.scalars(self._message_query(user_id, session_id).order_by(ChatMessage.id.desc()).limit(limit)))
             return [self._message_record(message) for message in reversed(rows)]
+
+    def _find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None:
+        with self._sessions() as db:
+            row = db.scalar(
+                select(ChatMessage)
+                .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+                .where(ChatMessage.id == message_id, ChatSession.user_id == user_id)
+            )
+            return self._message_record(row) if row is not None else None
 
     def _append_message(
         self, user_id: int, session_id: int, content: str, *, role: str,

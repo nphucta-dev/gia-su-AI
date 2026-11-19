@@ -10,8 +10,8 @@ from app.prompts import SocraticTopic
 from app.repositories.chat_repository import ChatChangedError, ChatMessageRecord, ChatRepository, ChatSessionRecord
 from app.repositories.user_repository import User
 from app.schemas.chat import (
-    ChatMessageItem, ChatMessageListResponse, ChatReplyResponse, ChatSessionItem,
-    ChatSessionListResponse, ChatSessionResponse,
+    ChatMessageItem, ChatMessageListResponse, ChatMessageSourcesResponse, ChatReplyResponse,
+    ChatSessionItem, ChatSessionListResponse, ChatSessionResponse, ChatSourceRefItem,
 )
 from app.services.chat_context import build_chat_messages, build_full_solution_messages, redact_sensitive_text
 from app.services.llm_client import LLMClient
@@ -55,6 +55,47 @@ def validate_message_content(content: str) -> str:
         )
     return cleaned
 
+
+
+NO_SOURCE_NOTICE = "Chưa có tài liệu nguồn phù hợp cho phản hồi này."
+
+
+def sanitize_source_refs(raw_refs: object) -> list[ChatSourceRefItem]:
+    """TK-049: Lọc và chuẩn hóa danh sách source_refs hợp lệ, loại bỏ bản ghi lỗi/trùng."""
+    if not isinstance(raw_refs, list):
+        return []
+    valid: list[ChatSourceRefItem] = []
+    seen: set[tuple[int, int]] = set()
+    for item in raw_refs:
+        if not isinstance(item, dict):
+            continue
+        doc_id = item.get("document_id")
+        chunk_id = item.get("chunk_id")
+        title = item.get("title")
+        if (
+            not isinstance(doc_id, int) or isinstance(doc_id, bool) or doc_id <= 0
+            or not isinstance(chunk_id, int) or isinstance(chunk_id, bool) or chunk_id <= 0
+            or not isinstance(title, str) or not title.strip()
+        ):
+            continue
+        key = (doc_id, chunk_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        chunk_index = item.get("chunk_index")
+        if not isinstance(chunk_index, int) or isinstance(chunk_index, bool) or chunk_index < 0:
+            chunk_index = None
+        source_url = item.get("source_url")
+        if not isinstance(source_url, str) or not source_url.strip():
+            source_url = None
+        valid.append(ChatSourceRefItem(
+            document_id=doc_id,
+            chunk_id=chunk_id,
+            title=title.strip(),
+            chunk_index=chunk_index,
+            source_url=source_url,
+        ))
+    return valid
 
 
 MAX_HINT_LEVEL = 3
@@ -130,6 +171,19 @@ class ChatService:
         return ChatMessageListResponse(
             session=session_item(session), messages=[message_item(item) for item in records[:limit]],
             limit=limit, offset=offset, has_more=len(records) > limit,
+        )
+
+    async def get_message_sources(self, user: User, message_id: int) -> ChatMessageSourcesResponse:
+        """TK-049: Trả về danh sách source_refs hợp lệ và ghi rõ khi không có chunk phù hợp."""
+        record = await self._repository.find_message(user.id, message_id)
+        if record is None:
+            raise AppError(404, "CHAT_MESSAGE_NOT_FOUND", "Không tìm thấy tin nhắn của bạn.")
+        refs = sanitize_source_refs(record.source_refs) if record.role == "assistant" else []
+        return ChatMessageSourcesResponse(
+            message_id=record.id,
+            has_sources=bool(refs),
+            source_refs=refs,
+            notice=None if refs else NO_SOURCE_NOTICE,
         )
 
     def _privacy(self, user: User) -> dict:

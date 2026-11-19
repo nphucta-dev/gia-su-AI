@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
-from typing import Protocol
+from typing import Any, Protocol
 
 from app.repositories.catalog_repository import InMemoryCatalogRepository
 
@@ -41,6 +41,7 @@ class ChatMessageRecord:
     created_at: str
     hint_level: int | None = None
     is_full_solution: bool = False
+    source_refs: list[dict[str, Any]] = field(default_factory=list)
     token_count: int | None = None
 
 
@@ -63,6 +64,8 @@ class ChatRepository(Protocol):
     async def list_messages(self, user_id: int, session_id: int, *, limit: int, offset: int) -> list[ChatMessageRecord]: ...
 
     async def recent_messages(self, user_id: int, session_id: int, *, limit: int = 12) -> list[ChatMessageRecord]: ...
+
+    async def find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None: ...
 
     async def append_user_message(self, user_id: int, session_id: int, content: str) -> ChatMessageRecord | None: ...
 
@@ -142,6 +145,12 @@ class InMemoryChatRepository:
         if limit <= 0:
             return []
         return self._owned_messages(user_id, session_id)[-limit:]
+
+    async def find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None:
+        message = self._messages.get(message_id)
+        if message is None or self._find_session(user_id, message.session_id) is None:
+            return None
+        return message
 
     def _append(
         self, session: ChatSessionRecord, content: str, *, role: str,
