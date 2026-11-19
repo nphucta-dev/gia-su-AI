@@ -22,3 +22,10 @@ class ProgressListResponse(BaseModel):
     limit: int
     offset: int
     has_more: bool = Field(serialization_alias="hasMore")
+
+
+class ReviewTopicsResponse(BaseModel):
+    topics: list[ProgressItem]
+    limit: int
+    offset: int
+    has_more: bool = Field(serialization_alias="hasMore")

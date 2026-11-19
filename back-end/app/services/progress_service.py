@@ -4,7 +4,7 @@ from dataclasses import asdict
 
 from app.repositories.progress_repository import ProgressRecord, ProgressRepository
 from app.repositories.user_repository import User
-from app.schemas.progress import ProgressItem, ProgressListResponse, ProgressResponse
+from app.schemas.progress import ProgressItem, ProgressListResponse, ProgressResponse, ReviewTopicsResponse
 from app.utils.errors import AppError
 
 
@@ -27,5 +27,13 @@ class ProgressService:
         records = await self._repository.list_progress(user.id, limit=limit + 1, offset=offset)
         return ProgressListResponse(
             progress=[progress_item(record) for record in records[:limit]],
+            limit=limit, offset=offset, has_more=len(records) > limit,
+        )
+
+    async def list_review_topics(self, user: User, *, limit: int, offset: int) -> ReviewTopicsResponse:
+        """TK-067: Gợi ý chủ đề cần ôn theo mastery_percent tăng dần."""
+        records = await self._repository.list_review_topics(user.id, limit=limit + 1, offset=offset)
+        return ReviewTopicsResponse(
+            topics=[progress_item(record) for record in records[:limit]],
             limit=limit, offset=offset, has_more=len(records) > limit,
         )

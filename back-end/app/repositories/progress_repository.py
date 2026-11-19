@@ -23,6 +23,8 @@ class ProgressRepository(Protocol):
 
     async def list_progress(self, user_id: int, *, limit: int, offset: int) -> list[ProgressRecord]: ...
 
+    async def list_review_topics(self, user_id: int, *, limit: int, offset: int) -> list[ProgressRecord]: ...
+
 
 class InMemoryProgressRepository:
     def __init__(self, records: Iterable[ProgressRecord] = ()) -> None:
@@ -35,4 +37,10 @@ class InMemoryProgressRepository:
     async def list_progress(self, user_id: int, *, limit: int, offset: int) -> list[ProgressRecord]:
         owned = (record for record in self._records.values() if record.user_id == user_id)
         records = sorted(owned, key=lambda record: (record.last_studied_at or "", record.id), reverse=True)
+        return records[offset:offset + limit]
+
+    async def list_review_topics(self, user_id: int, *, limit: int, offset: int) -> list[ProgressRecord]:
+        """TK-067: Xếp chủ đề cần ôn của user theo mastery_percent tăng dần."""
+        owned = (record for record in self._records.values() if record.user_id == user_id)
+        records = sorted(owned, key=lambda record: (record.mastery_percent, record.last_studied_at or "", record.id))
         return records[offset:offset + limit]
