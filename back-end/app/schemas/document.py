@@ -1,6 +1,11 @@
 """Dữ liệu công khai cho API tải tài liệu, không trả đường dẫn file nội bộ."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class UpdateDocumentActiveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    is_active: bool = Field(alias="isActive", strict=True)
 
 
 class DocumentInfo(BaseModel):

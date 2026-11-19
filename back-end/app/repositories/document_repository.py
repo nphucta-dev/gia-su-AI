@@ -78,6 +78,10 @@ class DocumentChunkRecord:
     source_url: str | None = None
 
 
+class DocumentNotReadyError(Exception):
+    """Không cho phép bật tài liệu có trạng thái khác ready."""
+
+
 def missing_topic_error() -> AppError:
     message = "Chủ đề không tồn tại hoặc môn/chủ đề đã bị vô hiệu hóa."
     return AppError(404, "TOPIC_NOT_FOUND", message, {"topic_id": message})
@@ -95,6 +99,8 @@ class DocumentRepository(Protocol):
     async def find_document(self, document_id: int) -> DocumentRecord | None: ...
 
     async def finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None: ...
+
+    async def set_active(self, document_id: int, *, is_active: bool) -> DocumentRecord | None: ...
 
     async def list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]: ...
 
@@ -184,6 +190,16 @@ class InMemoryDocumentRepository:
         self._documents[document_id] = result
         return result
 
+    async def set_active(self, document_id: int, *, is_active: bool) -> DocumentRecord | None:
+        current = self._documents.get(document_id)
+        if current is None:
+            return None
+        if is_active and current.status != "ready":
+            raise DocumentNotReadyError()
+        updated = replace(current, is_active=is_active)
+        self._documents[document_id] = updated
+        return updated
+
     async def list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]:
         eligible_docs = sorted(
             (
@@ -229,6 +245,9 @@ class SqlAlchemyDocumentRepository:
 
     async def finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None:
         return await asyncio.to_thread(self._finish_processing, document_id, chunks=chunks)
+
+    async def set_active(self, document_id: int, *, is_active: bool) -> DocumentRecord | None:
+        return await asyncio.to_thread(self._set_active, document_id, is_active=is_active)
 
     async def list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]:
         return await asyncio.to_thread(self._list_eligible_chunks, topic_id)
@@ -312,6 +331,20 @@ class SqlAlchemyDocumentRepository:
             # Chunks và trạng thái cùng commit; lỗi ghi sẽ rollback toàn bộ.
             db.flush()
             return self._to_record(document, topic.name, subject.name, len(chunks or ()))
+
+    def _set_active(self, document_id: int, *, is_active: bool) -> DocumentRecord | None:
+        with self._sessions.begin() as db:
+            document = db.get(DocumentModel, document_id, with_for_update=True)
+            if document is None:
+                return None
+            if is_active and document.status != "ready":
+                raise DocumentNotReadyError()
+            document.is_active = is_active
+            count = db.scalar(select(func.count(DocumentChunk.id)).where(DocumentChunk.document_id == document_id)) or 0
+            topic = db.get(TopicModel, document.topic_id)
+            subject = db.get(SubjectModel, topic.subject_id)
+            db.flush()
+            return self._to_record(document, topic.name, subject.name, count)
 
     def _list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]:
         with self._sessions() as db:
