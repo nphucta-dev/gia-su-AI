@@ -30,8 +30,25 @@ class QuizRecord:
     questions: tuple[QuizQuestionRecord, ...]
 
 
+@dataclass(frozen=True)
+class QuizAnswerRecord:
+    id: int
+    question_id: int
+    user_answer: str
+    is_correct: bool
+    created_at: str
+
+
 class QuizOwnerUnavailableError(Exception):
     """The authenticated account no longer exists or is inactive at save time."""
+
+
+class QuizAlreadySubmittedError(Exception):
+    """Answers have already been saved or the quiz is no longer in progress."""
+
+
+class QuizInvalidAnswersError(Exception):
+    """Submitted question IDs do not match the exact 5 questions of this quiz."""
 
 
 class QuizRepository(Protocol):
@@ -39,13 +56,17 @@ class QuizRepository(Protocol):
 
     async def find_quiz(self, user_id: int, quiz_id: int) -> QuizRecord | None: ...
 
+    async def save_answers(self, user_id: int, quiz_id: int, answers: dict[int, str]) -> list[QuizAnswerRecord] | None: ...
+
 
 class InMemoryQuizRepository:
     def __init__(self, catalog_repository: InMemoryCatalogRepository | None = None) -> None:
         self._catalog = catalog_repository if catalog_repository is not None else InMemoryCatalogRepository()
         self._quizzes: dict[int, QuizRecord] = {}
+        self._answers: dict[int, QuizAnswerRecord] = {}
         self._next_id = 1
         self._next_question_id = 1
+        self._next_answer_id = 1
 
     async def find_quiz(self, user_id: int, quiz_id: int) -> QuizRecord | None:
         record = self._quizzes.get(quiz_id)
@@ -71,3 +92,28 @@ class InMemoryQuizRepository:
         self._next_id += 1
         self._next_question_id += len(questions)
         return record
+
+    async def save_answers(self, user_id: int, quiz_id: int, answers: dict[int, str]) -> list[QuizAnswerRecord] | None:
+        record = self._quizzes.get(quiz_id)
+        if record is None or record.user_id != user_id:
+            return None
+        question_ids = {question.id for question in record.questions}
+        if record.status != "in_progress" or any(qid in self._answers for qid in question_ids):
+            raise QuizAlreadySubmittedError()
+        if set(answers) != question_ids:
+            raise QuizInvalidAnswersError()
+        now = utc_timestamp(datetime.now(timezone.utc))
+        saved: list[QuizAnswerRecord] = []
+        for question in record.questions:
+            choice = answers[question.id]
+            saved.append(QuizAnswerRecord(
+                id=self._next_answer_id + len(saved),
+                question_id=question.id,
+                user_answer=choice,
+                is_correct=(choice == question.correct_answer),
+                created_at=now,
+            ))
+        for item in saved:
+            self._answers[item.question_id] = item
+        self._next_answer_id += len(saved)
+        return saved
