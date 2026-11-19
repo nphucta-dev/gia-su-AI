@@ -1,5 +1,6 @@
 """Phiên và tin nhắn thật, ngữ cảnh riêng tư, điều phối thang gợi ý 1–3."""
 
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 import unicodedata
@@ -32,6 +33,25 @@ def missing_session() -> AppError:
 
 def changed_session() -> AppError:
     return AppError(409, "CHAT_CHANGED", "Hội thoại vừa được cập nhật. Hãy xem lại lịch sử trước khi gửi tiếp.")
+
+
+MAX_HINT_LEVEL = 3
+
+
+def resolve_next_hint_level(history: Sequence[ChatMessageRecord]) -> int:
+    """Điều phối thang gợi ý 1–3 cho câu hỏi gần nhất; server quyết định mức tiếp theo."""
+    question = next((item for item in reversed(history) if item.role == "user"), None)
+    if question is None:
+        raise AppError(409, "CHAT_QUESTION_REQUIRED", "Hãy gửi một câu hỏi trước khi xin gợi ý.")
+    levels = [
+        item.hint_level
+        for item in history
+        if item.role == "assistant" and item.id > question.id and item.hint_level is not None
+    ]
+    level = max(levels, default=0) + 1
+    if level > MAX_HINT_LEVEL:
+        raise AppError(409, "HINT_LIMIT_REACHED", "Bạn đã nhận đủ 3 mức gợi ý cho câu hỏi này.")
+    return level
 
 
 class ChatService:
@@ -117,13 +137,7 @@ class ChatService:
         self._require_open(session)
         async with self._generating(session_id):
             history = await self._repository.recent_messages(user.id, session_id, limit=24)
-            question = next((item for item in reversed(history) if item.role == "user"), None)
-            if question is None:
-                raise AppError(409, "CHAT_QUESTION_REQUIRED", "Hãy gửi một câu hỏi trước khi xin gợi ý.")
-            levels = [item.hint_level or 0 for item in history if item.role == "assistant" and item.id > question.id]
-            level = max(levels, default=0) + 1
-            if level > 3:
-                raise AppError(409, "HINT_LIMIT_REACHED", "Bạn đã nhận đủ 3 mức gợi ý cho câu hỏi này.")
+            level = resolve_next_hint_level(history)
             return await self._reply(user, session, expected_last_id=history[-1].id, hint_level=level, history=history)
 
     async def _reply(
