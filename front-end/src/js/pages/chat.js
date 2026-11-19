@@ -3,6 +3,7 @@ import { el, button, heading, notice, confirmDialog, link } from '../components/
 import { topics } from '../data.js';
 import { getSession } from '../session.js';
 import { setupValidation, validateFields } from '../components/validation.js';
+import { formatQuotaReset, loadChatQuota } from '../chat-quota.js';
 
 const SESSION_LIMIT = 20;
 const MESSAGE_LIMIT = 200;
@@ -175,6 +176,7 @@ function renderChatHistory() {
  let selectedMessages = [];
  let hintPending = false;
  let hintLockedCode = '';
+ let quotaLoading = false;
 
  const sidebarStatus = el('div', { className: 'chat-sidebar-status', role: 'status', 'aria-live': 'polite' });
  const sessionList = el('nav', { className: 'session-list', 'aria-label': 'Các phiên chat đã lưu' });
@@ -189,14 +191,55 @@ function renderChatHistory() {
  hintButton.disabled = true;
  const hintStatus = el('div', { className: 'chat-hint-status', role: 'status', 'aria-live': 'polite' });
  const hintControls = el('div', { className: 'chat-hint-controls' }, hintButton, hintStatus);
+ const quotaStatus = el('div', { className: 'chat-quota-copy', role: 'status', 'aria-live': 'polite' });
+ const quotaRegion = el('section', { className: 'chat-quota', 'aria-label': 'Hạn mức hỏi AI' }, quotaStatus);
  const messages = el('div', { className: 'messages chat-history-messages', 'aria-label': 'Nội dung phiên chat', 'aria-live': 'polite', 'aria-busy': 'false' },
   el('div', { className: 'empty-state' }, 'Chọn một phiên để xem lại hội thoại.'));
- const main = el('section', { className: 'chat-main' }, el('div', { className: 'chat-header chat-session-header' },
+ const main = el('section', { className: 'chat-main' }, quotaRegion, el('div', { className: 'chat-header chat-session-header' },
   el('div', { className: 'chat-session-copy' }, chatTitle, chatDescription), hintControls), messages);
  const root = el('div', {}, heading('Lịch sử trò chuyện', 'Mở lại những phiên học đã lưu trong tài khoản của bạn.'),
   el('div', { className: 'chat-layout chat-history-layout' }, sidebar, main));
 
  function isCurrent() { return !controller.signal.aborted && root.isConnected; }
+
+ function drawQuota(quota) {
+  const number = new Intl.NumberFormat('vi-VN');
+  const reset = formatQuotaReset(quota.nextResetAt);
+  const state = quota.remaining === 0 ? 'exhausted' : quota.remaining <= 5 ? 'low' : 'available';
+  quotaRegion.dataset.state = state;
+  quotaRegion.removeAttribute('aria-busy');
+  const title = state === 'exhausted'
+   ? 'Đã hết lượt hỏi AI hôm nay'
+   : state === 'low'
+    ? `Sắp hết lượt · Còn ${number.format(quota.remaining)}/${number.format(quota.limit)} lượt`
+    : `Còn ${number.format(quota.remaining)}/${number.format(quota.limit)} lượt hỏi AI hôm nay`;
+  quotaStatus.replaceChildren(
+   el('strong', {}, title),
+   el('span', {}, 'Làm mới lúc ', el('time', { datetime: quota.nextResetAt }, reset)),
+   el('span', { className: 'chat-quota-note' }, 'Thông tin đang được kiểm chứng bằng API mock; backend quota chưa được kết nối.'));
+ }
+
+ async function loadQuota(force = false) {
+  if (quotaLoading || controller.signal.aborted) return;
+  quotaLoading = true;
+  quotaRegion.dataset.state = 'loading';
+  quotaRegion.setAttribute('aria-busy', 'true');
+  quotaStatus.replaceChildren(el('span', {}, 'Đang tải hạn mức sử dụng…'));
+  try {
+   const quota = await loadChatQuota({ force, signal: controller.signal });
+   if (isCurrent()) drawQuota(quota);
+  } catch (error) {
+   if (error.name === 'AbortError' || !isCurrent()) return;
+   quotaRegion.dataset.state = 'error';
+   quotaRegion.removeAttribute('aria-busy');
+   quotaStatus.replaceChildren(
+    el('strong', {}, 'Chưa tải được hạn mức sử dụng'),
+    el('span', {}, error?.message || 'Không thể kết nối với máy chủ. Vui lòng thử lại.'),
+    button('Thử lại', () => loadQuota(true), 'secondary small'));
+  } finally {
+   quotaLoading = false;
+  }
+ }
 
  function hintState() {
   if (!selectedSession) return { disabled: true, label: 'Chọn một phiên để xin gợi ý' };
@@ -434,6 +477,7 @@ function renderChatHistory() {
  }
 
  loadSessions();
+ loadQuota();
  drawHintControl();
  if (request.invalid) {
   showMessageError(new ApiError('Mã phiên chat trên đường dẫn không hợp lệ.', 404, 'CHAT_SESSION_NOT_FOUND'), null);

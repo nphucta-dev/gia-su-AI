@@ -131,7 +131,7 @@ const messages = {
   listFailures = 0;
   await page.goto(`${base}/#chat`);
   await page.getByText('Máy chủ tạm thời chưa phản hồi.', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
+  await page.getByLabel('Lịch sử phiên chat', { exact: true }).getByRole('button', { name: 'Thử lại', exact: true }).click();
   await page.getByRole('link', { name: /Ôn phương trình bậc hai/ }).waitFor();
 
   listMode = 'empty';
