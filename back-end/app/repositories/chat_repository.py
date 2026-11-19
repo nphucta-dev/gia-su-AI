@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from collections.abc import Sequence
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
-from typing import Protocol
+from typing import Any, Protocol
 
 from app.repositories.catalog_repository import InMemoryCatalogRepository
 
@@ -41,6 +42,7 @@ class ChatMessageRecord:
     created_at: str
     hint_level: int | None = None
     is_full_solution: bool = False
+    source_refs: list[dict[str, Any]] = field(default_factory=list)
     token_count: int | None = None
 
 
@@ -68,7 +70,8 @@ class ChatRepository(Protocol):
 
     async def append_assistant_message(
         self, user_id: int, session_id: int, content: str, *, hint_level: int | None = None,
-        is_full_solution: bool = False, token_count: int | None, expected_last_id: int,
+        is_full_solution: bool = False, source_refs: Sequence[dict[str, Any]] | None = None,
+        token_count: int | None, expected_last_id: int,
     ) -> ChatMessageRecord | None: ...
 
 
@@ -145,12 +148,15 @@ class InMemoryChatRepository:
 
     def _append(
         self, session: ChatSessionRecord, content: str, *, role: str,
-        hint_level: int | None = None, is_full_solution: bool = False, token_count: int | None = None,
+        hint_level: int | None = None, is_full_solution: bool = False,
+        source_refs: Sequence[dict[str, Any]] | None = None, token_count: int | None = None,
     ) -> ChatMessageRecord:
         now = self._timestamp()
+        stored_refs = [dict(item) for item in source_refs] if role == "assistant" and source_refs else []
         message = ChatMessageRecord(
             id=self._next_message_id, session_id=session.id, role=role, content=content,
-            created_at=now, hint_level=hint_level, is_full_solution=is_full_solution, token_count=token_count,
+            created_at=now, hint_level=hint_level, is_full_solution=is_full_solution,
+            source_refs=stored_refs, token_count=token_count,
         )
         title = session.title
         if title is None and role == "user":
@@ -166,7 +172,8 @@ class InMemoryChatRepository:
 
     async def append_assistant_message(
         self, user_id: int, session_id: int, content: str, *, hint_level: int | None = None,
-        is_full_solution: bool = False, token_count: int | None, expected_last_id: int,
+        is_full_solution: bool = False, source_refs: Sequence[dict[str, Any]] | None = None,
+        token_count: int | None, expected_last_id: int,
     ) -> ChatMessageRecord | None:
         session = self._find_session(user_id, session_id)
         if session is None:
@@ -177,5 +184,5 @@ class InMemoryChatRepository:
             raise ChatChangedError()
         return self._append(
             session, content, role="assistant", hint_level=hint_level,
-            is_full_solution=is_full_solution, token_count=token_count,
+            is_full_solution=is_full_solution, source_refs=source_refs, token_count=token_count,
         )

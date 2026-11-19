@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
+from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -37,12 +39,13 @@ class SqlAlchemyChatRepository:
 
     async def append_assistant_message(
         self, user_id: int, session_id: int, content: str, *, hint_level: int | None = None,
-        is_full_solution: bool = False, token_count: int | None, expected_last_id: int,
+        is_full_solution: bool = False, source_refs: Sequence[dict[str, Any]] | None = None,
+        token_count: int | None, expected_last_id: int,
     ) -> ChatMessageRecord | None:
         return await asyncio.to_thread(
             self._append_message, user_id, session_id, content, role="assistant",
-            hint_level=hint_level, is_full_solution=is_full_solution, token_count=token_count,
-            expected_last_id=expected_last_id,
+            hint_level=hint_level, is_full_solution=is_full_solution, source_refs=source_refs,
+            token_count=token_count, expected_last_id=expected_last_id,
         )
 
     @staticmethod
@@ -77,7 +80,9 @@ class SqlAlchemyChatRepository:
         return ChatMessageRecord(
             id=message.id, session_id=message.session_id, role=message.role, content=message.content,
             created_at=utc_timestamp(message.created_at), hint_level=message.hint_level,
-            is_full_solution=message.is_full_solution, token_count=message.token_count,
+            is_full_solution=message.is_full_solution,
+            source_refs=[dict(item) for item in (message.source_refs or [])],
+            token_count=message.token_count,
         )
 
     def _create_session(self, user_id: int, topic_id: int, title: str | None) -> ChatSessionRecord | None:
@@ -122,7 +127,8 @@ class SqlAlchemyChatRepository:
 
     def _append_message(
         self, user_id: int, session_id: int, content: str, *, role: str,
-        hint_level: int | None = None, is_full_solution: bool = False, token_count: int | None = None,
+        hint_level: int | None = None, is_full_solution: bool = False,
+        source_refs: Sequence[dict[str, Any]] | None = None, token_count: int | None = None,
         expected_last_id: int | None = None,
     ) -> ChatMessageRecord | None:
         with self._sessions.begin() as db:
@@ -136,9 +142,11 @@ class SqlAlchemyChatRepository:
                 if last_id != expected_last_id:
                     raise ChatChangedError()
             now = db.scalar(select(func.utc_timestamp(6)))
+            stored_refs = [dict(item) for item in source_refs] if role == "assistant" and source_refs else []
             message = ChatMessage(
                 session_id=session_id, role=role, content=content, created_at=now,
                 hint_level=hint_level, token_count=token_count, is_full_solution=is_full_solution,
+                source_refs=stored_refs,
             )
             if session.title is None and role == "user":
                 session.title = " ".join(content.split())[:120] or None

@@ -116,7 +116,10 @@ def create_app(
             SqlAlchemyChatRepository(session_factory) if session_factory is not None
             else InMemoryChatRepository(catalog if isinstance(catalog, InMemoryCatalogRepository) else None)
         )
-    app.state.chat_service = ChatService(chat, llm_client or ChatCompletionsClient(settings), settings)
+    app.state.chat_service = ChatService(
+        chat, llm_client or ChatCompletionsClient(settings), settings,
+        document_repository=app.state.document_repository,
+    )
     quiz = quiz_repository
     if quiz is None:
         quiz = (
