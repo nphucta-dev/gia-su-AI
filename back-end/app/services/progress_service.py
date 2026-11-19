@@ -1,10 +1,12 @@
 """Read persisted progress through the authenticated account, never a supplied owner ID."""
 
 from dataclasses import asdict
+from decimal import Decimal
 
 from app.repositories.progress_repository import ProgressRecord, ProgressRepository
 from app.repositories.user_repository import User
 from app.schemas.progress import ProgressItem, ProgressListResponse, ProgressResponse
+from app.services.mastery import calculate_mastery_percent
 from app.utils.errors import AppError
 
 
@@ -16,6 +18,13 @@ def progress_item(record: ProgressRecord) -> ProgressItem:
 class ProgressService:
     def __init__(self, repository: ProgressRepository) -> None:
         self._repository = repository
+
+    @staticmethod
+    def calculate_mastery(correct_count: int, total_count: int) -> Decimal:
+        try:
+            return calculate_mastery_percent(correct_count, total_count)
+        except ValueError as error:
+            raise AppError(422, "VALIDATION_ERROR", str(error)) from None
 
     async def get_progress(self, user: User, progress_id: int) -> ProgressResponse:
         record = await self._repository.find_progress(user.id, progress_id)
