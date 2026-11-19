@@ -35,6 +35,28 @@ def changed_session() -> AppError:
     return AppError(409, "CHAT_CHANGED", "Hội thoại vừa được cập nhật. Hãy xem lại lịch sử trước khi gửi tiếp.")
 
 
+def validate_message_content(content: str) -> str:
+    """Chặn câu hỏi rỗng, chỉ chứa khoảng trắng/ký tự vô hình hoặc ký tự điều khiển."""
+    if not isinstance(content, str):
+        raise AppError(
+            422, "VALIDATION_ERROR", "Nội dung tin nhắn không hợp lệ.",
+            {"content": "Nội dung tin nhắn không hợp lệ."},
+        )
+    if any(unicodedata.category(char) in {"Cc", "Cs"} and char not in "\n\r\t" for char in content):
+        raise AppError(
+            422, "VALIDATION_ERROR", "Nội dung tin nhắn không hợp lệ.",
+            {"content": "Nội dung tin nhắn không hợp lệ."},
+        )
+    cleaned = content.strip()
+    if not cleaned or not any(not char.isspace() and unicodedata.category(char) != "Cf" for char in cleaned):
+        raise AppError(
+            422, "VALIDATION_ERROR", "Vui lòng nhập câu hỏi trước khi gửi.",
+            {"content": "Vui lòng nhập câu hỏi trước khi gửi."},
+        )
+    return cleaned
+
+
+
 MAX_HINT_LEVEL = 3
 
 
@@ -120,10 +142,7 @@ class ChatService:
     async def send_message(self, user: User, session_id: int, content: str) -> ChatReplyResponse:
         session = await self._find(user.id, session_id)
         self._require_open(session)
-        content = content.strip()
-        # Giữ hợp đồng đầu vào tối thiểu của API gửi tin và bộ tạo prompt.
-        if not content or any(unicodedata.category(char) in {"Cc", "Cs"} and char not in "\n\r\t" for char in content):
-            raise AppError(422, "VALIDATION_ERROR", "Nội dung tin nhắn không hợp lệ.")
+        content = validate_message_content(content)
         async with self._generating(session_id):
             saved = await self._repository.append_user_message(user.id, session_id, content)
             if saved is None:
