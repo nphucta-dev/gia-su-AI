@@ -9,7 +9,9 @@ from starlette.exceptions import HTTPException
 from app.dependencies.auth import require_roles
 from app.repositories.user_repository import User
 from app.schemas.auth import ErrorResponse
-from app.schemas.document import DocumentListResponse, DocumentOptionsResponse, DocumentResponse
+from app.schemas.document import (
+    DocumentListResponse, DocumentOptionsResponse, DocumentResponse, UpdateDocumentActiveRequest,
+)
 from app.services.document_service import DocumentService, invalid_field
 from app.utils.errors import AppError
 
@@ -57,6 +59,28 @@ async def process_document(
     """Xử lý đồng bộ, không gọi AI. Tài liệu ready được trả lại, không tạo đoạn trùng."""
     document = await service.process(document_id)
     return DocumentResponse(message=processing_message(document.status), document=document)
+
+
+@router.patch(
+    "/{document_id}",
+    response_model=DocumentResponse,
+    summary="ADMIN bật/tắt tài liệu nguồn (chỉ cho bật khi status=ready)",
+    responses={
+        401: {"model": ErrorResponse, "description": "Chưa đăng nhập"},
+        403: {"model": ErrorResponse, "description": "Chỉ ADMIN đang hoạt động"},
+        404: {"model": ErrorResponse, "description": "Tài liệu không tồn tại"},
+        409: {"model": ErrorResponse, "description": "Không thể bật tài liệu có trạng thái khác ready"},
+    },
+)
+async def update_document_active(
+    document_id: Annotated[int, Path(ge=1, le=2**31 - 1)],
+    payload: UpdateDocumentActiveRequest,
+    user: AdminUser,
+    service: Annotated[DocumentService, Depends(get_document_service)],
+) -> DocumentResponse:
+    document = await service.set_active(document_id, is_active=payload.is_active)
+    message = "Đã bật tài liệu nguồn." if document.is_active else "Đã tắt tài liệu nguồn."
+    return DocumentResponse(message=message, document=document)
 
 
 @router.post(

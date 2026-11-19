@@ -11,7 +11,9 @@ from uuid import uuid4
 
 from starlette.datastructures import UploadFile
 
-from app.repositories.document_repository import DocumentRecord, DocumentRepository, missing_topic_error
+from app.repositories.document_repository import (
+    DocumentNotReadyError, DocumentRecord, DocumentRepository, missing_topic_error,
+)
 from app.repositories.user_repository import parse_user_id
 from app.schemas.document import DocumentInfo, UploadSubjectInfo, UploadTopicInfo
 from app.services.document_text import DocumentTextError, extract_document_text, split_document_text
@@ -117,6 +119,21 @@ class DocumentService:
         except (DocumentTextError, OSError):
             chunks = None
         saved = await self.repository.finish_processing(document_id, chunks=chunks)
+        if saved is None:
+            raise AppError(404, "DOCUMENT_NOT_FOUND", "Tài liệu không tồn tại.")
+        return await asyncio.to_thread(self._public_document, saved)
+
+    async def set_active(self, document_id: int, *, is_active: bool) -> DocumentInfo:
+        """TK-072: Không cho bật tài liệu có status khác ready; tắt tài liệu sẽ loại khỏi chat mới."""
+        try:
+            saved = await self.repository.set_active(document_id, is_active=is_active)
+        except DocumentNotReadyError:
+            raise AppError(
+                409,
+                "DOCUMENT_NOT_READY",
+                "Chỉ được bật tài liệu đã xử lý thành công (ready).",
+                {"isActive": "Không thể bật tài liệu chưa ở trạng thái ready."},
+            ) from None
         if saved is None:
             raise AppError(404, "DOCUMENT_NOT_FOUND", "Tài liệu không tồn tại.")
         return await asyncio.to_thread(self._public_document, saved)
