@@ -41,6 +41,7 @@ class ChatMessageRecord:
     created_at: str
     hint_level: int | None = None
     is_full_solution: bool = False
+    feedback: int | None = None
     token_count: int | None = None
 
 
@@ -51,6 +52,10 @@ MessageRecord = ChatMessageRecord
 
 class ChatChangedError(Exception):
     """Phiên đã có tin mới trong lúc phản hồi AI đang được tạo."""
+
+
+class FeedbackTargetError(Exception):
+    """Chỉ tin nhắn của assistant mới được đánh giá hữu ích/chưa hữu ích."""
 
 
 class ChatRepository(Protocol):
@@ -70,6 +75,8 @@ class ChatRepository(Protocol):
         self, user_id: int, session_id: int, content: str, *, hint_level: int | None = None,
         is_full_solution: bool = False, token_count: int | None, expected_last_id: int,
     ) -> ChatMessageRecord | None: ...
+
+    async def update_message_feedback(self, user_id: int, message_id: int, feedback: int) -> ChatMessageRecord | None: ...
 
 
 class InMemoryChatRepository:
@@ -179,3 +186,15 @@ class InMemoryChatRepository:
             session, content, role="assistant", hint_level=hint_level,
             is_full_solution=is_full_solution, token_count=token_count,
         )
+
+    async def update_message_feedback(self, user_id: int, message_id: int, feedback: int) -> ChatMessageRecord | None:
+        message = self._messages.get(message_id)
+        if message is None:
+            return None
+        if self._find_session(user_id, message.session_id) is None:
+            return None
+        if message.role != "assistant":
+            raise FeedbackTargetError()
+        updated = replace(message, feedback=feedback)
+        self._messages[message_id] = updated
+        return updated

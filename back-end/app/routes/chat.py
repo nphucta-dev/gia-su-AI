@@ -9,8 +9,8 @@ from app.repositories.user_repository import User
 from app.routes.auth import require_json
 from app.schemas.auth import ErrorResponse
 from app.schemas.chat import (
-    ChatMessageListResponse, ChatReplyResponse, ChatSessionListResponse, ChatSessionResponse,
-    CreateChatSessionRequest, RequestFullSolutionRequest, SendChatMessageRequest,
+    ChatMessageListResponse, ChatMessageResponse, ChatReplyResponse, ChatSessionListResponse, ChatSessionResponse,
+    CreateChatSessionRequest, RequestFullSolutionRequest, SendChatMessageRequest, UpdateMessageFeedbackRequest,
 )
 from app.services.chat_service import ChatService
 
@@ -68,3 +68,18 @@ async def request_full_solution(
     session_id: SessionId, payload: RequestFullSolutionRequest, user: CurrentUser, service: Service,
 ) -> ChatReplyResponse:
     return await service.request_full_solution(user, session_id, confirmed=payload.confirmed)
+
+
+@router.patch(
+    "/messages/{message_id}/feedback",
+    response_model=ChatMessageResponse,
+    dependencies=[Depends(require_json)],
+    summary="Cập nhật đánh giá hữu ích (1) hoặc chưa hữu ích (-1) trên cùng tin nhắn AI",
+)
+async def update_message_feedback(
+    message_id: Annotated[int, Path(ge=1, le=2**31 - 1)],
+    payload: UpdateMessageFeedbackRequest,
+    user: CurrentUser,
+    service: Service,
+) -> ChatMessageResponse:
+    return await service.update_message_feedback(user, message_id, payload.feedback)
