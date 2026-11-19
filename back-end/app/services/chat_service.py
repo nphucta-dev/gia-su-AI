@@ -3,17 +3,20 @@
 from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+from typing import Any
 import unicodedata
 
 from app.config import Settings
 from app.prompts import SocraticTopic
 from app.repositories.chat_repository import ChatChangedError, ChatMessageRecord, ChatRepository, ChatSessionRecord
+from app.repositories.document_repository import DocumentChunkRecord, DocumentRepository
 from app.repositories.user_repository import User
 from app.schemas.chat import (
     ChatMessageItem, ChatMessageListResponse, ChatReplyResponse, ChatSessionItem,
     ChatSessionListResponse, ChatSessionResponse,
 )
 from app.services.chat_context import build_chat_messages, build_full_solution_messages, redact_sensitive_text
+from app.services.document_retrieval import DocumentRetrievalService
 from app.services.llm_client import LLMClient
 from app.utils.errors import AppError
 
@@ -58,6 +61,30 @@ def validate_message_content(content: str) -> str:
 
 
 MAX_HINT_LEVEL = 3
+MAX_SOURCE_REFS = 5
+
+
+def build_source_refs(chunks: Sequence[DocumentChunkRecord], *, limit: int = MAX_SOURCE_REFS) -> list[dict[str, Any]]:
+    """Chuẩn hóa danh sách nguồn tham khảo để lưu vào chat_messages.source_refs."""
+    refs: list[dict[str, Any]] = []
+    seen: set[tuple[int, int]] = set()
+    for chunk in chunks:
+        key = (chunk.document_id, chunk.id)
+        if key in seen:
+            continue
+        seen.add(key)
+        item: dict[str, Any] = {
+            "document_id": chunk.document_id,
+            "chunk_id": chunk.id,
+            "title": chunk.document_title,
+            "chunk_index": chunk.chunk_index,
+        }
+        if chunk.source_url:
+            item["source_url"] = chunk.source_url
+        refs.append(item)
+        if len(refs) >= limit:
+            break
+    return refs
 
 
 def resolve_next_hint_level(history: Sequence[ChatMessageRecord]) -> int:
@@ -77,10 +104,17 @@ def resolve_next_hint_level(history: Sequence[ChatMessageRecord]) -> int:
 
 
 class ChatService:
-    def __init__(self, repository: ChatRepository, client: LLMClient, settings: Settings) -> None:
+    def __init__(
+        self,
+        repository: ChatRepository,
+        client: LLMClient,
+        settings: Settings,
+        document_repository: DocumentRepository | None = None,
+    ) -> None:
         self._repository = repository
         self._client = client
         self._settings = settings
+        self._retrieval = DocumentRetrievalService(document_repository) if document_repository is not None else None
         self._busy: set[int] = set()
 
     @asynccontextmanager
@@ -212,10 +246,14 @@ class ChatService:
             raise AppError(502, "LLM_INVALID_RESPONSE", "Gia sư chưa trả về nội dung hợp lệ. Câu hỏi của bạn đã được lưu.") from None
         if not content.strip() or len(content) > 8000:
             raise AppError(502, "LLM_INVALID_RESPONSE", "Gia sư chưa trả về nội dung hợp lệ. Câu hỏi của bạn đã được lưu.")
+        source_refs: list[dict[str, Any]] = []
+        if self._retrieval is not None:
+            eligible_chunks = await self._retrieval.list_eligible_chunks(session.topic_id)
+            source_refs = build_source_refs(eligible_chunks)
         try:
             saved = await self._repository.append_assistant_message(
                 user.id, session.id, content, hint_level=hint_level, is_full_solution=is_full_solution,
-                token_count=reply.token_count, expected_last_id=expected_last_id,
+                source_refs=source_refs, token_count=reply.token_count, expected_last_id=expected_last_id,
             )
         except ChatChangedError:
             raise changed_session() from None

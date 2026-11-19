@@ -1,6 +1,6 @@
 """Dữ liệu API phiên chat, lịch sử và gợi ý; role/level do server quyết định."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -40,6 +40,7 @@ class ChatMessageItem(BaseModel):
     content: str
     hint_level: int | None = Field(default=None, serialization_alias="hintLevel")
     is_full_solution: bool = Field(default=False, serialization_alias="isFullSolution")
+    source_refs: list[dict[str, Any]] = Field(default_factory=list, serialization_alias="sourceRefs")
     token_count: int | None = Field(default=None, serialization_alias="tokenCount")
     created_at: str = Field(serialization_alias="createdAt")
 
