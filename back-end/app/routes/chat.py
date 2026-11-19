@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, Request
 
 from app.dependencies.auth import get_current_user
+from app.dependencies.quota import require_ai_quota
 from app.repositories.user_repository import User
 from app.routes.auth import require_json
 from app.schemas.auth import ErrorResponse
@@ -47,12 +48,12 @@ async def list_messages(session_id: SessionId, user: CurrentUser, service: Servi
     return await service.list_messages(user, session_id, limit=limit, offset=offset)
 
 
-@router.post("/sessions/{session_id}/messages", status_code=201, response_model=ChatReplyResponse, dependencies=[Depends(require_json)], summary="Lưu câu hỏi và gọi gia sư với ngữ cảnh gần nhất")
+@router.post("/sessions/{session_id}/messages", status_code=201, response_model=ChatReplyResponse, dependencies=[Depends(require_json), Depends(require_ai_quota)], summary="Lưu câu hỏi và gọi gia sư với ngữ cảnh gần nhất")
 async def send_message(session_id: SessionId, payload: SendChatMessageRequest, user: CurrentUser, service: Service) -> ChatReplyResponse:
     return await service.send_message(user, session_id, payload.content)
 
 
-@router.post("/sessions/{session_id}/hints", status_code=201, response_model=ChatReplyResponse, summary="Gợi ý tiếp theo; server quyết định mức 1–3")
+@router.post("/sessions/{session_id}/hints", status_code=201, response_model=ChatReplyResponse, dependencies=[Depends(require_ai_quota)], summary="Gợi ý tiếp theo; server quyết định mức 1–3")
 async def next_hint(session_id: SessionId, user: CurrentUser, service: Service) -> ChatReplyResponse:
     return await service.next_hint(user, session_id)
 
@@ -61,7 +62,7 @@ async def next_hint(session_id: SessionId, user: CurrentUser, service: Service) 
     "/sessions/{session_id}/solution",
     status_code=201,
     response_model=ChatReplyResponse,
-    dependencies=[Depends(require_json)],
+    dependencies=[Depends(require_json), Depends(require_ai_quota)],
     summary="Xem lời giải đầy đủ sau khi người học xác nhận",
 )
 async def request_full_solution(
