@@ -69,3 +69,30 @@ class QuizItem(BaseModel):
 
 class QuizResponse(BaseModel):
     quiz: QuizItem
+
+
+class SubmittedAnswerInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    question_id: int = Field(alias="questionId", strict=True, ge=1, le=2**31 - 1)
+    user_answer: AnswerLetter = Field(alias="userAnswer")
+
+
+class SubmitQuizAnswersRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    answers: list[SubmittedAnswerInput] = Field(min_length=5, max_length=5)
+
+
+class SavedQuizAnswerItem(BaseModel):
+    question_id: int = Field(serialization_alias="questionId")
+    user_answer: AnswerLetter = Field(serialization_alias="userAnswer")
+
+
+class QuizSubmissionItem(BaseModel):
+    quiz_id: int = Field(serialization_alias="quizId")
+    status: Literal["accepted"] = "accepted"
+    saved_count: int = Field(serialization_alias="savedCount")
+    answers: list[SavedQuizAnswerItem]
+
+
+class QuizSubmissionResponse(BaseModel):
+    submission: QuizSubmissionItem

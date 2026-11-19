@@ -1,5 +1,6 @@
 """Phiên và tin nhắn thật, ngữ cảnh riêng tư, điều phối thang gợi ý 1–3."""
 
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 import unicodedata
@@ -12,7 +13,7 @@ from app.schemas.chat import (
     ChatMessageItem, ChatMessageListResponse, ChatReplyResponse, ChatSessionItem,
     ChatSessionListResponse, ChatSessionResponse,
 )
-from app.services.chat_context import build_chat_messages, redact_sensitive_text
+from app.services.chat_context import build_chat_messages, build_full_solution_messages, redact_sensitive_text
 from app.services.llm_client import LLMClient
 from app.utils.errors import AppError
 
@@ -53,6 +54,26 @@ def validate_message_content(content: str) -> str:
             {"content": "Vui lòng nhập câu hỏi trước khi gửi."},
         )
     return cleaned
+
+
+
+MAX_HINT_LEVEL = 3
+
+
+def resolve_next_hint_level(history: Sequence[ChatMessageRecord]) -> int:
+    """Điều phối thang gợi ý 1–3 cho câu hỏi gần nhất; server quyết định mức tiếp theo."""
+    question = next((item for item in reversed(history) if item.role == "user"), None)
+    if question is None:
+        raise AppError(409, "CHAT_QUESTION_REQUIRED", "Hãy gửi một câu hỏi trước khi xin gợi ý.")
+    levels = [
+        item.hint_level
+        for item in history
+        if item.role == "assistant" and item.id > question.id and item.hint_level is not None
+    ]
+    level = max(levels, default=0) + 1
+    if level > MAX_HINT_LEVEL:
+        raise AppError(409, "HINT_LIMIT_REACHED", "Bạn đã nhận đủ 3 mức gợi ý cho câu hỏi này.")
+    return level
 
 
 class ChatService:
@@ -135,32 +156,50 @@ class ChatService:
         self._require_open(session)
         async with self._generating(session_id):
             history = await self._repository.recent_messages(user.id, session_id, limit=24)
-            question = next((item for item in reversed(history) if item.role == "user"), None)
-            if question is None:
-                raise AppError(409, "CHAT_QUESTION_REQUIRED", "Hãy gửi một câu hỏi trước khi xin gợi ý.")
-            levels = [item.hint_level or 0 for item in history if item.role == "assistant" and item.id > question.id]
-            level = max(levels, default=0) + 1
-            if level > 3:
-                raise AppError(409, "HINT_LIMIT_REACHED", "Bạn đã nhận đủ 3 mức gợi ý cho câu hỏi này.")
+            level = resolve_next_hint_level(history)
             return await self._reply(user, session, expected_last_id=history[-1].id, hint_level=level, history=history)
 
+    async def request_full_solution(self, user: User, session_id: int, *, confirmed: bool) -> ChatReplyResponse:
+        session = await self._find(user.id, session_id)
+        self._require_open(session)
+        if confirmed is not True:
+            raise AppError(
+                422,
+                "CONFIRMATION_REQUIRED",
+                "Vui lòng xác nhận trước khi xem lời giải đầy đủ.",
+                {"confirmed": "Bạn cần xác nhận trước khi xem lời giải đầy đủ."},
+            )
+        async with self._generating(session_id):
+            history = await self._repository.recent_messages(user.id, session_id, limit=24)
+            question = next((item for item in reversed(history) if item.role == "user"), None)
+            if question is None:
+                raise AppError(409, "CHAT_QUESTION_REQUIRED", "Hãy gửi một câu hỏi trước khi xem lời giải.")
+            return await self._reply(
+                user, session, expected_last_id=history[-1].id,
+                hint_level=None, is_full_solution=True, history=history,
+            )
+
     async def _reply(
-        self, user: User, session: ChatSessionRecord, *, expected_last_id: int, hint_level: int,
+        self, user: User, session: ChatSessionRecord, *, expected_last_id: int,
+        hint_level: int | None = None, is_full_solution: bool = False,
         history: list[ChatMessageRecord] | None = None,
     ) -> ChatReplyResponse:
         if history is None:
             history = await self._repository.recent_messages(user.id, session.id, limit=24)
         if not history or history[-1].id != expected_last_id:
             raise changed_session()
+        topic = SocraticTopic(
+            subject_name=session.subject_name, topic_name=session.topic_name, grade_level=session.grade_level,
+            chapter_name=session.chapter_name, description=session.topic_description,
+        )
+        history_payload = [{"role": item.role, "content": item.content} for item in history]
         try:
-            messages = build_chat_messages(
-                topic=SocraticTopic(
-                    subject_name=session.subject_name, topic_name=session.topic_name, grade_level=session.grade_level,
-                    chapter_name=session.chapter_name, description=session.topic_description,
-                ),
-                history=[{"role": item.role, "content": item.content} for item in history],
-                hint_level=hint_level, **self._privacy(user),
-            )
+            if is_full_solution:
+                messages = build_full_solution_messages(topic=topic, history=history_payload, **self._privacy(user))
+            else:
+                messages = build_chat_messages(
+                    topic=topic, history=history_payload, hint_level=hint_level or 1, **self._privacy(user),
+                )
         except ValueError:
             raise AppError(422, "INVALID_CHAT_CONTEXT", "Ngữ cảnh hội thoại chưa hợp lệ. Tin nhắn đã được lưu.") from None
         try:
@@ -175,8 +214,8 @@ class ChatService:
             raise AppError(502, "LLM_INVALID_RESPONSE", "Gia sư chưa trả về nội dung hợp lệ. Câu hỏi của bạn đã được lưu.")
         try:
             saved = await self._repository.append_assistant_message(
-                user.id, session.id, content, hint_level=hint_level, token_count=reply.token_count,
-                expected_last_id=expected_last_id,
+                user.id, session.id, content, hint_level=hint_level, is_full_solution=is_full_solution,
+                token_count=reply.token_count, expected_last_id=expected_last_id,
             )
         except ChatChangedError:
             raise changed_session() from None
