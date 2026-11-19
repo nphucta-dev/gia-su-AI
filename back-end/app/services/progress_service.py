@@ -29,3 +29,27 @@ class ProgressService:
             progress=[progress_item(record) for record in records[:limit]],
             limit=limit, offset=offset, has_more=len(records) > limit,
         )
+
+    async def record_completed_quiz(
+        self,
+        user: User,
+        *,
+        topic_id: int,
+        quiz_status: str,
+        correct_count: int,
+        total_count: int,
+    ) -> ProgressResponse:
+        """TK-062: Chỉ cập nhật total_quizzes, correct_count, total_count khi quiz đã completed."""
+        if quiz_status != "completed":
+            raise AppError(409, "QUIZ_NOT_COMPLETED", "Chỉ bài luyện tập đã hoàn tất mới được cập nhật thống kê học.")
+        if (
+            not isinstance(topic_id, int) or isinstance(topic_id, bool) or topic_id <= 0
+            or not isinstance(correct_count, int) or isinstance(correct_count, bool)
+            or not isinstance(total_count, int) or isinstance(total_count, bool)
+            or correct_count < 0 or total_count <= 0 or correct_count > total_count
+        ):
+            raise AppError(422, "VALIDATION_ERROR", "Số liệu thống kê bài luyện tập không hợp lệ.")
+        record = await self._repository.record_completed_quiz(
+            user.id, topic_id, correct_count=correct_count, total_count=total_count,
+        )
+        return ProgressResponse(progress=progress_item(record))
