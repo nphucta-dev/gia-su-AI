@@ -29,6 +29,9 @@ class SqlAlchemyQuizRepository:
     async def find_quiz(self, user_id: int, quiz_id: int) -> QuizRecord | None:
         return await asyncio.to_thread(self._find_quiz, user_id, quiz_id)
 
+    async def find_quiz_answers(self, user_id: int, quiz_id: int) -> list[QuizAnswerRecord] | None:
+        return await asyncio.to_thread(self._find_quiz_answers, user_id, quiz_id)
+
     async def save_answers(self, user_id: int, quiz_id: int, answers: dict[int, str]) -> list[QuizAnswerRecord] | None:
         return await asyncio.to_thread(self._save_answers, user_id, quiz_id, answers)
 
@@ -52,7 +55,31 @@ class SqlAlchemyQuizRepository:
                         explanation=question.explanation,
                     ) for question in questions
                 ),
+                score=float(quiz.score) if quiz.score is not None else None,
+                completed_at=utc_timestamp(quiz.completed_at) if quiz.completed_at is not None else None,
             )
+
+    def _find_quiz_answers(self, user_id: int, quiz_id: int) -> list[QuizAnswerRecord] | None:
+        with self._sessions() as db:
+            quiz = db.scalar(select(Quiz).where(Quiz.id == quiz_id, Quiz.user_id == user_id))
+            if quiz is None:
+                return None
+            rows = db.scalars(
+                select(QuizAnswer)
+                .join(QuizQuestion, QuizQuestion.id == QuizAnswer.question_id)
+                .where(QuizQuestion.quiz_id == quiz.id)
+                .order_by(QuizQuestion.position)
+            )
+            return [
+                QuizAnswerRecord(
+                    id=row.id,
+                    question_id=row.question_id,
+                    user_answer=row.user_answer,
+                    is_correct=row.is_correct,
+                    created_at=utc_timestamp(row.created_at),
+                )
+                for row in rows
+            ]
 
     def _create_quiz(self, user_id: int, topic_id: int, difficulty: QuizDifficulty, generated: GeneratedQuiz) -> QuizRecord | None:
         with self._sessions.begin() as db:

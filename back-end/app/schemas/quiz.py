@@ -96,3 +96,30 @@ class QuizSubmissionItem(BaseModel):
 
 class QuizSubmissionResponse(BaseModel):
     submission: QuizSubmissionItem
+
+
+class QuizResultQuestionItem(BaseModel):
+    id: int
+    position: int
+    question_text: str = Field(serialization_alias="questionText")
+    options: QuizOptions
+    user_answer: AnswerLetter = Field(serialization_alias="userAnswer")
+    correct_answer: AnswerLetter = Field(serialization_alias="correctAnswer")
+    is_correct: bool = Field(serialization_alias="isCorrect")
+    explanation: str
+
+
+class QuizResultItem(BaseModel):
+    id: int
+    topic_id: int = Field(serialization_alias="topicId")
+    difficulty: QuizDifficulty
+    status: Literal["in_progress", "completed"]
+    score: float
+    correct_count: int = Field(serialization_alias="correctCount")
+    total_count: int = Field(serialization_alias="totalCount")
+    completed_at: str | None = Field(default=None, serialization_alias="completedAt")
+    questions: list[QuizResultQuestionItem]
+
+
+class QuizResultResponse(BaseModel):
+    result: QuizResultItem

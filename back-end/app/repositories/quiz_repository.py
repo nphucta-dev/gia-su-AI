@@ -28,6 +28,8 @@ class QuizRecord:
     status: str
     created_at: str
     questions: tuple[QuizQuestionRecord, ...]
+    score: float | None = None
+    completed_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,8 @@ class QuizRepository(Protocol):
 
     async def find_quiz(self, user_id: int, quiz_id: int) -> QuizRecord | None: ...
 
+    async def find_quiz_answers(self, user_id: int, quiz_id: int) -> list[QuizAnswerRecord] | None: ...
+
     async def save_answers(self, user_id: int, quiz_id: int, answers: dict[int, str]) -> list[QuizAnswerRecord] | None: ...
 
 
@@ -71,6 +75,12 @@ class InMemoryQuizRepository:
     async def find_quiz(self, user_id: int, quiz_id: int) -> QuizRecord | None:
         record = self._quizzes.get(quiz_id)
         return record if record is not None and record.user_id == user_id else None
+
+    async def find_quiz_answers(self, user_id: int, quiz_id: int) -> list[QuizAnswerRecord] | None:
+        record = self._quizzes.get(quiz_id)
+        if record is None or record.user_id != user_id:
+            return None
+        return [self._answers[q.id] for q in record.questions if q.id in self._answers]
 
     async def create_quiz(self, user_id: int, topic_id: int, difficulty: QuizDifficulty, generated: GeneratedQuiz) -> QuizRecord | None:
         topic = self._catalog._topics.get(topic_id)
