@@ -52,6 +52,11 @@ async def send_message(session_id: SessionId, payload: SendChatMessageRequest, u
     return await service.send_message(user, session_id, payload.content)
 
 
+@router.post("/sessions/{session_id}/retry", status_code=201, response_model=ChatReplyResponse, summary="Thử gọi lại AI cho câu hỏi gần nhất đã lưu sau lỗi timeout/429/mất mạng")
+async def retry_last_message(session_id: SessionId, user: CurrentUser, service: Service) -> ChatReplyResponse:
+    return await service.retry_last_message(user, session_id)
+
+
 @router.post("/sessions/{session_id}/hints", status_code=201, response_model=ChatReplyResponse, summary="Gợi ý tiếp theo; server quyết định mức 1–3")
 async def next_hint(session_id: SessionId, user: CurrentUser, service: Service) -> ChatReplyResponse:
     return await service.next_hint(user, session_id)

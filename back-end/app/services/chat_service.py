@@ -58,6 +58,7 @@ def validate_message_content(content: str) -> str:
 
 
 MAX_HINT_LEVEL = 3
+RETRYABLE_LLM_CODES = frozenset({"LLM_TIMEOUT", "LLM_RATE_LIMITED", "LLM_UNAVAILABLE", "LLM_INVALID_RESPONSE"})
 
 
 def resolve_next_hint_level(history: Sequence[ChatMessageRecord]) -> int:
@@ -159,6 +160,21 @@ class ChatService:
             level = resolve_next_hint_level(history)
             return await self._reply(user, session, expected_last_id=history[-1].id, hint_level=level, history=history)
 
+    async def retry_last_message(self, user: User, session_id: int) -> ChatReplyResponse:
+        """TK-029: Thử gọi lại AI cho câu hỏi gần nhất đã lưu khi lượt trước gặp lỗi mạng/429/timeout."""
+        session = await self._find(user.id, session_id)
+        self._require_open(session)
+        async with self._generating(session_id):
+            history = await self._repository.recent_messages(user.id, session_id, limit=24)
+            if not history or history[-1].role != "user":
+                raise AppError(409, "CHAT_RETRY_NOT_NEEDED", "Không có câu hỏi nào đang chờ phản hồi để thử lại.")
+            pending_question = history[-1]
+            response = await self._reply(
+                user, session, expected_last_id=pending_question.id, hint_level=1, history=history,
+            )
+            response.user_message = message_item(pending_question)
+            return response
+
     async def request_full_solution(self, user: User, session_id: int, *, confirmed: bool) -> ChatReplyResponse:
         session = await self._find(user.id, session_id)
         self._require_open(session)
@@ -205,7 +221,16 @@ class ChatService:
         try:
             reply = await self._client.generate(messages)
         except AppError as error:
-            raise AppError(error.status_code, error.code, error.message + " Tin nhắn đã gửi vẫn được lưu trong lịch sử.", headers=error.headers) from None
+            details = dict(error.details) if error.details else {}
+            if error.code in RETRYABLE_LLM_CODES:
+                details["retryable"] = True
+            raise AppError(
+                error.status_code,
+                error.code,
+                error.message + " Tin nhắn đã gửi vẫn được lưu trong lịch sử.",
+                details or None,
+                headers=error.headers,
+            ) from None
         try:
             content = redact_sensitive_text(reply.content, **self._privacy(user))
         except ValueError:
