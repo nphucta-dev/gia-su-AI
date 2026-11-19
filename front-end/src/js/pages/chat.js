@@ -174,6 +174,8 @@ function renderChatHistory() {
  let selectedSession = null;
  let selectedMessages = [];
  let hintPending = false;
+ let solutionPending = false;
+ let confirmingSolution = false;
  let hintLockedCode = '';
 
  const sidebarStatus = el('div', { className: 'chat-sidebar-status', role: 'status', 'aria-live': 'polite' });
@@ -187,8 +189,10 @@ function renderChatHistory() {
  const chatDescription = el('p', { className: 'helper' }, 'Chọn một phiên trong lịch sử để xem lại nội dung đã lưu.');
  const hintButton = button('Chọn một phiên để xin gợi ý', () => requestHint(), 'secondary');
  hintButton.disabled = true;
+ const solutionButton = button('Xem lời giải', () => requestSolution(), 'ghost');
+ solutionButton.disabled = true;
  const hintStatus = el('div', { className: 'chat-hint-status', role: 'status', 'aria-live': 'polite' });
- const hintControls = el('div', { className: 'chat-hint-controls' }, hintButton, hintStatus);
+ const hintControls = el('div', { className: 'chat-hint-controls' }, hintButton, solutionButton, hintStatus);
  const messages = el('div', { className: 'messages chat-history-messages', 'aria-label': 'Nội dung phiên chat', 'aria-live': 'polite', 'aria-busy': 'false' },
   el('div', { className: 'empty-state' }, 'Chọn một phiên để xem lại hội thoại.'));
  const main = el('section', { className: 'chat-main' }, el('div', { className: 'chat-header chat-session-header' },
@@ -219,10 +223,15 @@ function renderChatHistory() {
 
  function drawHintControl() {
   const state = hintState();
+  const busy = hintPending || solutionPending || confirmingSolution;
+  const hasQuestion = selectedMessages.some(item => item.role === 'user');
   hintButton.textContent = hintPending && state.nextLevel ? `Đang lấy gợi ý mức ${state.nextLevel}…` : state.label;
-  hintButton.disabled = hintPending || state.disabled;
+  hintButton.disabled = busy || state.disabled;
   hintButton.setAttribute('aria-label', hintButton.textContent);
-  if (hintPending) hintControls.setAttribute('aria-busy', 'true');
+  solutionButton.textContent = solutionPending ? 'Đang tạo lời giải…' : 'Xem lời giải';
+  solutionButton.disabled = busy || !selectedSession || !hasQuestion || hintLockedCode === 'TOPIC_CLOSED' || hintLockedCode === 'CHAT_QUESTION_REQUIRED';
+  solutionButton.setAttribute('aria-label', solutionButton.textContent);
+  if (busy) hintControls.setAttribute('aria-busy', 'true');
   else hintControls.removeAttribute('aria-busy');
  }
 
@@ -285,6 +294,60 @@ function renderChatHistory() {
    if (error.name !== 'AbortError' && isCurrent() && requestedSessionId().id === sessionId) showHintError(error, sessionId);
   } finally {
    hintPending = false;
+   if (isCurrent()) drawHintControl();
+  }
+ }
+
+ async function requestSolution() {
+  const sessionId = Number(selectedSession?.id);
+  const hasQuestion = selectedMessages.some(item => item.role === 'user');
+  if (hintPending || solutionPending || confirmingSolution || !Number.isSafeInteger(sessionId) || !hasQuestion) return;
+  confirmingSolution = true;
+  drawHintControl();
+  const confirmed = await confirmDialog(
+   'Xem lời giải đầy đủ?',
+   'Thử tự giải thêm một bước trước khi đối chiếu. Bạn có chắc muốn xem lời giải đầy đủ cho câu hỏi này?',
+   'Xem lời giải',
+  );
+  confirmingSolution = false;
+  if (!isCurrent() || requestedSessionId().id !== sessionId) return;
+  if (!confirmed) {
+   drawHintControl();
+   solutionButton.focus({ preventScroll: true });
+   return;
+  }
+  solutionPending = true;
+  hintStatus.replaceChildren(el('p', { className: 'helper' }, 'Đang lấy lời giải đầy đủ…'));
+  drawHintControl();
+  try {
+   const result = await api(`/chat/sessions/${sessionId}/solution`, {
+    method: 'POST',
+    body: { confirmed: true },
+    signal: controller.signal,
+   });
+   if (!isCurrent() || requestedSessionId().id !== sessionId) return;
+   const assistant = result?.assistantMessage;
+   if (!result?.session || Number(result.session.id) !== sessionId || result.userMessage != null
+    || !assistant || Number(assistant.sessionId) !== sessionId || assistant.role !== 'assistant'
+    || assistant.isFullSolution !== true) {
+    throw new ApiError('Phản hồi lời giải từ máy chủ chưa hợp lệ. Vui lòng thử lại.', 0, 'INVALID_RESPONSE');
+   }
+   const messageNode = renderStoredMessage(assistant);
+   const duplicate = selectedMessages.some(item => Number(item.id) === Number(assistant.id));
+   if (!duplicate) {
+    selectedMessages.push(assistant);
+    messages.append(messageNode);
+   }
+   selectedSession = result.session;
+   const sessionIndex = sessions.findIndex(item => Number(item.id) === sessionId);
+   if (sessionIndex >= 0) sessions[sessionIndex] = result.session;
+   hintStatus.replaceChildren(el('p', { className: 'helper' }, 'Đã hiển thị lời giải đầy đủ.'));
+   drawSessions();
+   requestAnimationFrame(() => { if (isCurrent()) messages.scrollTop = messages.scrollHeight; });
+  } catch (error) {
+   if (error.name !== 'AbortError' && isCurrent() && requestedSessionId().id === sessionId) showHintError(error, sessionId);
+  } finally {
+   solutionPending = false;
    if (isCurrent()) drawHintControl();
   }
  }
