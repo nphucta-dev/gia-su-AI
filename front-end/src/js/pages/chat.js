@@ -9,6 +9,15 @@ const MESSAGE_LIMIT = 200;
 const MAX_MESSAGE_PAGES = 100;
 let activeChatController;
 
+export const EMPTY_QUESTION_MESSAGE = 'Vui lòng nhập câu hỏi trước khi gửi.';
+
+export function validateChatQuestion(raw) {
+ const value = typeof raw === 'string' ? raw : '';
+ const visible = value.replace(/\p{Cf}/gu, '').trim();
+ if (!visible) return { valid: false, text: '', error: EMPTY_QUESTION_MESSAGE };
+ return { valid: true, text: value.trim(), error: '' };
+}
+
 function sessionTitle(session) {
  const title = typeof session?.title === 'string' ? session.title.trim() : '';
  const topicName = typeof session?.topicName === 'string' ? session.topicName.trim() : '';
@@ -124,12 +133,18 @@ function renderPreviewChat() {
  setupValidation(form, [input]);
  form.addEventListener('submit', event => {
   event.preventDefault();
-  const text = input.value.trim();
-  if (!validateFields([[input, !text ? 'Vui lòng nhập câu hỏi trước khi gửi.' : '']])) return;
+  const check = validateChatQuestion(input.value);
+  if (!validateFields([[input, check.error]])) return;
   statusArea.replaceChildren();
-  add(text, 'user');
+  add(check.text, 'user');
   input.value = '';
   input.focus();
+ });
+ input.addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+   event.preventDefault();
+   form.requestSubmit();
+  }
  });
  const sources = el('details', {}, el('summary', {}, 'Nguồn tham khảo minh hoạ'),
   el('p', { className: 'helper' }, 'Ví dụ cách hiển thị: Tài liệu Đại số · phần Phương trình bậc hai. Chưa có tài liệu thực được truy xuất.'));
