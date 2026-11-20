@@ -25,6 +25,8 @@ from app.repositories.ai_quota_repository import InMemoryAiQuotaRepository, SqlA
 from app.repositories.chat_repository import ChatRepository, InMemoryChatRepository
 from app.repositories.quiz_repository import QuizRepository, InMemoryQuizRepository
 from app.repositories.progress_repository import ProgressRepository, InMemoryProgressRepository
+from app.repositories.dashboard_repository import DashboardRepository, InMemoryDashboardRepository
+from app.repositories.sqlalchemy_dashboard_repository import SqlAlchemyDashboardRepository
 from app.repositories.sqlalchemy_chat_repository import SqlAlchemyChatRepository
 from app.repositories.sqlalchemy_quiz_repository import SqlAlchemyQuizRepository
 from app.repositories.sqlalchemy_progress_repository import SqlAlchemyProgressRepository
@@ -38,6 +40,7 @@ from app.routes.catalog import router as catalog_router
 from app.routes.chat import router as chat_router
 from app.routes.quiz import router as quiz_router
 from app.routes.progress import router as progress_router
+from app.routes.dashboard import router as dashboard_router
 from app.routes.me import router as me_router
 from app.routes.profile import router as profile_router
 from app.routes.documents import router as documents_router
@@ -51,6 +54,7 @@ from app.services.document_retrieval import DocumentRetrievalService
 from app.services.chat_service import ChatService
 from app.services.quiz_service import QuizService
 from app.services.progress_service import ProgressService
+from app.services.dashboard_service import DashboardService
 from app.services.llm_client import ChatCompletionsClient, LLMClient
 from app.services.token_service import TokenService
 from app.utils.password import hash_password
@@ -78,6 +82,7 @@ def create_app(
     quiz_repository: QuizRepository | None = None,
     progress_repository: ProgressRepository | None = None,
     ai_quota_service: AiQuotaService | None = None,
+    dashboard_repository: DashboardRepository | None = None,
 ) -> FastAPI:
     """Tạo ứng dụng. Các phụ thuộc được truyền vào để dễ thay kho dữ liệu (ví dụ CSDL
     thật) và để test độc lập, không cần mở cổng thật."""
@@ -162,6 +167,13 @@ def create_app(
         retrieval_service=app.state.document_retrieval_service, quota_service=quota,
     )
     app.state.progress_service = ProgressService(progress)
+    dashboard = dashboard_repository
+    if dashboard is None:
+        dashboard = (
+            SqlAlchemyDashboardRepository(session_factory) if session_factory is not None
+            else InMemoryDashboardRepository(quiz, chat)
+        )
+    app.state.dashboard_service = DashboardService(dashboard)
     app.state.token_service = token_service or TokenService(
         secret=settings.jwt_secret,
         issuer=settings.jwt_issuer,
@@ -175,6 +187,7 @@ def create_app(
     app.include_router(chat_router)
     app.include_router(quiz_router)
     app.include_router(progress_router)
+    app.include_router(dashboard_router)
     app.include_router(admin_catalog_router)
     app.include_router(profile_router)
     app.include_router(documents_router)
