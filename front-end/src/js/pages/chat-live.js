@@ -2,6 +2,7 @@ import { api, ApiError } from '../api.js';
 import { loadCatalog, flattenTopics } from '../catalog.js';
 import { el, button, heading, notice, confirmDialog, link } from '../components/ui.js';
 import { validateChatQuestion } from '../chat-question.js';
+import { renderAiError } from '../components/ai-error.js';
 
 let activeController;
 
@@ -27,6 +28,7 @@ export function renderLiveChat() {
  let topics = [], sessions = [], selectedSession = null, selectedMessages = [];
  let topicId = requestedTopic, nextOffset = 0, hasMore = false, listPending = false;
  let busy = false, confirming = false, loaded = false, quota = null;
+ let unresolvedSend = false, failedContent = '';
  const topic = el('select', { className: 'select', 'aria-label': 'Chủ đề học', disabled: true });
  const sidebarStatus = el('div', { role: 'status' });
  const sessionList = el('nav', { className: 'session-list', 'aria-label': 'Các phiên chat đã lưu' });
@@ -48,7 +50,7 @@ export function renderLiveChat() {
   el('p', { className: 'chat-footer' }, 'Câu trả lời do AI tạo, hãy đối chiếu với tài liệu học tập.'));
  const newSession = button('+ Phiên mới', () => {
   if (busy || confirming) return;
-  selectedSession = null; selectedMessages = []; input.value = ''; actionStatus.replaceChildren();
+  selectedSession = null; selectedMessages = []; input.value = ''; unresolvedSend = false; failedContent = ''; actionStatus.replaceChildren();
   history.replaceState(null, '', topicId ? `#chat?topic=${topicId}` : '#chat');
   drawSession();
  });
@@ -72,7 +74,7 @@ export function renderLiveChat() {
  function drawControls() {
   const blocked = busy || confirming || !loaded || !openTopic() || quota?.remaining === 0;
   input.disabled = busy || confirming || !loaded || !openTopic();
-  send.disabled = blocked;
+  send.disabled = blocked || unresolvedSend;
   send.textContent = busy ? 'Đang xử lý…' : 'Gửi câu hỏi';
   topic.disabled = busy || confirming || !topics.length;
   newSession.disabled = busy || confirming;
@@ -208,9 +210,11 @@ export function renderLiveChat() {
   sessions.unshift(selectedSession);
   drawSession();
  }
- async function runAction(kind, content = '') {
+ async function runAction(kind, content = '', retrying = false) {
   if (busy || confirming || !loaded || !openTopic() || quota?.remaining === 0) return;
-  busy = true; actionStatus.replaceChildren(el('p', {}, 'Đang chuẩn bị phản hồi…')); drawControls();
+  if (kind === 'send' && unresolvedSend) return;
+  const restoreFocus = actionStatus.contains(document.activeElement);
+  busy = true; actionStatus.replaceChildren(el('p', {}, retrying ? 'Đang thử lại…' : 'Đang chuẩn bị phản hồi…')); drawControls();
   let retryKind = kind;
   try {
    await ensureSession();
@@ -223,18 +227,43 @@ export function renderLiveChat() {
    if (!current()) return;
    acceptReply(result, kind);
    if (kind === 'send') input.value = '';
+   if (kind === 'retry') {
+    if (input.value.trim() === failedContent) input.value = '';
+    unresolvedSend = false; failedContent = '';
+   }
    actionStatus.replaceChildren();
   } catch (error) {
    if (error.name === 'AbortError' || !current()) return;
-   if (kind === 'send' && error.fields?.messageSaved === 'true') {
-    input.value = ''; retryKind = 'retry';
+   if (kind === 'send') { unresolvedSend = true; failedContent = content; }
+   const saved = kind === 'send' && error.fields?.messageSaved === 'true';
+   if (saved) {
+    retryKind = 'retry';
     try { await loadMessages(selectedSession.id); } catch { /* Câu hỏi đã lưu vẫn đọc lại được bằng lịch sử. */ }
    }
-   const retry = () => runAction(retryKind, retryKind === 'send' ? content : '');
-   const changed = error.code === 'CHAT_CHANGED' || error.code === 'CHAT_REPLY_EXISTS';
-   actionStatus.replaceChildren(notice(error.message || 'Chưa thể nhận phản hồi.', 'error'),
-    changed ? button('Tải lại phiên', async () => { try { await loadMessages(selectedSession.id); actionStatus.replaceChildren(); } catch (failure) { actionStatus.replaceChildren(notice(failure.message, 'error')); } }, 'secondary small')
-     : error.status === 404 || error.code === 'TOPIC_CLOSED' ? null : button('Thử lại', retry, 'secondary small'));
+   if (!current()) return;
+   const reload = async () => {
+    if (busy || !selectedSession) return;
+    busy = true; drawControls();
+    actionStatus.replaceChildren(el('p', {}, 'Đang tải lại hội thoại…'));
+    try {
+     await loadMessages(selectedSession.id);
+     if (!current()) return;
+     unresolvedSend = selectedMessages.at(-1)?.role === 'user';
+     actionStatus.replaceChildren(el('p', {}, 'Đã tải lại hội thoại. Nội dung đang nhập vẫn được giữ.'));
+     if (selectedMessages.at(-1)?.role === 'user') actionStatus.append(button('Thử lại', () => runAction('retry', '', true), 'secondary small'));
+    } catch (failure) {
+     if (current() && failure.name !== 'AbortError') actionStatus.replaceChildren(renderAiError(failure, { onRetry: reload }));
+    } finally { busy = false; if (current()) drawControls(); }
+   };
+   const uncertain = kind === 'send' && !saved;
+   actionStatus.replaceChildren(renderAiError(error, {
+    description: saved ? 'Câu hỏi đã được lưu. Nội dung đang nhập vẫn được giữ; thử lại sẽ không gửi thêm câu hỏi.'
+     : uncertain ? 'Chưa xác nhận được câu hỏi đã lưu hay chưa. Nội dung đang nhập vẫn được giữ. Hãy tải lại hội thoại trước khi gửi tiếp.'
+      : 'Hội thoại và nội dung đang nhập vẫn được giữ.',
+    onRetry: uncertain ? null : () => runAction(retryKind, '', true), onReload: reload,
+   }));
+   if (uncertain && ![401, 403, 404].includes(error.status) && selectedSession) actionStatus.append(button('Tải lại hội thoại', reload, 'secondary small'));
+   if (restoreFocus) actionStatus.querySelector('button')?.focus({ preventScroll: true });
   } finally {
    busy = false;
    if (current()) { drawControls(); loadQuota(); }
