@@ -8,15 +8,15 @@ Chạy phát triển (từ thư mục back-end/)::
 from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Callable, Sequence
-from fastapi import Depends, FastAPI, Request
+from typing import Callable, Sequence
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from app.config import DEFAULT_UPLOAD_BODY_BYTES, Settings, load_settings
 from app.db.database import create_database_engine, create_session_factory
-from app.dependencies.auth import require_roles
+from app.dependencies.auth import AdminUser
 from app.error_handlers import register_error_handlers
 from app.middlewares.body_limit import BodySizeLimitMiddleware
 from app.middlewares.security_headers import SecurityHeadersMiddleware
@@ -33,7 +33,6 @@ from app.repositories.sqlalchemy_progress_repository import SqlAlchemyProgressRe
 from app.repositories.sqlalchemy_catalog_repository import SqlAlchemyCatalogRepository
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.repositories.document_repository import DocumentRepository, SqlAlchemyDocumentRepository
-from app.repositories.user_repository import User
 from app.routes.auth import router as auth_router
 from app.routes.admin_catalog import router as admin_catalog_router
 from app.routes.catalog import router as catalog_router
@@ -216,7 +215,7 @@ def create_app(
         return {"status": "ok", "database": "connected", "message": "Kết nối database thành công."}
 
     @app.get("/api/admin/access", tags=["admin"], summary="Kiểm tra quyền quản trị")
-    async def admin_access(user: Annotated[User, Depends(require_roles("ADMIN"))]) -> dict[str, str]:
+    async def admin_access(user: AdminUser) -> dict[str, str]:
         return {"role": user.role, "message": "Bạn có quyền quản trị."}
 
     # Middleware thêm sau nằm ở ngoài: CORS ngoài cùng nên mọi phản hồi (kể cả 413) đều có header CORS.

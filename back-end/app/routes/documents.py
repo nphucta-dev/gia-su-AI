@@ -6,8 +6,7 @@ from fastapi import APIRouter, Depends, Path, Request
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException
 
-from app.dependencies.auth import require_roles
-from app.repositories.user_repository import User
+from app.dependencies.auth import AdminUser, require_admin
 from app.schemas.auth import ErrorResponse
 from app.schemas.document import (
     DocumentListResponse, DocumentOptionsResponse, DocumentResponse, UpdateDocumentActiveRequest,
@@ -16,8 +15,6 @@ from app.routes.auth import require_json
 from app.services.document_service import DocumentService, invalid_field
 from app.utils.errors import AppError
 
-require_admin = require_roles("ADMIN")
-AdminUser = Annotated[User, Depends(require_admin)]
 router = APIRouter(
     prefix="/api/admin/documents", tags=["documents"], dependencies=[Depends(require_admin)],
     responses={code: {"model": ErrorResponse} for code in (401, 403, 503)},

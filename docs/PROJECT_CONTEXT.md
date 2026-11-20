@@ -257,7 +257,6 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   đây là lựa chọn triển khai cho các điểm tài liệu gốc chưa quy định rõ ở trên.
   Không đổi schema, MySQL/ID/scrypt, không cấu hình hay gọi model thật khi chưa có key.
   Hướng dẫn và giới hạn tại `docs/AI_SETUP.md`.
-<<<<<<< HEAD
 - TK-070 “API quản trị tài liệu” đã hoàn thiện listing và PATCH isActive chỉ cho
   ADMIN active. Danh sách gồm pending/ready/error và tài liệu thuộc nội dung đã tắt.
   Status chỉ do upload/process tính từ kết quả xử lý; client không tự đặt ready.
@@ -265,7 +264,6 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   dùng chung kiểm tra này, giữ tương thích code đã merge. Các lỗi SQL ở listing,
   options, upload, xử lý và cập nhật trả 503 cố định; rollback giữ file/chunk/lịch sử.
   Giao diện quản trị đã gọi các API này. Không thêm schema, xóa tài liệu hoặc gọi model.
-=======
 - TK-065 “API thống kê dashboard” bổ sung `GET /api/dashboard`: trả `dashboard`
   gồm `totalQuizzes` (chỉ completed), `averageScore` (0–100, hai chữ số) và
   `totalChatSessions`, lọc user từ token cho cả LEARNER/ADMIN. Tài khoản mới trả 0;
@@ -273,5 +271,11 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   một câu SQL, không ghép nhiều dòng quiz với chat, không dùng tổng minh họa hoặc
   learning_progress. API vẫn đọc khi hết quota, không gọi AI, có no-store và lỗi
   database 503 cố định. Không đổi schema; TK-064 frontend vẫn chưa nối API này.
->>>>>>> 0e9e034eebd0c6ef1f67b77f9d6e2da3dd59d2b3
+- TK-071 “Phân quyền API ADMIN” thống nhất `require_admin`/`AdminUser` trong
+  `app/dependencies/auth.py`, dùng cho danh mục, tài liệu và `/api/admin/access`.
+  Toàn bộ 12 thao tác quản trị chặn LEARNER bằng 403; token thiếu/sai/hết hạn hoặc
+  tài khoản đã xóa nhận 401, tài khoản bị khóa nhận 403. Role/is_active đọc lại từ
+  database mỗi request; hạ quyền có hiệu lực ngay với token cũ. Header/query/body và
+  claim role trong JWT không cấp thêm quyền. Test bao phủ đủ route, không đọc/ghi
+  dữ liệu quản trị khi bị chặn; MySQL dùng database tạm kiểm chứng thay đổi quyền.
 

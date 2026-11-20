@@ -68,3 +68,9 @@ def require_roles(*roles: str) -> Callable[..., Awaitable[User]]:
         return user
 
     return check_role
+
+
+# Một chính sách ADMIN dùng chung cho danh mục, tài liệu và API kiểm tra quyền.
+# get_current_user luôn đọc lại role/is_active từ database cho từng request.
+require_admin = require_roles("ADMIN")
+AdminUser = Annotated[User, Depends(require_admin)]

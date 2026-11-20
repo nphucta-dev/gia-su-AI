@@ -55,7 +55,7 @@ back-end/
 │   ├── routes/me.py                # GET /api/auth/me
 │   ├── services/auth_service.py    # Luồng đăng ký
 │   ├── services/token_service.py   # Tạo và kiểm tra token JWT
-│   ├── dependencies/auth.py        # get_current_user, require_roles
+│   ├── dependencies/auth.py        # get_current_user, require_roles, require_admin
 │   ├── repositories/user_repository.py   # DTO và repository bộ nhớ dùng cho test
 │   ├── repositories/sqlalchemy_user_repository.py  # Lưu/đọc tài khoản MySQL
 │   ├── validators/register_validator.py  # Kiểm tra dữ liệu đăng ký
@@ -104,7 +104,37 @@ Backend chuẩn hóa email, kiểm tra mật khẩu đã băm bằng scrypt và 
 
 ### `GET /api/admin/access`
 
-Endpoint đặt trong `app/main.py`, sử dụng `Depends(require_roles("ADMIN"))`. Gửi Bearer token: ADMIN nhận `200 {"role":"ADMIN","message":"Bạn có quyền quản trị."}`, LEARNER nhận 403, thiếu token nhận 401. Frontend kiểm tra endpoint này trước khi mở trang quản trị.
+Endpoint đặt trong `app/main.py`, sử dụng `AdminUser` từ `app/dependencies/auth.py`.
+Gửi Bearer token: ADMIN nhận `200 {"role":"ADMIN","message":"Bạn có quyền quản trị."}`,
+LEARNER nhận 403, thiếu token nhận 401. Frontend kiểm tra endpoint này trước khi mở
+trang quản trị; backend kiểm tra quyền riêng trên từng API quản trị.
+
+### Phân quyền API ADMIN (TK-071)
+
+Danh mục, tài liệu và `/api/admin/access` dùng chung dependency `require_admin`.
+Các router danh mục/tài liệu bảo vệ toàn bộ route bằng dependency này. `AdminUser`
+là kiểu dependency khi handler cần lấy đối tượng ADMIN đã xác thực.
+
+| Tài khoản/token | Kết quả khi gọi API quản trị |
+| --- | --- |
+| ADMIN đang hoạt động | Được xử lý yêu cầu theo quy tắc API |
+| LEARNER | `403 FORBIDDEN` |
+| Tài khoản đã bị khóa | `403 FORBIDDEN` |
+| Chưa đăng nhập | `401 NOT_AUTHENTICATED` |
+| Token sai, hết hạn hoặc tài khoản đã xóa | `401 INVALID_TOKEN` hoặc `TOKEN_EXPIRED` |
+
+Phạm vi gồm 12 thao tác: `GET /api/admin/access`; GET/POST/PATCH môn học và chủ đề;
+GET danh sách/lựa chọn tài liệu, POST upload/xử lý và PATCH bật/tắt tài liệu.
+Role và `is_active` được đọc lại từ database mỗi request. Hạ quyền ADMIN xuống
+LEARNER hoặc khóa tài khoản có hiệu lực với token đã cấp, kể cả token chưa hết hạn.
+Các trường role ở header/query/body hoặc claim JWT không thay được quyền lưu trên
+server. Đăng ký luôn tạo LEARNER, PATCH hồ sơ chỉ cập nhật các trường hồ sơ cho phép.
+Yêu cầu bị từ chối quyền không chạy service quản trị, không ghi danh mục/file/chunk.
+Các phản hồi `/api/admin/*`, kể cả lỗi, có `Cache-Control: no-store`.
+
+Đối chiếu TK-071 và SRS FR-08.3. Kiểm thử API:
+`tests/test_admin_permissions_api.py`; kiểm thử quyền với MySQL và token cũ:
+`tests/test_admin_permissions_database_integration.py` (database thử nghiệm riêng).
 
 ### `POST /api/auth/register`
 
@@ -205,14 +235,14 @@ Access token là JWT ký HS256. Trong token chỉ có `sub` (id người dùng),
 ```python
 from typing import Annotated
 from fastapi import Depends
-from app.dependencies.auth import get_current_user, require_roles
+from app.dependencies.auth import get_current_user, require_admin
 from app.repositories.user_repository import User
 
 @router.get("/lich-su")
 async def history(user: Annotated[User, Depends(get_current_user)]):
     ...                                   # user.id, user.role
 
-@router.get("/quan-tri", dependencies=[Depends(require_roles("ADMIN"))])
+@router.get("/quan-tri", dependencies=[Depends(require_admin)])
 async def admin_area():
     ...                                   # chỉ ADMIN, người khác nhận 403
 ```

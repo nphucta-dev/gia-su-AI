@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, Path, Request
 
-from app.dependencies.auth import require_roles
+from app.dependencies.auth import require_admin
 from app.routes.auth import require_json
 from app.schemas.admin_catalog import (
     AdminSubjectListResponse, AdminSubjectResponse,
@@ -16,7 +16,7 @@ from app.services.admin_catalog_service import AdminCatalogService
 
 router = APIRouter(
     prefix="/api/admin", tags=["admin catalog"],
-    dependencies=[Depends(require_roles("ADMIN"))],
+    dependencies=[Depends(require_admin)],
     responses={code: {"model": ErrorResponse} for code in (401, 403, 404, 409, 415, 422)},
 )
 
