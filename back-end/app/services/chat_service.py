@@ -25,6 +25,7 @@ from app.schemas.chat import (
 from app.services.chat_context import build_chat_messages, build_full_solution_messages, redact_sensitive_text
 from app.services.document_retrieval import DocumentRetrievalService
 from app.services.llm_client import LLMClient
+from app.services.quota_service import DEFAULT_DAILY_AI_LIMIT, QuotaService
 from app.utils.errors import AppError
 
 
@@ -158,11 +159,14 @@ class ChatService:
         client: LLMClient,
         settings: Settings,
         document_repository: DocumentRepository | None = None,
+        *,
+        daily_ai_limit: int = DEFAULT_DAILY_AI_LIMIT,
     ) -> None:
         self._repository = repository
         self._client = client
         self._settings = settings
         self._retrieval = DocumentRetrievalService(document_repository) if document_repository is not None else None
+        self._quota = QuotaService(repository, daily_limit=daily_ai_limit)
         self._busy: set[int] = set()
 
     @asynccontextmanager
@@ -298,6 +302,7 @@ class ChatService:
             history = await self._repository.recent_messages(user.id, session.id, limit=24)
         if not history or history[-1].id != expected_last_id:
             raise changed_session()
+        await self._quota.ensure_within_quota(user)
         topic = SocraticTopic(
             subject_name=session.subject_name, topic_name=session.topic_name, grade_level=session.grade_level,
             chapter_name=session.chapter_name, description=session.topic_description,
