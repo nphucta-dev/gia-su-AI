@@ -48,6 +48,7 @@ Các mục trên chỉ xác nhận phần UI hoặc client behavior; task nghi�
 | TK-050 | Chọn chủ đề và độ khó quiz | Hoàn thành FE: lấy chủ đề active từ API catalog, hỗ trợ topic trên URL, chọn easy/medium/hard, validation, loading/empty/error/retry và responsive 360px. Chưa gọi API sinh quiz; phần đó thuộc task sau. |
 | TK-053 | Giao diện làm quiz | Một phần; có UI nhưng câu hỏi lấy từ dữ liệu mẫu |
 | TK-054 | Cảnh báo câu chưa trả lời | Có phần UI; chưa nối submit thật |
+| TK-055 | Lỗi sinh quiz (UI) | Hoàn thành FE: lỗi theo mã, giữ chủ đề/độ khó, tạo lại qua POST /api/quizzes, chống gửi chồng, xử lý response muộn và kiểm tra bộ 5 câu trước khi mở bài. Browser test API mock PASS (gồm regression lựa chọn/quay lại form/preview); chưa kiểm chứng LLM/MySQL thật. API chưa có idempotency nên tạo lại sau mất response có thể tạo quiz mới. Không sửa backend TK-056. |
 | TK-057 | Gửi đáp án quiz | Hoàn thành phạm vi FE: lưu A–D theo question ID, tạo payload có thứ tự, confirmation/loading, chặn thiếu câu và gửi trùng, giữ đáp án khi lỗi và xử lý retry/trạng thái API. Browser test dùng API mock theo hợp đồng FE dự kiến; backend submit/chấm/lưu quiz chưa được triển khai nên chưa hoàn thành end-to-end. |
 | TK-060 | Trang kết quả quiz | Chưa xong; tính điểm từ dữ liệu mẫu |
 | TK-068 | Trang quản trị môn/chủ đề | Đã nối API CRUD cho môn học/chủ đề và trạng thái active; có loading, lỗi/thử lại, validation, tìm kiếm và responsive 360px. Preview vẫn tách riêng, không ghi API. |
