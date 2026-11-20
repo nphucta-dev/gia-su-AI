@@ -26,7 +26,7 @@ from app.services.llm_client import LLMClient
 from app.utils.errors import AppError
 from app.utils.async_tasks import finish_pending_task
 from app.utils.keywords import text_terms
-from app.validators.quiz import validate_generated_quiz
+from app.validators.quiz import invalid_quiz_response, validate_generated_quiz
 from app.repositories.quiz_repository import (
     QuizAlreadySubmittedError, QuizInvalidAnswersError,
     QuizOwnerUnavailableError, QuizRecord, QuizRepository,
@@ -105,7 +105,7 @@ class QuizService:
             reply = await self._client.generate(build_quiz_messages(safe_topic, difficulty, sources))
             content = reply.content
             if not isinstance(content, str) or len(content) > 128_000:
-                raise AppError(502, "QUIZ_INVALID_RESPONSE", "Model chưa tạo được bài hợp lệ. Vui lòng thử lại.")
+                raise invalid_quiz_response()
             fenced = re.fullmatch(r"```(?:json)?\s*\n(.*?)\n\s*```", content.strip(), flags=re.DOTALL | re.IGNORECASE)
             generated = validate_generated_quiz(fenced.group(1).strip() if fenced else content)
             payload = generated.model_dump()
@@ -118,13 +118,13 @@ class QuizService:
                     for value in question["options"].values()
                 }
                 if len(options) != 4:
-                    raise AppError(502, "QUIZ_INVALID_RESPONSE", "Model tạo các lựa chọn trùng nhau. Vui lòng tạo lại bài.")
+                    raise invalid_quiz_response()
             unique_questions = {
                 " ".join(unicodedata.normalize("NFKC", question["question_text"]).casefold().split())
                 for question in payload["questions"]
             }
             if len(unique_questions) != 5:
-                raise AppError(502, "QUIZ_INVALID_RESPONSE", "Model tạo các câu hỏi trùng nhau. Vui lòng tạo lại bài.")
+                raise invalid_quiz_response()
             # The SQL repository may still be committing in a worker thread when
             # the request is cancelled. Keep admission locked until that write ends.
             pending = asyncio.create_task(self.save_generated_quiz(user, topic_id, difficulty, payload))

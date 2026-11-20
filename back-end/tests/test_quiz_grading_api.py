@@ -162,6 +162,30 @@ async def test_concurrent_submit_and_legacy_grade_do_not_count_twice():
         assert row.total_quizzes == 1 and row.total_count == 5
 
 
+async def test_concurrent_conflicting_submissions_keep_only_winning_answers_and_score():
+    async with quiz_api() as state:
+        path = f"/api/quizzes/{state.quiz_id}/submit"
+        headers = state.headers[state.owner.id]
+        payloads = [payload_for(state, correct) for correct in (0, 5)]
+        responses = await asyncio.gather(*(
+            state.client.post(path, headers=headers, json=payload) for payload in payloads
+        ))
+        assert sorted(response.status_code for response in responses) == [200, 409]
+        winner = next(index for index, response in enumerate(responses) if response.status_code == 200)
+        loser = responses[1 - winner]
+        assert loser.json()["error"]["code"] == "ALREADY_SUBMITTED"
+        expected_score = winner * 100
+        quiz = state.repository._quizzes[state.quiz_id]
+        assert quiz.score == expected_score and quiz.status == "completed"
+        assert len(state.repository._answers) == 5
+        assert {qid: answer.user_answer for qid, answer in state.repository._answers.items()} == answer_map(payloads[winner])
+        row = next(iter(state.repository.progress_repository._records.values()))
+        assert (row.total_quizzes, row.correct_count, row.total_count, row.mastery_percent) == (1, winner * 5, 5, expected_score)
+        result = await state.client.get(f"/api/quizzes/{state.quiz_id}/result", headers=headers)
+        assert result.status_code == 200
+        assert result.json()["result"]["score"] == expected_score
+
+
 async def test_disabled_catalog_does_not_prevent_finishing_owned_quiz():
     async with quiz_api() as state:
         state.catalog._subjects[state.subject_id]["is_active"] = False

@@ -17,6 +17,7 @@ def make_user(user_id: int) -> User:
         name=f"User {user_id}",
         password_hash="hash",
         role="LEARNER",
+        created_at="2026-11-20T00:00:00Z",
         is_active=True,
         birth_year=2002,
     )
@@ -38,12 +39,15 @@ def sample_generated_payload():
 
 @pytest.mark.anyio
 async def test_get_quiz_result_blocks_unsubmitted_and_returns_full_details_after_submit():
-    repo = InMemoryQuizRepository(InMemoryCatalogRepository())
+    catalog = InMemoryCatalogRepository()
+    subject_id = catalog.add_subject("Toán", "THPT")
+    topic_id = catalog.add_topic(subject_id, "Đại số", "Phép cộng")
+    repo = InMemoryQuizRepository(catalog)
     service = QuizService(repo)
     owner = make_user(1)
     other = make_user(2)
 
-    created = (await service.save_generated_quiz(owner, 1, "easy", sample_generated_payload())).quiz
+    created = (await service.save_generated_quiz(owner, topic_id, "easy", sample_generated_payload())).quiz
 
     # Chưa nộp bài không được lộ đáp án đúng / explanation
     with pytest.raises(AppError) as unsubmitted:

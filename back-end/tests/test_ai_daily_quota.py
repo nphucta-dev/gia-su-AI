@@ -35,6 +35,7 @@ def make_user(user_id: int) -> User:
         role="LEARNER",
         is_active=True,
         birth_year=2002,
+        created_at="2026-11-18T00:00:00Z",
     )
 
 
@@ -45,6 +46,8 @@ def test_default_daily_limit_is_30():
 @pytest.mark.anyio
 async def test_daily_quota_counts_only_successful_ai_replies_and_isolates_users():
     catalog = InMemoryCatalogRepository()
+    subject_id = catalog.add_subject("Toán", "THPT")
+    catalog.add_topic(subject_id, "Đại số", "Phương trình bậc hai")
     repo = InMemoryChatRepository(catalog)
     llm = FlakyLLMClient()
     service = ChatService(repo, llm, load_settings(), daily_ai_limit=2)

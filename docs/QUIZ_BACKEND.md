@@ -72,3 +72,56 @@ cd D:\gia-su-AI\back-end
 fixture tạo database thử nghiệm ngẫu nhiên. Kiểm tra lưu đủ 5 câu, không lộ đáp án,
 không cập nhật tiến độ sớm, từ chối dữ liệu sai/nội dung đã tắt và rollback cả bài
 khi giả lập lỗi chèn câu cuối. Fixture không ghi vào database dự án đang sử dụng.
+
+## Lỗi sinh quiz và tạo lại bài (TK-056)
+
+`POST /api/quizzes` trả HTTP **502** với cùng envelope khi nội dung quiz do model
+trả về sai JSON, thiếu/thừa câu, thiếu lựa chọn/đáp án/giải thích, trùng câu/lựa chọn,
+trùng khóa JSON, quá dài hoặc có ký tự điều khiển không hợp lệ:
+
+```json
+{
+  "error": {
+    "code": "QUIZ_INVALID_RESPONSE",
+    "message": "Dữ liệu bài luyện tập chưa hợp lệ. Chưa có bài nào được lưu. Vui lòng tạo lại bài."
+  }
+}
+```
+
+Không trả lại nội dung model, đáp án, thông tin cá nhân hay lỗi SQL trong thông báo.
+Đề đã có vẫn được giữ, đề lỗi không được lưu và không tính quota. Để tạo lại, gửi
+lại `POST /api/quizzes` với cùng `topicId`/`difficulty`; không cần endpoint retry riêng.
+Backend không tự gọi lại model hoặc sửa JSON thành đề giả. Sau lỗi, khóa yêu cầu
+được giải phóng để lần gửi sau có thể thành công.
+
+JSON lỗi ở lớp phản hồi HTTP của nhà cung cấp (kể cả lồng quá sâu) trả 502
+`LLM_INVALID_RESPONSE`. Giữ các mã provider hiện có: `LLM_TIMEOUT` (504),
+`LLM_UNAVAILABLE` (502), `LLM_RATE_LIMITED` (429), `LLM_NOT_CONFIGURED` (503).
+Các phản hồi này được mô tả trong OpenAPI của API tạo quiz. JSON do **client** gửi
+sai vẫn trả 400 `INVALID_JSON` hoặc 422 `VALIDATION_ERROR`, không nhầm với lỗi model.
+
+## Pytest Auth, Quiz và quyền truy cập (TK-088)
+
+Chạy từ `back-end`, sau khi cài `requirements-dev.txt`:
+
+```powershell
+.\venv\Scripts\python.exe -m pytest -q
+```
+
+Các kiểm thử API dùng ứng dụng FastAPI thật, repository bộ nhớ riêng và provider
+giả lập; không gọi model bên ngoài. Các regression chính gồm:
+
+- `test_token_auth_api.py`: đăng ký/đăng nhập cấp JWT, quyền lấy lại từ tài khoản
+  hiện tại, khóa/xóa tài khoản, không nhận token qua query/cookie/header giả.
+- `test_admin_permissions_api.py`: kiểm tra quyền trên toàn bộ route quản trị.
+- `test_quiz_generation_errors_api.py`: lỗi model, không ghi dở dang/không trừ
+  quota, bảo vệ nội dung lỗi và tạo lại thành công qua adapter HTTP giả lập.
+- `test_quiz_authenticated_workflow_api.py`: đăng ký → đăng nhập → sinh 5 câu
+  A–D → chặn đọc/nộp khác chủ → nộp/chấm → kết quả riêng tư; đề chưa nộp không
+  lộ đáp án hay giải thích.
+- `test_quiz_grading_api.py`: chặn nộp lại và nộp đồng thời với đáp án khác nhau;
+  đáp án, điểm và tiến độ chỉ ghi theo yêu cầu thắng.
+
+Các test MySQL được bỏ qua khi chưa đặt `TEST_DATABASE_URL`. Khi có MySQL,
+fixture tạo database tên ngẫu nhiên `gia_su_ai_test_*` rồi dọn đúng database đó;
+không chạy migration/seed vào database dự án. Không coi các test bị skip là đã qua.

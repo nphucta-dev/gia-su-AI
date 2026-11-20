@@ -8,6 +8,9 @@ TK-082 bảo vệ dữ liệu theo tài khoản: chat, `GET /api/quizzes/{id}`,
 xem [TK-059](../docs/QUIZ_GRADING.md). Tra cứu đoạn theo từ khóa dùng
 `GET /api/catalog/topics/{id}/chunks?q=...&limit=5`; xem [TK-044](../docs/KEYWORD_RETRIEVAL.md).
 
+Lỗi sinh quiz và cách tạo lại (TK-056), cùng hướng dẫn pytest Auth/Quiz/quyền truy cập
+(TK-088), xem [QUIZ_BACKEND.md](../docs/QUIZ_BACKEND.md#lỗi-sinh-quiz-và-tạo-lại-bài-tk-056).
+
 Schema hiện tại dùng `INT AUTO_INCREMENT` cho ID của 11 bảng; API trả `id` dạng số. Database cũ đang dùng UUID cần chạy migration `0002_integer_ids` sau khi dừng server và sao lưu, theo [hướng dẫn chuyển ID](../database/README.md#chuyển-database-cũ-từ-uuid-sang-id-tự-tăng).
 
 Xem [hướng dẫn database](../database/README.md) để kết nối MySQL, cấu hình `.env`, tạo đủ 11 bảng bằng migration và seed dữ liệu.

@@ -26,7 +26,15 @@ def get_service(request: Request) -> QuizService:
     return request.app.state.quiz_service
 
 
-@router.post("", status_code=201, response_model=QuizResponse, dependencies=[Depends(require_json)], summary="Tạo 5 câu luyện tập bằng model AI")
+@router.post(
+    "", status_code=201, response_model=QuizResponse, dependencies=[Depends(require_json)],
+    summary="Tạo 5 câu luyện tập bằng model AI",
+    responses={
+        429: {"model": ErrorResponse, "description": "Hết hạn mức AI hoặc nhà cung cấp giới hạn yêu cầu."},
+        502: {"model": ErrorResponse, "description": "Lỗi model hoặc QUIZ_INVALID_RESPONSE; không lưu đề sai, có thể gửi lại yêu cầu tạo bài."},
+        504: {"model": ErrorResponse, "description": "Model phản hồi quá lâu; có thể thử lại."},
+    },
+)
 async def generate_quiz(
     payload: GenerateQuizRequest, user: CurrentUser, service: Annotated[QuizService, Depends(get_service)],
 ) -> QuizResponse:

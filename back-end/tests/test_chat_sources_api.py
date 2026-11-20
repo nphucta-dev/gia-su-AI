@@ -27,6 +27,7 @@ def make_user(user_id: int) -> User:
         role="LEARNER",
         is_active=True,
         birth_year=2002,
+        created_at="2026-11-18T00:00:00Z",
     )
 
 
@@ -48,6 +49,8 @@ def test_sanitize_source_refs_filters_invalid_and_duplicate_entries():
 @pytest.mark.anyio
 async def test_get_message_sources_returns_valid_refs_or_no_source_notice():
     catalog = InMemoryCatalogRepository()
+    subject_id = catalog.add_subject("Toán", "THPT")
+    catalog.add_topic(subject_id, "Đại số", "Phương trình bậc hai")
     repo = InMemoryChatRepository(catalog)
     service = ChatService(repo, FakeLLMClient(), load_settings())
     owner = make_user(1)

@@ -31,12 +31,16 @@ def make_user(user_id: int = 1) -> User:
         role="LEARNER",
         is_active=True,
         birth_year=2002,
+        created_at="2026-11-18T00:00:00Z",
     )
 
 
 @pytest.mark.anyio
 async def test_llm_errors_preserve_user_message_and_allow_retry_without_duplication():
-    repo = InMemoryChatRepository(InMemoryCatalogRepository())
+    catalog = InMemoryCatalogRepository()
+    subject_id = catalog.add_subject("Toán", "THPT")
+    catalog.add_topic(subject_id, "Đại số", "Phương trình bậc hai")
+    repo = InMemoryChatRepository(catalog)
     llm = ScriptedLLMClient([
         AppError(504, "LLM_TIMEOUT", "Model phản hồi quá lâu."),
         AppError(429, "LLM_RATE_LIMITED", "Dịch vụ model đang giới hạn yêu cầu."),
@@ -53,7 +57,9 @@ async def test_llm_errors_preserve_user_message_and_allow_retry_without_duplicat
         await service.send_message(user, session.id, "Giải thích phương trình bậc hai")
     assert timeout_err.value.status_code == 504
     assert timeout_err.value.code == "LLM_TIMEOUT"
-    assert timeout_err.value.details == {"retryable": True}
+    assert timeout_err.value.fields["messageSaved"] == "true"
+    assert timeout_err.value.fields["sessionId"] == str(session.id)
+    assert int(timeout_err.value.fields["userMessageId"]) > 0
 
     msgs_after_fail = (await service.list_messages(user, session.id, limit=10, offset=0)).messages
     assert len(msgs_after_fail) == 1
@@ -63,12 +69,12 @@ async def test_llm_errors_preserve_user_message_and_allow_retry_without_duplicat
     with pytest.raises(AppError) as rate_err:
         await service.retry_last_message(user, session.id)
     assert rate_err.value.status_code == 429
-    assert rate_err.value.details == {"retryable": True}
+    assert rate_err.value.code == "LLM_RATE_LIMITED"
 
     with pytest.raises(AppError) as net_err:
         await service.retry_last_message(user, session.id)
     assert net_err.value.status_code == 502
-    assert net_err.value.details == {"retryable": True}
+    assert net_err.value.code == "LLM_UNAVAILABLE"
 
     # Retry lần tiếp theo thành công, chỉ có đúng 1 tin user và 1 tin assistant
     retried = await service.retry_last_message(user, session.id)

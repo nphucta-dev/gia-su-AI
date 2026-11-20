@@ -19,6 +19,7 @@ def make_user(user_id: int = 1) -> User:
         role="LEARNER",
         is_active=True,
         birth_year=2002,
+        created_at="2026-11-18T00:00:00Z",
     )
 
 

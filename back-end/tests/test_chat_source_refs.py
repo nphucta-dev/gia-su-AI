@@ -61,6 +61,8 @@ def test_build_source_refs_deduplicates_and_formats_fields():
 async def test_chat_persists_source_refs_for_assistant_and_empty_for_user():
     users = InMemoryUserRepository()
     catalog = InMemoryCatalogRepository()
+    subject_id = catalog.add_subject("Toán", "THPT")
+    catalog.add_topic(subject_id, "Đại số", "Phương trình bậc hai")
     chat_repo = InMemoryChatRepository(catalog)
     doc_repo = InMemoryDocumentRepository(
         subjects=[SubjectRecord(id=1, name="Toán", grade_level="THPT")],
@@ -80,19 +82,21 @@ async def test_chat_persists_source_refs_for_assistant_and_empty_for_user():
         chat_repository=chat_repo,
         document_repository=doc_repo,
         llm_client=FakeLLMClient(),
-        password_hasher=lambda raw: f"hash:{raw}",
     )
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         register = await client.post("/api/auth/register", json={
-            "fullName": "Nguyễn Văn A",
+            "name": "Nguyễn Văn A",
             "email": "learner@example.com",
             "password": "Password123!",
-            "birthYear": 2002,
+            "confirmPassword": "Password123!",
+            "consent": True,
         })
         assert register.status_code == 201
-        token = register.json()["token"]
+        logged_in = await client.post("/api/auth/login", json={"email": "learner@example.com", "password": "Password123!"})
+        assert logged_in.status_code == 200
+        token = logged_in.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
 
         created = await client.post("/api/chat/sessions", json={"topicId": 1}, headers=headers)
@@ -101,7 +105,7 @@ async def test_chat_persists_source_refs_for_assistant_and_empty_for_user():
 
         sent = await client.post(
             f"/api/chat/sessions/{session_id}/messages",
-            json={"content": "Giải giúp mình x^2 - 5x + 6 = 0"},
+            json={"content": "Công thức nghiệm và định lý Vi-ét giúp giải phương trình bậc hai x^2 - 5x + 6 = 0 như thế nào?"},
             headers=headers,
         )
         assert sent.status_code == 201
@@ -109,10 +113,10 @@ async def test_chat_persists_source_refs_for_assistant_and_empty_for_user():
         assert payload["userMessage"]["sourceRefs"] == []
         refs = payload["assistantMessage"]["sourceRefs"]
         assert len(refs) == 2
-        assert refs[0]["document_id"] == ready_active.id
+        assert refs[0]["documentId"] == ready_active.id
         assert refs[0]["title"] == "Giáo trình Đại số"
-        assert refs[0]["chunk_index"] == 0
-        assert refs[1]["chunk_index"] == 1
+        assert refs[0]["chunkIndex"] == 0
+        assert refs[1]["chunkIndex"] == 1
 
         history = await client.get(f"/api/chat/sessions/{session_id}/messages", headers=headers)
         assert history.status_code == 200

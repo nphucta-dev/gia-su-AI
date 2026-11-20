@@ -98,6 +98,71 @@ async def test_luong_day_du_dang_ky_roi_dung_token_goi_me():
         assert response.json()["user"]["email"] == "sang@ptit.edu.vn"
 
 
+async def test_login_issued_token_uses_current_account_permissions_throughout_lifecycle():
+    """TK-088: exercise real register/login before checking actual protected routes."""
+    async with api() as (client, _, repository):
+        registered = await client.post("/api/auth/register", json={
+            "name": "Người học mới", "email": "new@example.com", "password": "MatKhau@123",
+            "confirmPassword": "MatKhau@123", "consent": True, "role": "ADMIN",
+        })
+        assert registered.status_code == 201
+        assert registered.json()["user"]["role"] == "LEARNER"
+        logged_in = await client.post("/api/auth/login", json={
+            "email": "NEW@example.com", "password": "MatKhau@123",
+        })
+        assert logged_in.status_code == 200
+        headers = bearer(logged_in.json()["access_token"])
+        user = await repository.find_by_id(registered.json()["user"]["id"])
+        assert user.password_hash.startswith("scrypt$")
+
+        profile = await client.get("/api/profile", headers=headers)
+        assert profile.status_code == 200 and profile.json()["user"]["id"] == user.id
+        assert (await client.get("/api/admin/access", headers=headers)).status_code == 403
+
+        # The same login token must reflect server-side changes without reissuing it.
+        repository._users[user.id] = replace(user, role="ADMIN")
+        assert (await client.get("/api/admin/access", headers=headers)).status_code == 200
+        repository._users[user.id] = replace(user, role="ADMIN", is_active=False)
+        for path in (ME, "/api/profile", "/api/admin/access"):
+            denied = await client.get(path, headers=headers)
+            assert denied.status_code == 403
+            assert denied.json()["error"]["code"] == "FORBIDDEN"
+            assert denied.headers["cache-control"] == "no-store"
+
+        repository._users[user.id] = user
+        assert (await client.get(ME, headers=headers)).status_code == 200
+        assert (await client.get("/api/admin/access", headers=headers)).status_code == 403
+        del repository._users[user.id]
+        for path in (ME, "/api/profile", "/api/admin/access"):
+            denied = await client.get(path, headers=headers)
+            assert denied.status_code == 401
+            assert denied.json()["error"]["code"] == "INVALID_TOKEN"
+            assert "Bearer" in denied.headers["www-authenticate"]
+
+
+@pytest.mark.parametrize("transport", ["query", "cookie", "untrusted_headers"])
+async def test_valid_login_token_outside_authorization_header_does_not_authenticate(transport):
+    async with api() as (client, _, repository):
+        user = await repository.create(name="Quản trị", email="admin@example.com",
+                                       password_hash=fast_hasher("MatKhau@123"), role="ADMIN")
+        logged_in = await client.post("/api/auth/login", json={
+            "email": user.email, "password": "MatKhau@123",
+        })
+        assert logged_in.status_code == 200
+        token = logged_in.json()["access_token"]
+        options = {"params": {"access_token": token, "token": token}} if transport == "query" else {
+            "headers": {"Cookie": f"access_token={token}; token={token}"}
+        } if transport == "cookie" else {
+            "headers": {"X-Access-Token": token, "X-User-Id": str(user.id), "X-Role": "ADMIN"}
+        }
+        for path in (ME, "/api/profile", "/api/admin/access"):
+            denied = await client.get(path, **options)
+            assert denied.status_code == 401
+            assert denied.json()["error"]["code"] == "NOT_AUTHENTICATED"
+            assert denied.headers["cache-control"] == "no-store"
+        assert (await client.get("/api/admin/access", headers=bearer(token))).status_code == 200
+
+
 async def test_khong_gui_token_401_not_authenticated_kem_www_authenticate():
     async with api() as (client, _, _):
         response = await client.get(ME)

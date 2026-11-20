@@ -8,6 +8,14 @@ from app.schemas.quiz import GeneratedQuiz
 from app.utils.errors import AppError
 
 
+def invalid_quiz_response() -> AppError:
+    """Keep malformed, incomplete and duplicate model output on one safe contract."""
+    return AppError(
+        502, "QUIZ_INVALID_RESPONSE",
+        "Dữ liệu bài luyện tập chưa hợp lệ. Chưa có bài nào được lưu. Vui lòng tạo lại bài.",
+    )
+
+
 def _unique_keys(pairs: list[tuple[str, object]]) -> dict:
     result = {}
     for key, value in pairs:
@@ -28,4 +36,4 @@ def validate_generated_quiz(payload: object) -> GeneratedQuiz:
         return GeneratedQuiz.model_validate(payload)
     except (ValidationError, ValueError, TypeError, RecursionError):
         # Provider output can contain an answer key or PII; never echo it in errors.
-        raise AppError(502, "QUIZ_INVALID_RESPONSE", "Dữ liệu bài luyện tập chưa hợp lệ. Chưa có bài nào được lưu.") from None
+        raise invalid_quiz_response() from None

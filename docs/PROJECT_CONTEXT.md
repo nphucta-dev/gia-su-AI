@@ -285,4 +285,14 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   không tăng thang gợi ý; lời giải đầy đủ vẫn cần xác nhận riêng. Kiểm tra ownership,
   nội dung active, quota và request chồng; lỗi ngữ cảnh SQL trả 503 cố định. UI hiện có
   đã gọi API; kiểm thử dùng model giả lập và MySQL tạm, không đổi schema hoặc gọi model thật.
+- TK-056 “Lỗi sinh quiz (API)” thống nhất lỗi 502 `QUIZ_INVALID_RESPONSE` cho
+  JSON/nội dung đề sai, gồm ký tự điều khiển Unicode; giữ thông báo cố định và cho
+  tạo lại bằng POST cùng topicId/difficulty. JSON envelope provider lồng quá sâu
+  trả `LLM_INVALID_RESPONSE`, không rơi vào 500. Không lưu đề lỗi, không tăng quota,
+  không tự sinh đề giả hoặc gọi lại model; OpenAPI mô tả lỗi 429/502/503/504.
+- TK-088 bổ sung pytest đăng ký/đăng nhập cấp JWT rồi kiểm tra quyền hiện tại,
+  tài khoản bị khóa/xóa, quiz đủ 5 câu A–D, ownership và nộp/chấm đúng một lần
+  kể cả hai yêu cầu khác đáp án đồng thời. Sửa fixture cũ cho đúng hợp đồng API;
+  giữ scrypt và logic xác thực. Test offline dùng repository/provider giả lập;
+  test MySQL cần TEST_DATABASE_URL và database tạm riêng. Xem `docs/QUIZ_BACKEND.md`.
 

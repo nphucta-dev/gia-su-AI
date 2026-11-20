@@ -153,7 +153,7 @@ class ChatCompletionsClient:
         try:
             body = json.loads(payload.decode("utf-8"))
             content, token_count = extract_text(body, protocol)
-        except (UnicodeError, ValueError, TypeError, KeyError, IndexError):
+        except (UnicodeError, ValueError, TypeError, KeyError, IndexError, RecursionError):
             raise _invalid_response() from None
         if not isinstance(content, str) or not content.strip() or len(content) > MAX_REPLY_CHARS:
             raise _invalid_response()

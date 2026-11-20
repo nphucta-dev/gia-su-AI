@@ -19,12 +19,16 @@ def make_user(user_id: int) -> User:
         role="LEARNER",
         is_active=True,
         birth_year=2002,
+        created_at="2026-11-18T00:00:00Z",
     )
 
 
 @pytest.mark.anyio
 async def test_get_quota_returns_remaining_and_next_reset_at():
-    repo = InMemoryChatRepository(InMemoryCatalogRepository())
+    catalog = InMemoryCatalogRepository()
+    subject_id = catalog.add_subject("Toán", "THPT")
+    catalog.add_topic(subject_id, "Đại số", "Phương trình bậc hai")
+    repo = InMemoryChatRepository(catalog)
     service = QuotaService(repo, daily_limit=30)
     user = make_user(1)
 

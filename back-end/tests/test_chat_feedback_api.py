@@ -25,12 +25,15 @@ def make_user(user_id: int) -> User:
         role="LEARNER",
         is_active=True,
         birth_year=2002,
+        created_at="2026-11-18T00:00:00Z",
     )
 
 
 @pytest.mark.anyio
 async def test_update_message_feedback_mutates_in_place_without_creating_new_record():
     catalog = InMemoryCatalogRepository()
+    subject_id = catalog.add_subject("Toán", "THPT")
+    catalog.add_topic(subject_id, "Đại số", "Phương trình bậc hai")
     repo = InMemoryChatRepository(catalog)
     service = ChatService(repo, FakeLLMClient(), load_settings())
     owner = make_user(1)

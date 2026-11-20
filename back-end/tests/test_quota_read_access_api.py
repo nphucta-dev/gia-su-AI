@@ -32,6 +32,8 @@ class FakeLLMClient:
 async def test_history_and_progress_get_endpoints_remain_accessible_when_quota_exhausted():
     users = InMemoryUserRepository()
     catalog = InMemoryCatalogRepository()
+    subject_id = catalog.add_subject("Toán", "THPT")
+    catalog.add_topic(subject_id, "Đại số", "Phương trình bậc hai")
     chat_repo = InMemoryChatRepository(catalog)
     progress_repo = InMemoryProgressRepository([
         ProgressRecord(1, user_id=1, topic_id=1, total_quizzes=1, correct_count=4, total_count=5, mastery_percent=Decimal("80.00"), last_studied_at="2026-11-18T10:00:00Z"),
@@ -43,19 +45,21 @@ async def test_history_and_progress_get_endpoints_remain_accessible_when_quota_e
         chat_repository=chat_repo,
         progress_repository=progress_repo,
         llm_client=llm,
-        password_hasher=lambda raw: f"hash:{raw}",
     )
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         reg = await client.post("/api/auth/register", json={
-            "fullName": "Nguyễn Văn A",
+            "name": "Nguyễn Văn A",
             "email": "quota@example.com",
             "password": "Password123!",
-            "birthYear": 2002,
+            "confirmPassword": "Password123!",
+            "consent": True,
         })
         assert reg.status_code == 201
-        headers = {"Authorization": f"Bearer {reg.json()['token']}"}
+        logged_in = await client.post("/api/auth/login", json={"email": "quota@example.com", "password": "Password123!"})
+        assert logged_in.status_code == 200
+        headers = {"Authorization": f"Bearer {logged_in.json()['access_token']}"}
 
         created = await client.post("/api/chat/sessions", json={"topicId": 1}, headers=headers)
         assert created.status_code == 201

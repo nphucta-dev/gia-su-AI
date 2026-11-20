@@ -1,6 +1,7 @@
 """Generated quiz data stays on the server; learner views omit the answer key."""
 
 from typing import Annotated, Literal
+import unicodedata
 from pydantic import computed_field, BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 
@@ -41,7 +42,7 @@ class GeneratedQuizQuestion(BaseModel):
 
 def _valid_unicode(value: str) -> str:
     # TEXT uses utf8mb4. Invalid surrogate/control characters must not reach MySQL.
-    if any(0xD800 <= ord(char) <= 0xDFFF or (ord(char) < 32 and char not in "\n\r\t") for char in value):
+    if any(unicodedata.category(char) in {"Cc", "Cs"} and char not in "\n\r\t" for char in value):
         raise ValueError("Invalid text")
     return value
 
