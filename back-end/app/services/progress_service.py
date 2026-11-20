@@ -7,6 +7,8 @@ from app.repositories.progress_repository import ProgressRecord, ProgressReposit
 from app.repositories.user_repository import User
 from app.schemas.progress import ProgressItem, ProgressListResponse, ProgressResponse
 from app.services.mastery import calculate_mastery_percent
+
+from app.schemas.progress import ProgressItem, ProgressListResponse, ProgressResponse, ReviewTopicsResponse
 from app.utils.errors import AppError
 
 
@@ -62,3 +64,11 @@ class ProgressService:
             user.id, topic_id, correct_count=correct_count, total_count=total_count,
         )
         return ProgressResponse(progress=progress_item(record))
+
+    async def list_review_topics(self, user: User, *, limit: int, offset: int) -> ReviewTopicsResponse:
+        """TK-067: Gợi ý chủ đề cần ôn theo mastery_percent tăng dần."""
+        records = await self._repository.list_review_topics(user.id, limit=limit + 1, offset=offset)
+        return ReviewTopicsResponse(
+            topics=[progress_item(record) for record in records[:limit]],
+            limit=limit, offset=offset, has_more=len(records) > limit,
+        )

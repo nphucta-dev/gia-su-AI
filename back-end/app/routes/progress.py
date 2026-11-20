@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Path, Query, Request
 from app.dependencies.auth import get_current_user
 from app.repositories.user_repository import User
 from app.schemas.auth import ErrorResponse
-from app.schemas.progress import ProgressListResponse, ProgressResponse
+from app.schemas.progress import ProgressListResponse, ProgressResponse, ReviewTopicsResponse
 from app.services.progress_service import ProgressService
 
 router = APIRouter(
@@ -32,6 +32,14 @@ async def list_progress(
     limit: Annotated[int, Query(ge=1, le=100)] = 20, offset: Offset = 0,
 ) -> ProgressListResponse:
     return await service.list_progress(user, limit=limit, offset=offset)
+
+
+@router.get("/review-topics", response_model=ReviewTopicsResponse, summary="Gợi ý chủ đề cần ôn theo mastery_percent tăng dần")
+async def list_review_topics(
+    user: CurrentUser, service: Service,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20, offset: Offset = 0,
+) -> ReviewTopicsResponse:
+    return await service.list_review_topics(user, limit=limit, offset=offset)
 
 
 @router.get("/{progress_id}", response_model=ProgressResponse, summary="Xem một tiến độ học tập của chính mình")

@@ -88,6 +88,9 @@ class SqlAlchemyProgressRepository:
             studied_at=studied_at,
         )
 
+    async def list_review_topics(self, user_id: int, *, limit: int, offset: int) -> list[ProgressRecord]:
+        return await asyncio.to_thread(self._list_review_topics, user_id, limit=limit, offset=offset)
+
     @staticmethod
     def _record(row: LearningProgress) -> ProgressRecord:
         return ProgressRecord(
@@ -132,3 +135,16 @@ class SqlAlchemyProgressRepository:
                 studied_at=studied_at,
             )
             return self._record(row)
+
+    def _list_review_topics(self, user_id: int, *, limit: int, offset: int) -> list[ProgressRecord]:
+        with self._sessions() as db:
+            rows = db.scalars(
+                select(LearningProgress).where(LearningProgress.user_id == user_id)
+                .order_by(
+                    LearningProgress.mastery_percent.asc(),
+                    LearningProgress.last_studied_at.asc(),
+                    LearningProgress.id.asc(),
+                )
+                .offset(offset).limit(limit)
+            )
+            return [self._record(row) for row in rows]
