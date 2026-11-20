@@ -90,6 +90,8 @@
 .quiz-layout > * { min-width: 0; }
 .quiz-submission-status:empty { display: none; }
 .quiz-submission-status .notice { margin: 14px 0 4px; overflow-wrap: anywhere; }
+.message-feedback { margin-top: 12px; min-width: 0; white-space: normal; }
+.message-feedback-status:not(:empty) { display: grid; justify-items: start; gap: 8px; margin-top: 8px; font-size: 14px; overflow-wrap: anywhere; }
 
 @media (min-width: 768px) {
  .quiz-setup-fields { grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr); }
