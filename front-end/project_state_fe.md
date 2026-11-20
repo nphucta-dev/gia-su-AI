@@ -40,6 +40,7 @@ Các mục trên chỉ xác nhận phần UI hoặc client behavior; task nghi�
 | TK-022 | Trạng thái chờ phản hồi | Chưa xong; chỉ có selector xem trước, chưa gắn request chat |
 | TK-024 | Sidebar lịch sử chat | Đã tích hợp sidebar lịch sử chat với API; mở lại đúng nội dung phiên theo tài khoản. |
 | TK-026 | Chặn câu hỏi rỗng UI | Có |
+| TK-028 | Thông báo lỗi AI (UI) | Hoàn thành FE: thông báo theo mã lỗi trong composer/gợi ý/lời giải, giữ draft và lịch sử, khóa gửi trùng khi chưa rõ trạng thái lưu, tải lại hội thoại và gọi API /chat/sessions/{id}/retry hiện có khi an toàn. Browser test API mock PASS; chưa kiểm chứng LLM/MySQL thật. Không sửa backend TK-029. |
 | TK-031 | Nút gợi ý 3 mức | Hoàn thành FE: nút tuần tự gọi API hints không gửi level, hiển thị mức 1–3 từ server, chống gửi chồng và xử lý loading/lỗi/giới hạn/race. Preview vẫn tách riêng bằng dữ liệu minh họa. |
 | TK-033 | Đơn giản hơn/Cho ví dụ | Một phần; nội dung đang hard-code |
 | TK-035 | Modal xác nhận lời giải | Một phần; modal có nhưng chưa gọi API lời giải |
