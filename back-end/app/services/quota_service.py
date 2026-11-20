@@ -35,17 +35,21 @@ def utc_day_bounds(now: datetime | None = None) -> tuple[datetime, datetime]:
 class QuotaService:
     """Tính hạn mức từ các phản hồi AI thành công (role='assistant') trong ngày UTC hiện tại."""
 
-    def __init__(self, chat_repository: ChatRepository, *, daily_limit: int = DEFAULT_DAILY_AI_LIMIT) -> None:
+    def __init__(self, chat_repository: ChatRepository, *, daily_limit: int = DEFAULT_DAILY_AI_LIMIT, ai_quota_service=None) -> None:
         if not isinstance(daily_limit, int) or isinstance(daily_limit, bool) or daily_limit < 1:
             raise ValueError("daily_limit phải là số nguyên dương.")
         self._chat_repository = chat_repository
         self._daily_limit = daily_limit
+        self._ai_quota_service = ai_quota_service
 
     @property
     def daily_limit(self) -> int:
         return self._daily_limit
 
     async def get_quota_status(self, user_id: int, *, now: datetime | None = None) -> QuotaStatus:
+        if self._ai_quota_service is not None:
+            quota = await self._ai_quota_service.get_quota(user_id)
+            return QuotaStatus(quota.limit, quota.used, quota.remaining, quota.next_reset_at)
         day_start, next_reset = utc_day_bounds(now)
         used = await self._chat_repository.count_assistant_messages_since(user_id, day_start)
         remaining = max(0, self._daily_limit - used)
@@ -59,6 +63,10 @@ class QuotaService:
     async def ensure_within_quota(self, user: User, *, now: datetime | None = None) -> QuotaStatus:
         status = await self.get_quota_status(user.id, now=now)
         if status.remaining <= 0:
+            if self._ai_quota_service is not None:
+                reset = datetime.fromisoformat(status.next_reset_at.replace("Z", "+00:00"))
+                seconds = max(1, int((reset - datetime.now(timezone.utc)).total_seconds()))
+                raise AppError(429, "AI_QUOTA_EXCEEDED", "B?n ?? d?ng h?t l??t AI h?m nay. L?ch s? v?n xem ???c.", {"nextResetAt": status.next_reset_at}, headers={"Retry-After": str(seconds)})
             raise AppError(
                 429,
                 "AI_QUOTA_EXCEEDED",
@@ -67,12 +75,8 @@ class QuotaService:
         return status
 
     async def get_quota(self, user: User, *, now: datetime | None = None) -> QuotaResponse:
-        day_start, next_reset = utc_day_bounds(now)
-        used = await self._chat_repository.count_assistant_messages_since(user.id, day_start)
-        remaining = max(0, self._daily_limit - used)
+        status = await self.get_quota_status(user.id, now=now)
         return QuotaResponse(quota=QuotaInfo(
-            daily_limit=self._daily_limit,
-            used_today=used,
-            remaining=remaining,
-            next_reset_at=utc_timestamp(next_reset),
+            daily_limit=status.daily_limit, used_today=status.used_today,
+            remaining=status.remaining, next_reset_at=status.next_reset_at,
         ))

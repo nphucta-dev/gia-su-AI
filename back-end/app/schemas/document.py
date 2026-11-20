@@ -28,6 +28,11 @@ class DocumentResponse(BaseModel):
     document: DocumentInfo
 
 
+class UpdateDocumentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    is_active: bool = Field(alias="isActive", strict=True)
+
+
 class DocumentListResponse(BaseModel):
     documents: list[DocumentInfo]
 

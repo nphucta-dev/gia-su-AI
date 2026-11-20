@@ -5,6 +5,7 @@ const { runProfileUploadChecks } = require('./profile-upload.cjs');
 const { runCatalogChecks } = require('./catalog.cjs');
 const { runAdminCatalogChecks } = require('./admin-catalog.cjs');
 const { runSessionRefreshChecks } = require('./session-refresh.cjs');
+const { runAIWorkflowChecks } = require('./ai-workflows.cjs');
 
 async function runBrowserChecks(application) {
   await runLoginChecks(application);
@@ -31,6 +32,9 @@ async function runBrowserChecks(application) {
     await page.getByText('learner@example.com', { exact: true }).waitFor();
     assert.equal(await page.getByRole('link', { name: 'Khu vực quản trị', exact: true }).count(), 0);
     await page.goto(`${baseUrl}/#chat`);
+    await page.getByRole('textbox', { name: 'Câu hỏi cho gia sư', exact: true }).fill('Em cần giải phương trình bậc hai như thế nào?');
+    await page.getByRole('button', { name: 'Gửi câu hỏi', exact: true }).click();
+    await page.locator('.message.assistant').waitFor();
     await page.getByRole('button', { name: 'Xem lời giải', exact: true }).click();
     await page.getByRole('dialog').waitFor();
     await page.getByRole('button', { name: 'Quay lại', exact: true }).click();
@@ -47,6 +51,7 @@ async function runBrowserChecks(application) {
   await runAdminCatalogChecks(application);
   await runProfileUploadChecks(application);
   await runSessionRefreshChecks(application);
+  await runAIWorkflowChecks(application);
 
   // Backend dừng phải hiện lỗi và giữ trạng thái khách, không giả lập đăng nhập thành công.
   await stopBackend();

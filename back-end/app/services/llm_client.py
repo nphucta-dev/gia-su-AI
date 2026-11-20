@@ -18,10 +18,11 @@ from typing import Protocol
 import httpx
 
 from app.config import Settings
+from app.services.llm_protocols import extract_text, key_is_optional, make_request, protocol_for
 from app.utils.errors import AppError
 
 MAX_RESPONSE_BYTES = 256 * 1024
-MAX_REPLY_CHARS = 8000
+MAX_REPLY_CHARS = 32000
 _llm_request_active: ContextVar[bool] = ContextVar("llm_request_active", default=False)
 
 
@@ -70,27 +71,37 @@ class ChatCompletionsClient:
         self._transport = transport
 
     def _configuration(self) -> tuple[str, str, str, float]:
-        raw_values = (self._settings.llm_api_url, self._settings.llm_api_key, self._settings.llm_model)
+        raw_values = (self._settings.llm_api_url, self._settings.llm_model)
         if any(not isinstance(value, str) or not value.strip() for value in raw_values):
             raise _not_configured()
-        endpoint, key, model = (value.strip() for value in raw_values)
+        endpoint, model = (value.strip() for value in raw_values)
+        key = self._settings.llm_api_key
+        if not isinstance(key, str):
+            raise _not_configured()
+        key = key.strip()
         if not key.isascii() or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in key):
             raise _not_configured()
         if any(unicodedata.category(char) in {"Cc", "Cs"} for char in model):
             raise _not_configured()
         try:
             url = httpx.URL(endpoint)
+            protocol = protocol_for(endpoint, self._settings.llm_provider)
         except (httpx.InvalidURL, ValueError):
             raise _not_configured() from None
         credential_names = {"key", "api_key", "api-key", "apikey", "token", "access_token", "access-token", "authorization", "password", "secret"}
         if (
             url.scheme not in {"http", "https"} or not url.host or url.userinfo or url.fragment
             or any(name.casefold() in credential_names for name in url.params)
-            or key in endpoint
+            or (key and key in endpoint)
+            or (not key and not key_is_optional(endpoint, protocol))
         ):
             raise _not_configured()
         timeout = self._settings.llm_timeout_seconds
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or not 1 <= timeout <= 120:
+            raise _not_configured()
+        if type(self._settings.llm_max_tokens) is not int or not 1 <= self._settings.llm_max_tokens <= 32768:
+            raise _not_configured()
+        if not isinstance(self._settings.llm_api_version, str) or not self._settings.llm_api_version or any(char.isspace() or ord(char) < 32 or ord(char) > 126 for char in self._settings.llm_api_version):
             raise _not_configured()
         return endpoint, key, model, timeout
 
@@ -105,6 +116,13 @@ class ChatCompletionsClient:
             raise AppError(502, "LLM_UNAVAILABLE", "Chưa thể kết nối với model. Vui lòng thử lại.") from None
 
     async def _request(self, endpoint: str, key: str, model: str, messages: list[dict[str, str]], timeout: float) -> LLMReply:
+        try:
+            protocol, endpoint, headers, body = make_request(
+                endpoint, key, model, messages, provider=self._settings.llm_provider,
+                max_tokens=self._settings.llm_max_tokens, api_version=self._settings.llm_api_version,
+            )
+        except (ValueError, KeyError, TypeError):
+            raise _not_configured() from None
         client = httpx.AsyncClient(
             transport=self._transport, timeout=timeout, follow_redirects=False, trust_env=False,
         )
@@ -113,8 +131,7 @@ class ChatCompletionsClient:
         try:
             async with client:
                 async with client.stream(
-                    "POST", endpoint, headers={"Authorization": "Bearer " + key, "Accept": "application/json", "Accept-Encoding": "identity"},
-                    json={"model": model, "messages": messages},
+                    "POST", endpoint, headers=headers, json=body,
                 ) as response:
                     if response.status_code == 429:
                         raise AppError(429, "LLM_RATE_LIMITED", "Dịch vụ model đang giới hạn yêu cầu. Vui lòng thử lại sau.")
@@ -127,23 +144,21 @@ class ChatCompletionsClient:
                         if len(payload) + len(chunk) > MAX_RESPONSE_BYTES:
                             raise _invalid_response()
                         payload.extend(chunk)
-                    return self._parse_reply(payload)
+                    return self._parse_reply(payload, protocol)
         finally:
             _llm_request_active.reset(token)
 
     @staticmethod
-    def _parse_reply(payload: bytes | bytearray) -> LLMReply:
+    def _parse_reply(payload: bytes | bytearray, protocol: str = "openai") -> LLMReply:
         try:
             body = json.loads(payload.decode("utf-8"))
-            content = body["choices"][0]["message"]["content"]
+            content, token_count = extract_text(body, protocol)
         except (UnicodeError, ValueError, TypeError, KeyError, IndexError):
             raise _invalid_response() from None
         if not isinstance(content, str) or not content.strip() or len(content) > MAX_REPLY_CHARS:
             raise _invalid_response()
         if any(unicodedata.category(char) in {"Cc", "Cs"} and char not in "\n\r\t" for char in content):
             raise _invalid_response()
-        usage = body.get("usage")
-        token_count = usage.get("completion_tokens") if isinstance(usage, dict) else None
         if type(token_count) is not int or not 0 <= token_count <= 2**31 - 1:
             token_count = None
         return LLMReply(content=content.strip(), token_count=token_count)

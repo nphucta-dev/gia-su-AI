@@ -1,14 +1,13 @@
 """Dữ liệu phiên/tin nhắn và kho trong bộ nhớ dùng cho kiểm thử chat."""
 
 from __future__ import annotations
-
 from collections.abc import Sequence
-
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
-
 from app.repositories.catalog_repository import InMemoryCatalogRepository
+
+
 
 
 def utc_timestamp(value: datetime) -> str:
@@ -44,10 +43,8 @@ class ChatMessageRecord:
     hint_level: int | None = None
     is_full_solution: bool = False
     source_refs: list[dict[str, Any]] = field(default_factory=list)
-
-    feedback: int | None = None
-
     token_count: int | None = None
+    feedback: int | None = None
 
 
 # Tên ngắn dùng được ở các service không cần nhắc lại tiền tố Chat.
@@ -57,10 +54,6 @@ MessageRecord = ChatMessageRecord
 
 class ChatChangedError(Exception):
     """Phiên đã có tin mới trong lúc phản hồi AI đang được tạo."""
-
-
-class FeedbackTargetError(Exception):
-    """Chỉ tin nhắn của assistant mới được đánh giá hữu ích/chưa hữu ích."""
 
 
 class ChatRepository(Protocol):
@@ -74,8 +67,6 @@ class ChatRepository(Protocol):
 
     async def recent_messages(self, user_id: int, session_id: int, *, limit: int = 12) -> list[ChatMessageRecord]: ...
 
-    async def find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None: ...
-
     async def append_user_message(self, user_id: int, session_id: int, content: str) -> ChatMessageRecord | None: ...
 
     async def append_assistant_message(
@@ -84,9 +75,17 @@ class ChatRepository(Protocol):
         token_count: int | None, expected_last_id: int,
     ) -> ChatMessageRecord | None: ...
 
+    async def update_feedback(self, user_id: int, session_id: int, message_id: int, feedback: int | None) -> ChatMessageRecord | None: ...
+
+
+    async def find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None: ...
+
+
     async def count_assistant_messages_since(self, user_id: int, since: datetime) -> int: ...
 
+
     async def update_message_feedback(self, user_id: int, message_id: int, feedback: int) -> ChatMessageRecord | None: ...
+
 
 
 class InMemoryChatRepository:
@@ -160,12 +159,6 @@ class InMemoryChatRepository:
             return []
         return self._owned_messages(user_id, session_id)[-limit:]
 
-    async def find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None:
-        message = self._messages.get(message_id)
-        if message is None or self._find_session(user_id, message.session_id) is None:
-            return None
-        return message
-
     def _append(
         self, session: ChatSessionRecord, content: str, *, role: str,
         hint_level: int | None = None, is_full_solution: bool = False,
@@ -204,8 +197,26 @@ class InMemoryChatRepository:
             raise ChatChangedError()
         return self._append(
             session, content, role="assistant", hint_level=hint_level,
-            is_full_solution=is_full_solution, source_refs=source_refs, token_count=token_count,
+            is_full_solution=is_full_solution, token_count=token_count, source_refs=source_refs,
         )
+
+    async def update_feedback(self, user_id: int, session_id: int, message_id: int, feedback: int | None) -> ChatMessageRecord | None:
+        if self._find_session(user_id, session_id) is None:
+            return None
+        record = self._messages.get(message_id)
+        if record is None or record.session_id != session_id or record.role != "assistant":
+            return None
+        record = replace(record, feedback=feedback)
+        self._messages[message_id] = record
+        return record
+
+
+    async def find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None:
+        message = self._messages.get(message_id)
+        if message is None or self._find_session(user_id, message.session_id) is None:
+            return None
+        return message
+
 
     async def count_assistant_messages_since(self, user_id: int, since: datetime) -> int:
         since_iso = utc_timestamp(since)
@@ -214,6 +225,7 @@ class InMemoryChatRepository:
             1 for m in self._messages.values()
             if m.session_id in owned_session_ids and m.role == "assistant" and m.created_at >= since_iso
         )
+
 
     async def update_message_feedback(self, user_id: int, message_id: int, feedback: int) -> ChatMessageRecord | None:
         message = self._messages.get(message_id)
@@ -226,3 +238,7 @@ class InMemoryChatRepository:
         updated = replace(message, feedback=feedback)
         self._messages[message_id] = updated
         return updated
+
+
+class FeedbackTargetError(Exception):
+    """Chỉ tin nhắn của assistant mới được đánh giá hữu ích/chưa hữu ích."""

@@ -1,9 +1,11 @@
 """API riêng cho browser test, chỉ sử dụng dữ liệu trong bộ nhớ."""
 
 import argparse
+import json
 import os
 import sys
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from pathlib import Path
 
 os.environ["PYTHON_DOTENV_DISABLED"] = "1"
@@ -19,6 +21,28 @@ from app.repositories.catalog_repository import InMemoryCatalogRepository
 from app.repositories.user_repository import InMemoryUserRepository
 from app.repositories.document_repository import InMemoryDocumentRepository, SubjectRecord, TopicRecord
 from app.utils.password import hash_password
+from app.services.llm_client import LLMReply
+from app.utils.errors import AppError
+
+
+class BrowserModel:
+    """Deterministic provider used only by the isolated browser test server."""
+
+    def __init__(self):
+        self.failed_questions = set()
+
+    async def generate(self, messages):
+        if messages[0]["content"].startswith("Bạn là giáo viên tạo bài luyện tập"):
+            return LLMReply(json.dumps({"questions": [{
+                "question_text": f"Câu {index}: Một cộng một bằng bao nhiêu?",
+                "options": {"A": "Một", "B": "Hai", "C": "Ba", "D": "Bốn"},
+                "correct_answer": "B", "explanation": "Một cộng một bằng hai.",
+            } for index in range(1, 6)]}, ensure_ascii=False))
+        text = json.dumps(messages, ensure_ascii=False)
+        if "RETRY_ONCE" in text and "RETRY_ONCE" not in self.failed_questions:
+            self.failed_questions.add("RETRY_ONCE")
+            raise AppError(503, "LLM_UNAVAILABLE", "Model kiểm thử tạm thời chưa phản hồi.")
+        return LLMReply("Bạn thử xác định dữ kiện đã biết rồi chọn bước giải tiếp theo nhé.", token_count=12)
 
 
 def fast_hasher(password: str) -> str:
@@ -53,6 +77,7 @@ def create_browser_app():
         password_hasher=fast_hasher,
         settings=Settings(jwt_secret=os.environ["JWT_SECRET"]),
         document_repository=documents,
+        llm_client=BrowserModel(),
         upload_dir=Path(os.environ["BROWSER_UPLOAD_DIR"]),
     )
     original_lifespan = app.router.lifespan_context
@@ -74,6 +99,9 @@ def create_browser_app():
         storage.mkdir(parents=True, exist_ok=True)
         (storage / "pending-source.txt").write_text("Nội dung tài liệu chờ xử lý. Hàm số bậc hai.", encoding="utf-8")
         await documents.create(topic_id=quadratic, title="Tài liệu chờ xử lý", file_path="pending-source.txt")
+        source = await documents.create(topic_id=quadratic, title="Nguồn Đại số kiểm thử", file_path="ai-source.txt")
+        await documents.finish_processing(source.id, chunks=["Phương trình bậc hai có dạng ax² + bx + c = 0. Biệt thức delta giúp xét nghiệm."])
+        documents._documents[source.id] = replace(documents._documents[source.id], is_active=True)
         async with original_lifespan(current_app):
             yield
 

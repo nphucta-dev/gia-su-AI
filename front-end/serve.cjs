@@ -45,7 +45,11 @@ function createServer({ backendUrl = process.env.BACKEND_URL || 'http://127.0.0.
         response.pipe(res);
       });
       upstream.on('error', () => proxyError(res));
-      upstream.setTimeout(30000, () => upstream.destroy());
+      const generatesAi = req.method === 'POST' && (
+        /^\/api\/quizzes\/?$/.test(pathname)
+        || /^\/api\/chat\/sessions\/[1-9]\d*\/(messages|hints|retry|explanations|solution)\/?$/.test(pathname)
+      );
+      upstream.setTimeout(generatesAi ? 150000 : 30000, () => upstream.destroy());
       req.on('aborted', () => upstream.destroy());
       req.pipe(upstream);
       return;

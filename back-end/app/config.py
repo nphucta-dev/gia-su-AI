@@ -49,6 +49,9 @@ class Settings:
     llm_api_url: str = field(default="", repr=False)
     llm_model: str = field(default="", repr=False)
     llm_timeout_seconds: float = 30.0
+    llm_provider: str = field(default="auto", repr=False)
+    llm_max_tokens: int = 4096
+    llm_api_version: str = "2023-06-01"
 
 
 def _load_jwt_secret() -> str:
@@ -136,4 +139,17 @@ def load_settings() -> Settings:
         llm_api_url=os.environ.get("LLM_API_URL", "").strip(),
         llm_model=os.environ.get("LLM_MODEL", "").strip(),
         llm_timeout_seconds=_load_llm_timeout(),
+        llm_provider=os.environ.get("LLM_PROVIDER", "auto").strip().lower() or "auto",
+        llm_max_tokens=_load_llm_max_tokens(),
+        llm_api_version=os.environ.get("LLM_API_VERSION", "2023-06-01").strip() or "2023-06-01",
     )
+
+
+def _load_llm_max_tokens() -> int:
+    try:
+        value = int(os.environ.get("LLM_MAX_TOKENS", "4096"))
+    except ValueError:
+        raise ValueError("LLM_MAX_TOKENS phải là số nguyên từ 1 đến 32768.") from None
+    if not 1 <= value <= 32768:
+        raise ValueError("LLM_MAX_TOKENS phải là số nguyên từ 1 đến 32768.")
+    return value

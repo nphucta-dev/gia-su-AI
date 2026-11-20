@@ -109,7 +109,7 @@ async function runProfileUploadChecks({ browser, baseUrl }) {
     assert.equal(await search.inputValue(), 'chờ xử lý');
     assert.equal(await statusFilter.inputValue(), 'all');
     assert.match(await pendingRow.locator('.document-chunks').textContent(), /\d+ đoạn văn bản/);
-    assert.equal(await pendingRow.getByRole('switch').isDisabled(), true);
+    assert.equal(await pendingRow.getByRole('switch').isDisabled(), false);
     const repeated = await page.evaluate(async ({path, key}) => {
       const response = await fetch(path, {method:'POST', headers:{Authorization:`Bearer ${sessionStorage.getItem(key)}`}});
       return {status:response.status, body:await response.json()};
@@ -173,7 +173,15 @@ async function runProfileUploadChecks({ browser, baseUrl }) {
     await page.reload();
     const row = page.locator('.document-row').filter({ hasText: 'Tài liệu browser thực' });
     await row.waitFor();
-    assert.equal(await row.getByRole('switch').isDisabled(), true);
+    assert.equal(await row.getByRole('switch').isDisabled(), false);
+    for (const active of [true, false]) {
+      const changed = page.waitForResponse(response => response.request().method() === 'PATCH' && new URL(response.url()).pathname === `/api/admin/documents/${document.id}`);
+      await row.getByRole('switch').click();
+      const updated = await changed;
+      assert.equal(updated.status(), 200);
+      assert.equal((await updated.json()).document.isActive, active);
+      await row.locator(`[role="switch"][aria-checked="${active}"]`).waitFor();
+    }
     await row.getByText('Sẵn sàng', {exact:true}).waitFor();
     assert.match(await row.locator('.document-chunks').textContent(), /\d+ đoạn văn bản/);
     for (const width of [360, 768, 1440]) {

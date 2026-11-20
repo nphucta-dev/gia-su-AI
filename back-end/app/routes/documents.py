@@ -12,6 +12,8 @@ from app.schemas.auth import ErrorResponse
 from app.schemas.document import (
     DocumentListResponse, DocumentOptionsResponse, DocumentResponse, UpdateDocumentActiveRequest,
 )
+from app.schemas.document import UpdateDocumentRequest
+from app.routes.auth import require_json
 from app.services.document_service import DocumentService, invalid_field
 from app.utils.errors import AppError
 

@@ -6,17 +6,14 @@ Chạy phát triển (từ thư mục back-end/)::
 """
 
 from __future__ import annotations
-
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Callable, Sequence
-
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
-
 from app.config import DEFAULT_UPLOAD_BODY_BYTES, Settings, load_settings
 from app.db.database import create_database_engine, create_session_factory
 from app.dependencies.auth import require_roles
@@ -24,6 +21,7 @@ from app.error_handlers import register_error_handlers
 from app.middlewares.body_limit import BodySizeLimitMiddleware
 from app.middlewares.security_headers import SecurityHeadersMiddleware
 from app.repositories.catalog_repository import InMemoryCatalogRepository
+from app.repositories.ai_quota_repository import InMemoryAiQuotaRepository, SqlAlchemyAiQuotaRepository
 from app.repositories.chat_repository import ChatRepository, InMemoryChatRepository
 from app.repositories.quiz_repository import QuizRepository, InMemoryQuizRepository
 from app.repositories.progress_repository import ProgressRepository, InMemoryProgressRepository
@@ -42,19 +40,26 @@ from app.routes.quiz import router as quiz_router
 from app.routes.progress import router as progress_router
 from app.routes.me import router as me_router
 from app.routes.profile import router as profile_router
-from app.routes.quota import router as quota_router
 from app.routes.documents import router as documents_router
+from app.routes.document_search import router as document_search_router
+from app.routes.ai_quota import router as ai_quota_router
 from app.services.auth_service import AuthService, UserRepository
+from app.services.ai_quota import AiQuotaService
 from app.services.admin_catalog_service import AdminCatalogService
 from app.services.catalog_service import CatalogRepository, CatalogService
+from app.services.document_retrieval import DocumentRetrievalService
 from app.services.chat_service import ChatService
 from app.services.quiz_service import QuizService
 from app.services.progress_service import ProgressService
-from app.services.quota_service import QuotaService
 from app.services.llm_client import ChatCompletionsClient, LLMClient
 from app.services.token_service import TokenService
 from app.utils.password import hash_password
 from app.utils.errors import AppError
+from app.routes.quota import router as quota_router
+from app.services.quota_service import QuotaService
+
+
+
 
 
 def create_app(
@@ -72,6 +77,7 @@ def create_app(
     llm_client: LLMClient | None = None,
     quiz_repository: QuizRepository | None = None,
     progress_repository: ProgressRepository | None = None,
+    ai_quota_service: AiQuotaService | None = None,
 ) -> FastAPI:
     """Tạo ứng dụng. Các phụ thuộc được truyền vào để dễ thay kho dữ liệu (ví dụ CSDL
     thật) và để test độc lập, không cần mở cổng thật."""
@@ -108,6 +114,10 @@ def create_app(
     app.state.document_repository = document_repository
     if document_repository is None and session_factory is not None:
         app.state.document_repository = SqlAlchemyDocumentRepository(session_factory)
+    app.state.document_retrieval_service = (
+        DocumentRetrievalService(app.state.document_repository)
+        if app.state.document_repository is not None else None
+    )
     app.state.upload_dir = Path(upload_dir) if upload_dir is not None else settings.upload_dir
     app.state.auth_service = AuthService(repository, password_hasher or hash_password)
     app.state.catalog_service = CatalogService(catalog)
@@ -118,21 +128,39 @@ def create_app(
             SqlAlchemyChatRepository(session_factory) if session_factory is not None
             else InMemoryChatRepository(catalog if isinstance(catalog, InMemoryCatalogRepository) else None)
         )
-    app.state.chat_service = ChatService(
-        chat, llm_client or ChatCompletionsClient(settings), settings,
-        document_repository=app.state.document_repository,
-    )
-    app.state.quota_service = QuotaService(chat)
+    model_client = llm_client if llm_client is not None else ChatCompletionsClient(settings)
+    progress = progress_repository
+    if progress is None:
+        if session_factory is not None:
+            progress = SqlAlchemyProgressRepository(session_factory)
+        elif isinstance(quiz_repository, InMemoryQuizRepository):
+            progress = quiz_repository.progress_repository
+        else:
+            progress = InMemoryProgressRepository()
     quiz = quiz_repository
     if quiz is None:
         quiz = (
             SqlAlchemyQuizRepository(session_factory) if session_factory is not None
-            else InMemoryQuizRepository(catalog if isinstance(catalog, InMemoryCatalogRepository) else None)
+            else InMemoryQuizRepository(
+                catalog if isinstance(catalog, InMemoryCatalogRepository) else None,
+                progress_repository=progress if isinstance(progress, InMemoryProgressRepository) else None,
+            )
         )
-    app.state.quiz_service = QuizService(quiz)
-    progress = progress_repository
-    if progress is None:
-        progress = SqlAlchemyProgressRepository(session_factory) if session_factory is not None else InMemoryProgressRepository()
+    quota_repository = (
+        SqlAlchemyAiQuotaRepository(session_factory) if session_factory is not None
+        else InMemoryAiQuotaRepository(chat, quiz)
+    )
+    quota = ai_quota_service if ai_quota_service is not None else AiQuotaService(quota_repository)
+    app.state.quota_service = QuotaService(chat, ai_quota_service=quota)
+    app.state.ai_quota_service = quota
+    app.state.chat_service = ChatService(
+        chat, model_client, settings,
+        retrieval_service=app.state.document_retrieval_service, quota_service=quota,
+    )
+    app.state.quiz_service = QuizService(
+        quiz, catalog_service=app.state.catalog_service, llm_client=model_client, settings=settings,
+        retrieval_service=app.state.document_retrieval_service, quota_service=quota,
+    )
     app.state.progress_service = ProgressService(progress)
     app.state.token_service = token_service or TokenService(
         secret=settings.jwt_secret,
@@ -149,8 +177,10 @@ def create_app(
     app.include_router(progress_router)
     app.include_router(admin_catalog_router)
     app.include_router(profile_router)
-    app.include_router(quota_router)
     app.include_router(documents_router)
+    app.include_router(document_search_router)
+    app.include_router(ai_quota_router)
+    app.include_router(quota_router)
 
     @app.get("/api/health", tags=["system"])
     async def health() -> dict[str, str]:

@@ -29,7 +29,7 @@ export function buildQuizSubmission(quizId, questions, answers) {
   return { answers: payload };
 }
 
-// Provisional frontend contract for TK-057. The backend route is not implemented yet.
+// Only learner selections are sent; grading and explanations come from the backend.
 export async function submitQuizAnswers(quizId, questions, answers, { signal } = {}) {
   const payload = buildQuizSubmission(quizId, questions, answers);
   const result = await api(`/quizzes/${quizId}/submit`, { method: 'POST', body: payload, signal });

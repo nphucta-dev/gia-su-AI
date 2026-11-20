@@ -208,9 +208,10 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   trích văn bản PDF/TXT và lưu `document_chunks` theo thứ tự, không gọi AI/OCR. Upload xử lý đồng bộ;
   thành công `ready`, lỗi `error`, cập nhật `processed_at` và trả `chunkCount`/`processedAt`.
   ADMIN có `POST /api/admin/documents/{id}/process` để xử lý pending cũ hoặc thử lại lỗi; UI có nút tương ứng.
-  Chunks và trạng thái được ghi cùng transaction, xử lý ready không tạo đoạn trùng. Nguồn vẫn inactive;
-  chưa triển khai bật nguồn hoặc retrieval. Frontend chat, quiz, dashboard
-  còn phần minh họa. Chế độ xem thử localhost tiếp tục dùng dữ liệu mẫu.
+  Chunks và trạng thái được ghi cùng transaction, xử lý ready không tạo đoạn trùng. Nguồn mới vẫn inactive;
+  yêu cầu tích hợp AI bổ sung đã có PATCH bật/tắt nguồn ready và retrieval từ khóa.
+  Frontend chat/quiz đăng nhập dùng API thật; dashboard và một số lịch sử học tập
+  còn minh họa. Chế độ xem thử localhost tiếp tục dùng dữ liệu mẫu.
   Cần kiểm tra từng phần trước khi đánh dấu TK xong.
 - Venv mặc định ở `back-end/venv`; các lệnh chạy ở README hiện hành. Không tự chạy migration,
   seed, sửa database hay gọi LLM chỉ vì đang đọc các bước trong tài liệu.
@@ -221,14 +222,13 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   (TK-018/021/023/025/032/081/084) theo yêu cầu bổ sung: `/api/chat/sessions`, tin nhắn và hints;
   ngữ cảnh có giới hạn và lọc PII, giữ câu hỏi khi model thiếu cấu hình/lỗi. Chưa có key thật
   thì không sinh câu trả lời giả. Đọc `docs/CHAT_BACKEND.md` và `docs/SOCRATIC_PROMPT.md`
-  để biết hợp đồng API, cấu hình, giới hạn PII và kiểm thử. RAG, quota và chất lượng model
-  thực tế chưa được nghiệm thu; frontend chat vẫn chưa nối các API backend mới.
+  để biết hợp đồng API, cấu hình, giới hạn PII và kiểm thử. Yêu cầu bổ sung đã nối RAG,
+  quota, hints, giải thích, lời giải xác nhận và frontend; chất lượng model thật vẫn cần key để đánh giá.
 - Theo yêu cầu bổ sung ngày 18/11/2026, TK-052 có `app.state.quiz_service.save_generated_quiz`:
   kiểm tra đủ 5 câu, bốn lựa chọn A–D, đáp án và giải thích trước khi lưu quiz/câu hỏi cùng
-  transaction MySQL. Phản hồi dành cho người học không chứa đáp án/giải thích. Đây là tầng
-  backend để luồng sinh quiz gọi; chưa triển khai TK-051 gọi model hay nối frontend quiz.
-  Xem `docs/QUIZ_BACKEND.md`. Phần tích hợp frontend đã bị merge ghi đè được khôi phục;
-  giữ nguyên giao diện và các luồng chat/quiz minh họa.
+  transaction MySQL. Phản hồi dành cho người học không chứa đáp án/giải thích. Yêu cầu AI
+  bổ sung đã có POST `/api/quizzes` gọi model rồi validate/lưu, GET `/{id}/result` trả
+  kết quả sau nộp; frontend luyện tập dùng các API này. Xem `docs/QUIZ_BACKEND.md`.
 - TK-082 bổ sung đọc quiz/tiến độ theo chủ sở hữu lấy từ token: `GET /api/quizzes/{id}`,
   `GET /api/progress`, `GET /api/progress/{id}`. Các truy vấn SQL lọc `user_id`, câu hỏi
   được lấy qua quiz đã lọc owner; ADMIN cũng không được đọc dữ liệu học tập của tài khoản
@@ -236,4 +236,25 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   Kiểm thử bao phủ đọc/ghi chat trái phép, không gọi model/không thay đổi dữ liệu,
   quiz không lộ đáp án, giả mạo `user_id` và phân trang tiến độ. Xem `docs/OWNERSHIP.md`.
   Không triển khai nộp/chấm quiz, tính tiến độ hoặc giao diện mới trong task này.
+- Theo yêu cầu bổ sung, TK-059 mở rộng `POST /api/quizzes/{id}/submit` để lưu lựa chọn,
+  chấm điểm 0–100, đổi `completed` và cập nhật `learning_progress` trong cùng transaction.
+  Giữ envelope `status=accepted` cho frontend hiện có, thêm `quizStatus`, điểm, số câu và
+  thời gian hoàn tất. `POST /api/quizzes/{id}/grade` chỉ chấm lựa chọn cũ đã lưu theo TK-058.
+  Khóa user rồi quiz giúp chống chấm/nộp trùng và mất thống kê khi nộp đồng thời.
+  Không tự chấm dữ liệu cũ khi khởi động; xem `docs/QUIZ_GRADING.md`.
+- TK-044 có `DocumentRetrievalService.search` và `GET /api/catalog/topics/{id}/chunks`
+  theo query `q`/`limit`. Tìm toàn từ, chuẩn hóa tiếng Việt, xếp hạng trước khi giới hạn;
+  SQL chỉ lấy nguồn đúng chủ đề, ready/active và môn/chủ đề active. Không dùng model,
+  vector, tự bật nguồn hoặc thêm source_refs trong task này. Xem `docs/KEYWORD_RETRIEVAL.md`.
+- Theo yêu cầu mới “tất cả các chức năng AI…chỉ cần thêm API với model” và hỗ trợ
+  nhiều model, client chung có adapter OpenAI-compatible, Responses, Gemini GenerateContent,
+  Anthropic Messages và Ollama. URL/key/model nằm trong backend env, có tùy chọn
+  `LLM_PROVIDER`; giao thức riêng khác cần adapter, không hứa hỗ trợ mọi model bất kỳ.
+  Chat/quiz frontend đã nối luồng thật, lỗi/retry không dùng câu trả lời/đề giả.
+  Assistant lưu refs nguồn thực tế, kiểm tra khả dụng khi đọc lại; có feedback -1/1/null.
+  Quota triển khai 30 lượt thành công/ngày UTC dùng chung chat và quiz, đếm assistant
+  messages + quizzes theo ngày tạo, có MySQL advisory lock chống chạy chồng tài khoản;
+  đây là lựa chọn triển khai cho các điểm tài liệu gốc chưa quy định rõ ở trên.
+  Không đổi schema, MySQL/ID/scrypt, không cấu hình hay gọi model thật khi chưa có key.
+  Hướng dẫn và giới hạn tại `docs/AI_SETUP.md`.
 

@@ -50,12 +50,13 @@ async function runCatalogChecks({ browser, baseUrl }) {
     await grade.selectOption('THCS');
     await page.getByRole('heading', { name: 'Phép cộng phân số', exact: true }).waitFor();
     await page.goto(`${baseUrl}/#chat`);
-    await page.locator('.session-button').filter({ hasText: 'Phép cộng phân số' }).waitFor();
-    assert.deepEqual(new Set(await page.locator('.session-button').allTextContents()), new Set(['Phương trình bậc hai', 'Hàm số và đồ thị', 'Phép cộng phân số']));
+    const chatTopics = page.getByLabel('Chủ đề học', { exact: true });
+    await chatTopics.locator('option[value="3"]').waitFor({ state: 'attached' });
+    assert.deepEqual(new Set(await chatTopics.locator('option').evaluateAll(options => options.map(option => option.value))), new Set(['1', '2', '3']));
     await page.goto(`${baseUrl}/#practice`);
     const practiceTopic = page.getByLabel('Chủ đề', { exact: true });
     await practiceTopic.locator('option[value="3"]').waitFor({ state: 'attached' });
-    assert.equal(await practiceTopic.locator('option').count(), 3);
+    assert.deepEqual(new Set(await practiceTopic.locator('option').evaluateAll(options => options.map(option => option.value))), new Set(['', '1', '2', '3']));
 
     // Phản hồi THCS đến muộn không được ghi đè lựa chọn THPT mới hơn.
     await freshHome();

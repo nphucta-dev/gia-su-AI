@@ -18,6 +18,7 @@ from app.repositories.user_repository import parse_user_id
 from app.schemas.document import DocumentInfo, UploadSubjectInfo, UploadTopicInfo
 from app.services.document_text import DocumentTextError, extract_document_text, split_document_text
 from app.utils.errors import AppError
+from sqlalchemy.exc import SQLAlchemyError
 
 MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 READ_CHUNK_BYTES = 64 * 1024
@@ -47,6 +48,15 @@ class DocumentService:
     async def list_documents(self) -> list[DocumentInfo]:
         records = await self.repository.list_documents()
         return await asyncio.to_thread(lambda: [self._public_document(record) for record in records])
+
+    async def set_active(self, document_id: int, is_active: bool) -> DocumentInfo:
+        try:
+            record = await self.repository.set_document_active(document_id, is_active)
+        except SQLAlchemyError:
+            raise AppError(503, "DATABASE_UNAVAILABLE", "Chưa thể cập nhật tài liệu. Vui lòng thử lại.") from None
+        if record is None:
+            raise AppError(404, "DOCUMENT_NOT_FOUND", "Không tìm thấy tài liệu.")
+        return await asyncio.to_thread(self._public_document, record)
 
     async def upload(self, *, topic_id: object, title: object, file: UploadFile) -> DocumentInfo:
         parsed_id = parse_user_id(topic_id) if isinstance(topic_id, (str, int)) else None
@@ -119,21 +129,6 @@ class DocumentService:
         except (DocumentTextError, OSError):
             chunks = None
         saved = await self.repository.finish_processing(document_id, chunks=chunks)
-        if saved is None:
-            raise AppError(404, "DOCUMENT_NOT_FOUND", "Tài liệu không tồn tại.")
-        return await asyncio.to_thread(self._public_document, saved)
-
-    async def set_active(self, document_id: int, *, is_active: bool) -> DocumentInfo:
-        """TK-072: Không cho bật tài liệu có status khác ready; tắt tài liệu sẽ loại khỏi chat mới."""
-        try:
-            saved = await self.repository.set_active(document_id, is_active=is_active)
-        except DocumentNotReadyError:
-            raise AppError(
-                409,
-                "DOCUMENT_NOT_READY",
-                "Chỉ được bật tài liệu đã xử lý thành công (ready).",
-                {"isActive": "Không thể bật tài liệu chưa ở trạng thái ready."},
-            ) from None
         if saved is None:
             raise AppError(404, "DOCUMENT_NOT_FOUND", "Tài liệu không tồn tại.")
         return await asyncio.to_thread(self._public_document, saved)

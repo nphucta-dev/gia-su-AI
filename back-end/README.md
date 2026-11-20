@@ -4,7 +4,9 @@ API Python 3.10+ dùng FastAPI. Có đăng ký, đăng nhập, xác thực JWT, 
 
 TK-082 bảo vệ dữ liệu theo tài khoản: chat, `GET /api/quizzes/{id}`,
 `GET /api/progress` và `GET /api/progress/{id}`. Xem [quyền sở hữu dữ liệu](../docs/OWNERSHIP.md)
-để biết quy tắc truy cập và kiểm thử. Các API tiến độ đọc dữ liệu đã lưu; chưa thêm luồng chấm quiz.
+để biết quy tắc truy cập và kiểm thử. API nộp quiz đã chấm điểm và cập nhật tiến độ cùng giao dịch;
+xem [TK-059](../docs/QUIZ_GRADING.md). Tra cứu đoạn theo từ khóa dùng
+`GET /api/catalog/topics/{id}/chunks?q=...&limit=5`; xem [TK-044](../docs/KEYWORD_RETRIEVAL.md).
 
 Schema hiện tại dùng `INT AUTO_INCREMENT` cho ID của 11 bảng; API trả `id` dạng số. Database cũ đang dùng UUID cần chạy migration `0002_integer_ids` sau khi dừng server và sao lưu, theo [hướng dẫn chuyển ID](../database/README.md#chuyển-database-cũ-từ-uuid-sang-id-tự-tăng).
 
@@ -286,6 +288,7 @@ Các API sau yêu cầu token của **ADMIN đang hoạt động**; LEARNER nh�
 | `GET /api/admin/documents` | Danh sách tài liệu đã lưu; trả `documents`. |
 | `POST /api/admin/documents` | Tải PDF/TXT, trích văn bản và lưu các đoạn; trả `201` với `message`, `document`. |
 | `POST /api/admin/documents/{id}/process` | Xử lý tài liệu cũ đang chờ hoặc thử lại tài liệu lỗi; không cần body, trả `200`. |
+| `PATCH /api/admin/documents/{id}` | `{"isActive":true}` hoặc `false`; chỉ bật nguồn ready đã có chunk. |
 
 POST dùng **multipart/form-data** với `file`, `topic_id`, `title` (1–200 ký tự). File tối đa **10 MiB**, không rỗng, đuôi và MIME phải khớp PDF/TXT. PDF kiểm tra chữ ký `%PDF-`; TXT phải là UTF-8 hợp lệ. Chủ đề và môn cha phải tồn tại, đang active. Swagger `/docs` có form chọn file sau khi Authorize bằng token ADMIN.
 
@@ -293,7 +296,7 @@ File lưu bằng tên ngẫu nhiên trong `back-end/storage/documents/`, metadat
 
 TK-042 và TK-043 không gọi model AI hoặc OCR. PDF cần có lớp văn bản và không mã hóa. Các giới hạn xử lý hiện tại: 200 trang PDF, 1.000.000 ký tự văn bản, luồng nội dung mỗi trang tối đa 4 MiB; mỗi đoạn tối đa 1.000 ký tự, chồng lấp tối đa 150 ký tự, tối đa 2.000 đoạn. Đây là các lựa chọn triển khai, có hằng số trong `app/services/document_text.py`.
 
-Các đoạn được lưu vào `document_chunks` theo `chunk_index` bắt đầu từ 0, cùng transaction với `status` và `processed_at` trong `documents`. Ghi lỗi sẽ rollback để tránh `ready` khi thiếu đoạn. Xử lý lại một tài liệu đã `ready` không tạo trùng đoạn; các yêu cầu đồng thời được bảo vệ bằng khóa bản ghi cha. Nguồn sau xử lý vẫn tắt, chờ phần quản trị kích hoạt.
+Các đoạn được lưu vào `document_chunks` theo `chunk_index` bắt đầu từ 0, cùng transaction với `status` và `processed_at` trong `documents`. Ghi lỗi sẽ rollback để tránh `ready` khi thiếu đoạn. Xử lý lại một tài liệu đã `ready` không tạo trùng đoạn; các yêu cầu đồng thời được bảo vệ bằng khóa bản ghi cha. Nguồn sau xử lý vẫn tắt; ADMIN bật sử dụng tại giao diện hoặc PATCH. Retrieval chỉ lấy nguồn ready/active thuộc môn/chủ đề active.
 
 Đặt `UPLOAD_DIR` để đổi nơi lưu; đường dẫn tương đối tính từ `back-end/`. Khi chuyển môi trường cần mang theo cả kho file và database. Tài liệu cũ đang `pending` có thể gọi API `/process` hoặc bấm **Xử lý** ở trang quản trị. Không cần migration mới.
 
@@ -307,15 +310,15 @@ Prompt lượt đầu nằm ở `app/prompts/socratic_system.txt`; `build_first_
 .\venv\Scripts\python.exe -m app.prompts
 ```
 
-`LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL` có trong `.env.example` và `Settings`, cho phép để trống. Backend chat đã có adapter cho API tương thích Chat Completions; xem [API chat, cấu hình và gợi ý](../docs/CHAT_BACKEND.md). Xem thêm [cách dùng và các tình huống đánh giá prompt](../docs/SOCRATIC_PROMPT.md).
+`LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL` có trong `.env.example` và `Settings`, cho phép để trống. Adapter hỗ trợ OpenAI-compatible, Responses, Gemini, Anthropic và Ollama; xem [hướng dẫn cấu hình model](../docs/AI_SETUP.md), [API chat](../docs/CHAT_BACKEND.md) và [các tình huống đánh giá prompt](../docs/SOCRATIC_PROMPT.md).
 
 ## API hội thoại và gợi ý
 
-Backend có tạo phiên, gửi/lưu tin nhắn, lịch sử có phân trang, ngữ cảnh gần nhất và thang gợi ý 1–3 tại `/api/chat`. Lọc thông tin cá nhân được áp dụng cho bản sao payload gửi model. Chưa cấu hình model thì API gửi tin trả 503 và giữ lại câu hỏi; tạo phiên/lấy lịch sử vẫn hoạt động. Frontend chat hiện chưa nối các API này. Chi tiết và cách thử trên Swagger: [CHAT_BACKEND.md](../docs/CHAT_BACKEND.md).
+Backend có tạo phiên, gửi/lưu tin, lịch sử có phân trang, ngữ cảnh gần nhất, gợi ý 1–3, giải thích/ví dụ, xác nhận lời giải và feedback tại `/api/chat`. Lọc dữ liệu cá nhân áp dụng cho payload gửi model. Chưa cấu hình model thì gửi tin trả 503 và giữ câu hỏi; `/retry` phản hồi lại mà không tạo tin trùng. Frontend chat và quiz đã nối API thật. `POST /api/quizzes` sinh/validate/lưu đề; nộp bài chấm bằng backend; `GET /api/quizzes/{id}/result` đọc kết quả của mình. `GET /api/ai/quota` trả hạn mức chung 30 lượt thành công/ngày UTC. Chi tiết: [AI_SETUP.md](../docs/AI_SETUP.md).
 
 ## Việc cần làm tiếp
 
 - Các API ghi danh mục, chat và quiz sử dụng model trong `app/models/` và session transaction của `app/db/database.py`; kiểm tra chủ sở hữu và quy tắc nghiệp vụ theo tài liệu SRS trước khi lưu dữ liệu.
 - Chưa có refresh token và đăng xuất thu hồi token: token đã phát hành vẫn dùng được đến khi hết hạn. Nếu cần thu hồi ngay, thêm danh sách token bị thu hồi hoặc số phiên bản token theo người dùng.
 - Giới hạn số lần gọi theo IP cho `/api/auth/register` (mỗi lần băm tốn CPU và 32 MiB bộ nhớ).
-- Danh sách và quản lý môn/chủ đề, hồ sơ, upload/liệt kê/xử lý tài liệu đã dùng API thật. Backend chat/gợi ý có API riêng và adapter model; frontend chat, quiz và dashboard còn phần minh họa. Bật/tắt nguồn và truy xuất tài liệu cho AI chưa triển khai.
+- Danh mục, hồ sơ, upload/xử lý/bật nguồn, chat và quiz đã nối API thật. Dashboard và một số trang lịch sử học tập còn dữ liệu minh họa; chất lượng phản hồi model cần kiểm chứng khi có key/model thật. Xem phạm vi hỗ trợ tại [AI_SETUP.md](../docs/AI_SETUP.md).

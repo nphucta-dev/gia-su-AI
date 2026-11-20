@@ -60,6 +60,7 @@ export function renderAdmin() {
   let documentsReady = !liveDocuments;
   let uploadPending = false;
   let processingDocumentId = null;
+  let togglingDocumentId = null;
   const processingErrors = new Map();
   const pageHeading = heading(active === 'subjects' ? 'Quản lý môn học' : active === 'topics' ? 'Quản lý chủ đề' : 'Tài liệu nguồn', active === 'subjects' ? 'Cập nhật danh mục người học có thể truy cập.' : active === 'topics' ? 'Sắp xếp nội dung theo môn học và chương.' : 'Kiểm soát nguồn kiến thức được dùng trong câu trả lời AI.');
   root.prepend(pageHeading);
@@ -374,8 +375,21 @@ export function renderAdmin() {
     const makeRow = document => {
       const busy = processingDocumentId === document.id;
       const [label, kind] = busy ? ['Đang xử lý', 'warning'] : statusMeta[document.status] || statusMeta.pending;
-      const toggle = el('button', { type: 'button', className: `source-switch ${document.active ? 'active' : ''}`, role: 'switch', 'aria-checked': String(document.active), 'aria-label': `${document.active ? 'Tắt' : 'Bật'} nguồn ${document.name}`, disabled: liveDocuments || document.status !== 'ready' }, el('span', { 'aria-hidden': 'true' }));
-      if (!liveDocuments) toggle.addEventListener('click', () => { document.active = !document.active; renderList(); toast(document.active ? 'Đã bật tài liệu trong bản xem trước.' : 'Đã tắt tài liệu trong bản xem trước.'); });
+      const toggle = el('button', { type: 'button', className: `source-switch ${document.active ? 'active' : ''}`, role: 'switch', 'aria-checked': String(document.active), 'aria-label': `${document.active ? 'Tắt' : 'Bật'} nguồn ${document.name}`, disabled: document.status !== 'ready' || processingDocumentId !== null || togglingDocumentId !== null }, el('span', { 'aria-hidden': 'true' }));
+      toggle.addEventListener('click', async () => {
+        if (!liveDocuments) { document.active = !document.active; renderList(); toast(document.active ? 'Đã bật tài liệu trong bản xem trước.' : 'Đã tắt tài liệu trong bản xem trước.'); return; }
+        if (togglingDocumentId !== null) return;
+        togglingDocumentId = document.id; processingErrors.delete(document.id); renderList();
+        try {
+          const result = await api(`/admin/documents/${document.id}`, {method:'PATCH', body:{isActive:!document.active}});
+          if (!currentPage()) return;
+          if (result?.document?.id !== document.id) throw new Error('Chưa thể xác nhận trạng thái tài liệu.');
+          const updated = serverDocument(result.document);
+          documents = documents.map(item => item.id === updated.id ? updated : item);
+          toast(updated.active ? 'Đã bật nguồn tài liệu.' : 'Đã tắt nguồn tài liệu.');
+        } catch (error) { if (currentPage()) processingErrors.set(document.id, error.message || 'Chưa thể đổi trạng thái tài liệu.'); }
+        finally { togglingDocumentId = null; if (currentPage()) renderList(); }
+      });
       const action = liveDocuments
         ? document.status === 'ready' ? el('span', {className:'document-waiting'}, 'Đã xử lý') : button(busy ? 'Đang xử lý…' : document.status === 'error' ? 'Xử lý lại' : 'Xử lý', () => processDocument(document), 'ghost small document-action')
         : document.status === 'error' ? button('Thử lại', () => { document.status = 'pending'; document.error = ''; renderList(); toast('Đã đổi trạng thái minh họa sang chờ xử lý. Chưa gửi yêu cầu lên máy chủ.'); }, 'document-action') : document.status === 'pending' ? el('span', { className: 'document-waiting' }, 'Chờ xử lý') : button('Chi tiết', () => toast(`${document.name}: trạng thái sẵn sàng là dữ liệu minh họa.`), 'document-action');

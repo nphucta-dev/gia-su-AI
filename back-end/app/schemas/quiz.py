@@ -1,8 +1,8 @@
 """Generated quiz data stays on the server; learner views omit the answer key."""
 
 from typing import Annotated, Literal
+from pydantic import computed_field, BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 
 QuizDifficulty = Literal["easy", "medium", "hard"]
@@ -51,6 +51,12 @@ class GeneratedQuiz(BaseModel):
     questions: tuple[GeneratedQuizQuestion, ...] = Field(min_length=5, max_length=5)
 
 
+class GenerateQuizRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    topic_id: int = Field(alias="topicId", strict=True, ge=1, le=2**31 - 1)
+    difficulty: QuizDifficulty
+
+
 class QuizQuestionItem(BaseModel):
     id: int
     position: int
@@ -92,11 +98,44 @@ class QuizSubmissionItem(BaseModel):
     status: Literal["accepted"] = "accepted"
     saved_count: int = Field(serialization_alias="savedCount")
     answers: list[SavedQuizAnswerItem]
+    quiz_status: Literal["completed"] = Field(serialization_alias="quizStatus")
+    score: float
+    correct_count: int = Field(serialization_alias="correctCount")
+    total_count: int = Field(serialization_alias="totalCount")
+    completed_at: str = Field(serialization_alias="completedAt")
 
 
 class QuizSubmissionResponse(BaseModel):
     submission: QuizSubmissionItem
 
+
+class QuizResultQuestion(QuizQuestionItem):
+    user_answer: AnswerLetter = Field(serialization_alias="userAnswer")
+    correct_answer: AnswerLetter = Field(serialization_alias="correctAnswer")
+    is_correct: bool = Field(serialization_alias="isCorrect")
+    explanation: str
+
+
+class QuizResultItem(BaseModel):
+    difficulty: QuizDifficulty | None = None
+
+    @computed_field
+    @property
+    def id(self) -> int:
+        return self.quiz_id
+
+    quiz_id: int = Field(serialization_alias="quizId")
+    topic_id: int = Field(serialization_alias="topicId")
+    status: Literal["completed"] = "completed"
+    score: float
+    correct_count: int = Field(serialization_alias="correctCount")
+    total_count: int = Field(serialization_alias="totalCount")
+    completed_at: str = Field(serialization_alias="completedAt")
+    questions: list[QuizResultQuestion]
+
+
+class QuizResultResponse(BaseModel):
+    result: QuizResultItem
 
 class QuizResultQuestionItem(BaseModel):
     id: int
@@ -107,19 +146,3 @@ class QuizResultQuestionItem(BaseModel):
     correct_answer: AnswerLetter = Field(serialization_alias="correctAnswer")
     is_correct: bool = Field(serialization_alias="isCorrect")
     explanation: str
-
-
-class QuizResultItem(BaseModel):
-    id: int
-    topic_id: int = Field(serialization_alias="topicId")
-    difficulty: QuizDifficulty
-    status: Literal["in_progress", "completed"]
-    score: float
-    correct_count: int = Field(serialization_alias="correctCount")
-    total_count: int = Field(serialization_alias="totalCount")
-    completed_at: str | None = Field(default=None, serialization_alias="completedAt")
-    questions: list[QuizResultQuestionItem]
-
-
-class QuizResultResponse(BaseModel):
-    result: QuizResultItem

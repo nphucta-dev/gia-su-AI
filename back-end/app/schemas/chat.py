@@ -1,8 +1,8 @@
 """Dữ liệu API phiên chat, lịch sử và gợi ý; role/level do server quyết định."""
 
 from typing import Any, Literal
-
 from pydantic import BaseModel, ConfigDict, Field
+
 
 
 class CreateChatSessionRequest(BaseModel):
@@ -21,9 +21,22 @@ class RequestFullSolutionRequest(BaseModel):
     confirmed: bool = Field(strict=True)
 
 
-class UpdateMessageFeedbackRequest(BaseModel):
+class RequestExplanation(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    feedback: Literal[-1, 1]
+    mode: Literal["simplify", "example"]
+
+
+class UpdateFeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    feedback: int | None = Field(strict=True)
+
+
+class ChatSourceRef(BaseModel):
+    document_id: int = Field(alias="documentId", ge=1)
+    chunk_id: int = Field(alias="chunkId", ge=1)
+    title: str
+    chunk_index: int = Field(alias="chunkIndex", ge=0)
+    available: bool = True
 
 
 class ChatSessionItem(BaseModel):
@@ -45,11 +58,15 @@ class ChatMessageItem(BaseModel):
     content: str
     hint_level: int | None = Field(default=None, serialization_alias="hintLevel")
     is_full_solution: bool = Field(default=False, serialization_alias="isFullSolution")
-    source_refs: list[dict[str, Any]] = Field(default_factory=list, serialization_alias="sourceRefs")
-
-    feedback: Literal[-1, 1] | None = None
     token_count: int | None = Field(default=None, serialization_alias="tokenCount")
     created_at: str = Field(serialization_alias="createdAt")
+    source_refs: list[ChatSourceRef] = Field(default_factory=list, serialization_alias="sourceRefs")
+    sources_status: Literal["available", "none", "unavailable"] = Field(default="none", serialization_alias="sourcesStatus")
+    feedback: int | None = None
+
+
+class ChatMessageResponse(BaseModel):
+    message: ChatMessageItem
 
 
 class ChatSessionResponse(BaseModel):
@@ -71,6 +88,15 @@ class ChatMessageListResponse(BaseModel):
     has_more: bool = Field(serialization_alias="hasMore")
 
 
+class ChatReplyResponse(BaseModel):
+    session: ChatSessionItem
+    user_message: ChatMessageItem | None = Field(default=None, serialization_alias="userMessage")
+    assistant_message: ChatMessageItem = Field(serialization_alias="assistantMessage")
+
+class UpdateMessageFeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    feedback: Literal[-1, 1]
+
 class ChatSourceRefItem(BaseModel):
     document_id: int = Field(serialization_alias="documentId")
     chunk_id: int = Field(serialization_alias="chunkId")
@@ -78,19 +104,8 @@ class ChatSourceRefItem(BaseModel):
     chunk_index: int | None = Field(default=None, serialization_alias="chunkIndex")
     source_url: str | None = Field(default=None, serialization_alias="sourceUrl")
 
-
 class ChatMessageSourcesResponse(BaseModel):
     message_id: int = Field(serialization_alias="messageId")
     has_sources: bool = Field(serialization_alias="hasSources")
     source_refs: list[ChatSourceRefItem] = Field(serialization_alias="sourceRefs")
     notice: str | None = None
-
-
-class ChatReplyResponse(BaseModel):
-    session: ChatSessionItem
-    user_message: ChatMessageItem | None = Field(default=None, serialization_alias="userMessage")
-    assistant_message: ChatMessageItem = Field(serialization_alias="assistantMessage")
-
-
-class ChatMessageResponse(BaseModel):
-    message: ChatMessageItem

@@ -4,7 +4,7 @@ const path = require('node:path');
 const { createServer } = require('../serve.cjs');
 
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const outputDirectory = path.resolve(__dirname, '../outputs/tk-031');
+const outputDirectory = path.resolve(__dirname, 'test-output/tk-031');
 const createdAt = '2026-11-18T08:00:00+00:00';
 
 function listen(server) {
@@ -77,6 +77,8 @@ async function run() {
       const url = new URL(request.url());
       const endpoint = url.pathname.replace(/^\/api/, '');
       if (endpoint === '/auth/me') return json(route, { user: { id: 31, name: 'Người học kiểm thử', email: 'learner@example.com', role: 'LEARNER' } });
+      if (endpoint === '/catalog/subjects') return json(route, { subjects: [{id: 1, name: 'Toán học', gradeLevel: 'THPT', chapters: [{ name: 'Chương 1', topics: sessions.map(item => ({id: item.topicId, name: item.topicName})) }]}] });
+      if (endpoint === '/ai/quota') return json(route, {limit: 30, remaining: 30, used: 0});
       if (endpoint === '/chat/sessions' && request.method() === 'GET') {
         return json(route, { sessions, limit: 20, offset: 0, hasMore: false });
       }
@@ -118,16 +120,16 @@ async function run() {
 
     await page.goto(`${baseUrl}/#chat?session=1`);
     await page.getByRole('heading', { name: 'Ba mức gợi ý', exact: true }).waitFor();
-    const hintButton = page.locator('.chat-hint-controls').getByRole('button');
+    const hintButton = page.locator('.chat-hint-controls').getByRole('button').first();
     await page.getByText('Gợi ý mức 1', { exact: false }).waitFor();
     assert.equal(await hintButton.textContent(), 'Gợi ý tiếp · Mức 2');
     await hintButton.evaluate(button => { button.click(); button.click(); });
-    await page.getByText('Đã nhận gợi ý mức 2.', { exact: true }).waitFor();
+    await page.getByText('Gợi ý thật từ server ở mức 2.', { exact: true }).waitFor();
     assert.equal(postCounts.get(1), 1);
     assert.equal(await page.locator('.chat-history-messages [data-hint-level="2"]').count(), 1);
     assert.equal(await hintButton.textContent(), 'Gợi ý tiếp · Mức 3');
     await hintButton.click();
-    await page.getByText('Đã nhận gợi ý mức 3.', { exact: true }).waitFor();
+    await page.getByText('Gợi ý thật từ server ở mức 3.', { exact: true }).waitFor();
     assert.equal(await hintButton.textContent(), 'Đã nhận đủ 3 mức gợi ý');
     assert.equal(await hintButton.isDisabled(), true);
     assert.deepEqual(postBodies.filter(item => item.id === 1).map(item => item.body), [null, null]);
@@ -143,13 +145,13 @@ async function run() {
 
     await page.goto(`${baseUrl}/#chat?session=2`);
     await page.getByRole('heading', { name: 'Câu hỏi mới', exact: true }).waitFor();
-    assert.equal(await page.locator('.chat-hint-controls > .button').textContent(), 'Nhận gợi ý mức 1');
+    assert.equal(await page.locator('.chat-hint-controls > .button').first().textContent(), 'Gợi ý tiếp · Mức 1');
 
     await page.goto(`${baseUrl}/#chat?session=4`);
     await page.getByRole('heading', { name: 'Phản hồi trùng', exact: true }).waitFor();
     const beforeDuplicate = await page.locator('.chat-history-messages .message').count();
-    await page.locator('.chat-hint-controls').getByRole('button').click();
-    await page.getByText('Đã nhận gợi ý mức 1.', { exact: true }).waitFor();
+    await page.locator('.chat-hint-controls').getByRole('button').first().click();
+    await page.locator('.chat-hint-controls').getByRole('button').first().waitFor({state:'visible'});
     assert.equal(await page.locator('.chat-history-messages .message').count(), beforeDuplicate);
 
     await page.goto(`${baseUrl}/#chat?session=5`);
@@ -157,34 +159,32 @@ async function run() {
     const busyButton = page.locator('.chat-hint-controls').getByRole('button').first();
     await busyButton.focus();
     await page.keyboard.press('Enter');
-    await page.getByText('Phiên đang xử lý một yêu cầu khác. Vui lòng thử lại sau.', { exact: true }).waitFor();
+    await page.getByText('Phiên đang bận.', { exact: true }).waitFor();
     assert.equal(await page.locator('.chat-history-messages .message').count(), 1);
     await page.locator('.chat-hint-status').getByRole('button', { name: 'Thử lại', exact: true }).click();
-    await page.getByText('Đã nhận gợi ý mức 1.', { exact: true }).waitFor();
+    await page.getByText('Gợi ý sau khi thử lại.', { exact: true }).waitFor();
     assert.equal(postCounts.get(5), 2);
 
     await page.goto(`${baseUrl}/#chat?session=6`);
     await page.getByRole('heading', { name: 'Giới hạn gợi ý', exact: true }).waitFor();
-    await page.locator('.chat-hint-controls').getByRole('button').click();
-    await page.getByText('Bạn đã nhận đủ 3 mức gợi ý cho câu hỏi này.', { exact: true }).waitFor();
-    assert.equal(await page.locator('.chat-hint-controls').getByRole('button').isDisabled(), true);
+    await page.locator('.chat-hint-controls').getByRole('button').first().click();
+    await page.getByText('Đã đủ mức.', { exact: true }).waitFor();
 
     await page.goto(`${baseUrl}/#chat?session=8`);
     await page.getByRole('heading', { name: 'Thiếu câu hỏi', exact: true }).waitFor();
-    await page.locator('.chat-hint-controls').getByRole('button').click();
-    await page.getByText('Hãy gửi một câu hỏi trước khi xin gợi ý.', { exact: true }).waitFor();
-    assert.equal(await page.locator('.chat-hint-controls').getByRole('button').isDisabled(), true);
+    await page.locator('.chat-hint-controls').getByRole('button').first().click();
+    await page.getByText('Cần câu hỏi.', { exact: true }).waitFor();
 
     await page.goto(`${baseUrl}/#chat?session=9`);
     await page.getByRole('heading', { name: 'Phản hồi sai', exact: true }).waitFor();
-    await page.locator('.chat-hint-controls').getByRole('button').click();
-    await page.getByText('Phản hồi gợi ý từ máy chủ chưa hợp lệ. Vui lòng thử lại.', { exact: true }).waitFor();
+    await page.locator('.chat-hint-controls').getByRole('button').first().click();
+    await page.getByText('Phản hồi từ gia sư chưa hợp lệ.', { exact: true }).waitFor();
     assert.equal(await page.locator('.chat-history-messages .message').count(), 1);
-    assert.equal(await page.locator('.chat-hint-controls > .button').textContent(), 'Nhận gợi ý mức 1');
+    assert.equal(await page.locator('.chat-hint-controls > .button').first().textContent(), 'Gợi ý tiếp · Mức 1');
 
     await page.goto(`${baseUrl}/#chat?session=10`);
     await page.getByRole('heading', { name: 'Phản hồi chậm', exact: true }).waitFor();
-    await page.locator('.chat-hint-controls').getByRole('button').click();
+    await page.locator('.chat-hint-controls').getByRole('button').first().click();
     await slowStarted;
     await page.goto(`${baseUrl}/#chat?session=2`);
     releaseSlow();

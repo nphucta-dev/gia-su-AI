@@ -5,7 +5,7 @@ const http = require('node:http');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const root = path.resolve(__dirname, '..');
-const output = path.join(root, 'outputs', 'tk-024');
+const output = path.join(__dirname, 'test-output', 'tk-024');
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 const server = http.createServer((req, res) => {
  const pathname = new URL(req.url, 'http://localhost').pathname;
@@ -85,11 +85,11 @@ const messages = {
 
   const base = `http://127.0.0.1:${server.address().port}`;
   await page.goto(`${base}/#chat`);
-  await page.getByRole('heading', { name: 'Lịch sử trò chuyện', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Hỏi gia sư AI', exact: true }).waitFor();
   await page.getByRole('link', { name: /Ôn phương trình bậc hai/ }).waitFor();
   assert.equal(await page.getByRole('navigation', { name: 'Các phiên chat đã lưu' }).getByRole('link').count(), 2);
   assert.equal(await page.getByText('Dữ liệu minh họa — chưa kết nối tài khoản thật.').count(), 0);
-  assert.equal(await page.getByRole('button', { name: 'Gửi câu hỏi' }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'Gửi câu hỏi', exact: true }).isDisabled(), true);
   await page.getByRole('button', { name: 'Tải thêm phiên', exact: true }).click();
   await page.getByText('Lịch sử chủ đề đã tắt', { exact: true }).waitFor();
   assert.equal(await page.getByRole('navigation', { name: 'Các phiên chat đã lưu' }).getByRole('link').count(), 3);
@@ -102,7 +102,7 @@ const messages = {
   assert.equal(await page.locator('.chat-history-messages .message').count(), 4);
   assert.deepEqual(await page.locator('.chat-history-messages .message').evaluateAll(nodes => nodes.map(node => node.classList.contains('user') ? 'user' : 'assistant')), ['user', 'assistant', 'user', 'assistant']);
   assert.equal(await page.locator('.chat-history-messages img').count(), 0);
-  assert.equal(await page.getByRole('link', { name: /Ôn phương trình bậc hai.*Đang xem/ }).getAttribute('aria-current'), 'page');
+  assert.equal(await page.getByRole('link', { name: /Ôn phương trình bậc hai/ }).getAttribute('aria-current'), 'page');
   await page.getByRole('button', { name: 'Tải thêm phiên', exact: true }).click();
   await page.getByText('Lịch sử chủ đề đã tắt', { exact: true }).waitFor();
   fs.mkdirSync(output, { recursive: true });
@@ -153,6 +153,9 @@ const messages = {
   await preview.addInitScript(() => sessionStorage.setItem('gia-su-ai.preview-role', 'LEARNER'));
   await preview.goto(`${base}/#chat`);
   await preview.getByText('Dữ liệu minh họa — chưa kết nối tài khoản thật.', { exact: true }).waitFor();
+  await preview.getByRole('textbox', { name: 'Câu hỏi cho gia sư', exact: true }).fill('Câu hỏi xem thử');
+  await preview.getByRole('button', { name: 'Gửi câu hỏi', exact: true }).click();
+  await preview.locator('.message.user').filter({ hasText: 'Câu hỏi xem thử' }).waitFor();
   assert.equal(await preview.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(previewErrors, []);
   assert.deepEqual(previewRequests, []);

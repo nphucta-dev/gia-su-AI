@@ -20,9 +20,9 @@ Server frontend chuyển tiếp `/api` tới `http://127.0.0.1:8000`. Có thể 
 - Token Bearer lưu trong sessionStorage của tab, không lưu mật khẩu. Khi storage bị chặn, phiên chỉ tồn tại trong bộ nhớ. Dữ liệu người dùng không được lưu riêng ở localStorage.
 - Đăng xuất xóa token, trạng thái người dùng, kết quả luyện tập trong bộ nhớ và nội dung dialog rồi về #login. Đây là đăng xuất trên tab hiện tại; không thu hồi token trên máy chủ hoặc đăng xuất thiết bị/tab khác. Backend hiện chưa có hợp đồng thu hồi token/logout.
 
-**Phạm vi đã kết nối:** đăng ký/đăng nhập, hồ sơ GET/PATCH, danh mục môn/chủ đề theo cấp học, quản trị môn/chủ đề và tải/liệt kê/xử lý tài liệu gọi API thật. Backend kiểm tra phân quyền độc lập với router frontend.
+**Phạm vi đã kết nối:** đăng ký/đăng nhập, hồ sơ, danh mục, quản trị môn/chủ đề, tải/xử lý/bật tài liệu, chat Socratic/lịch sử/gợi ý/giải thích/lời giải xác nhận/feedback/quota và sinh/làm/chấm/xem kết quả quiz gọi API thật. Backend kiểm tra phân quyền độc lập với router frontend. Model cấu hình tại [AI_SETUP.md](../docs/AI_SETUP.md).
 
-**Giới hạn giao diện:** hội thoại, bài quiz, kết quả, lịch sử học tập và dashboard còn dùng nội dung minh họa. Chat và luyện tập đã lấy danh mục chủ đề từ API nhưng chưa nối luồng chat hoặc lưu quiz; không coi dữ liệu mẫu là kết quả AI hay dữ liệu đã lưu. TK-052 là phần kiểm tra/lưu quiz ở backend, không đồng nghĩa frontend quiz đã tích hợp.
+**Giới hạn giao diện:** dashboard và một số trang lịch sử học tập còn minh họa. Chế độ xem thử localhost dùng dữ liệu mẫu riêng. Với tài khoản đăng nhập, chat/quiz không tạo kết quả giả khi thiếu model; lỗi cấu hình hiện thông báo và cho thử lại. Chưa kiểm chứng chất lượng model thật khi chưa có API key.
 
 ## Cấu trúc
 
@@ -54,7 +54,7 @@ Tại #login, dùng “Vào thử tài khoản sinh viên” hoặc “Vào th�
 
 Theo SRS FR-05/FR-08, ADMIN quản lý môn học, chủ đề và tài liệu nguồn. Điều hướng ADMIN gồm ba mục riêng trong sidebar tối trên desktop và menu thu gọn trên mobile, menu tài khoản chỉ có Hồ sơ quản trị và Đăng xuất. URL chuẩn là #admin?tab=subjects, #admin?tab=topics, #admin?tab=documents. Tab không hợp lệ trở về subjects. Back/Forward/reload đồng bộ mục đang chọn. Các URL học tập được đưa về quản trị khi role ADMIN; LEARNER vẫn bị chặn trước khi render admin.
 
-Với tài khoản thật, hồ sơ quản trị lưu qua API hồ sơ; tạo/sửa/bật tắt môn và chủ đề gọi API quản trị theo ID. Upload PDF/TXT được backend kiểm tra, trích văn bản và tách đoạn; tài liệu pending/error có thao tác xử lý/thử lại. Nguồn sau xử lý vẫn chưa được bật tự động; bật nguồn và retrieval chưa nối giao diện. LEARNER gọi API quản trị nhận 403.
+Với tài khoản thật, hồ sơ quản trị lưu qua API hồ sơ; tạo/sửa/bật tắt môn và chủ đề gọi API quản trị theo ID. Upload PDF/TXT được backend kiểm tra, trích văn bản và tách đoạn; tài liệu pending/error có thao tác xử lý/thử lại. Nguồn sau xử lý chưa bật tự động; nút sử dụng gọi PATCH và chỉ bật tài liệu ready có chunk. Chat dùng nguồn đúng chủ đề đang bật. LEARNER gọi API quản trị nhận 403.
 
 Với chế độ xem thử, thay đổi danh mục và tài liệu chỉ nằm trong bộ nhớ; tải lại hoặc đăng xuất sẽ đặt lại dữ liệu. Bộ `npm.cmd test` bao gồm kiểm tra tách biệt chế độ này với các thao tác ghi API thật.
 

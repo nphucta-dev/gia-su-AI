@@ -18,10 +18,17 @@ phiên của chính mình; phiên không thuộc tài khoản trả 404. Các ph
 | `GET /api/chat/sessions/{id}/messages?limit=50&offset=0` | Trả `{session,messages,limit,offset,hasMore}`, tin cũ đến mới. `limit` 1–200. |
 | `POST /api/chat/sessions/{id}/messages` | JSON `{"content":"Em nên bắt đầu giải phương trình này thế nào?"}`; lưu câu hỏi rồi gọi model; trả 201 `{session,userMessage,assistantMessage}`. |
 | `POST /api/chat/sessions/{id}/hints` | Không cần body; tạo gợi ý tiếp theo, trả 201 `{session,userMessage:null,assistantMessage}`. |
+| `POST /api/chat/sessions/{id}/retry` | Phản hồi lại câu hỏi cuối chưa có assistant; không tạo thêm tin user. |
+| `POST /api/chat/sessions/{id}/explanations` | JSON `{"mode":"simplify"}` hoặc `{"mode":"example"}`. |
+| `POST /api/chat/sessions/{id}/solution` | JSON `{"confirmed":true}`; chỉ gọi sau xác nhận. |
+| `PATCH /api/chat/sessions/{id}/messages/{message_id}/feedback` | JSON `{"feedback":1}`, `-1` hoặc `null`, chỉ trên assistant của mình. |
+| `GET /api/ai/quota` | Hạn mức chung chat/quiz, thời điểm reset UTC. |
 
 `session` gồm ID, thông tin môn/chủ đề, tiêu đề, `createdAt`, `updatedAt`.
 `message` gồm ID, `sessionId`, `role`, `content`, `createdAt`, `hintLevel`,
-`isFullSolution`, `tokenCount`. Các vai trò và mức gợi ý do server đặt. Nếu phiên
+`isFullSolution`, `tokenCount`, `feedback`, `sourceRefs`, `sourcesStatus`. Nguồn có
+ID tài liệu/chunk, tiêu đề, thứ tự đoạn và `available`; trạng thái nguồn là
+`available`, `none` hoặc `unavailable`. Các vai trò và mức gợi ý do server đặt. Nếu phiên
 chưa có tiêu đề, câu hỏi đầu tiên được dùng làm tiêu đề rút gọn.
 
 Thử API tại `http://localhost:8000/docs`: đăng nhập bằng `/api/auth/login`, dùng JWT
@@ -33,7 +40,7 @@ API key của model chỉ đặt trong backend, không dùng làm token đăng n
 Tạo phiên và đọc lịch sử vẫn hoạt động. Gửi tin sẽ lưu tin `user` trước; nếu chưa
 có cấu hình model thì trả 503 `LLM_NOT_CONFIGURED`, không tạo câu trả lời giả.
 Tin đã lưu vẫn xem được qua API lịch sử. Sau khi cấu hình model và khởi động lại
-backend, có thể gọi `/hints` để phản hồi câu hỏi gần nhất ở mức 1 nếu câu đó chưa có phản hồi.
+backend, gọi `/retry` để phản hồi câu hỏi gần nhất mà không nhân đôi tin user.
 
 Các lỗi timeout (504), giới hạn dịch vụ model (429), mất mạng hoặc phản hồi không hợp lệ
 (502) cũng giữ nguyên câu hỏi. Không tạo tin assistant hoặc tăng mức gợi ý khi model thất bại.
@@ -49,16 +56,16 @@ LLM_MODEL=
 LLM_TIMEOUT_SECONDS=30
 ```
 
-`LLM_API_URL` là **endpoint đầy đủ**, ví dụ endpoint chat-completions do nhà cung cấp
-đưa, không chỉ là domain/base URL. Adapter gửi JSON `model`/`messages` và Bearer key
-trong header; đọc `choices[0].message.content` theo định dạng
-[Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
-Không chọn sẵn nhà cung cấp hay tên model. Nếu API dùng định dạng hoặc cách xác thực khác,
-thay adapter triển khai `LLMClient.generate()`; không cần đổi service quản lý chat.
+`LLM_API_URL` nhận endpoint đầy đủ hoặc base URL. Adapter hỗ trợ OpenAI-compatible
+Chat Completions, Responses, Gemini GenerateContent, Anthropic Messages và Ollama;
+`LLM_PROVIDER=auto` nhận diện theo URL hoặc đặt giao thức rõ ràng. Không chọn sẵn tên
+model. Xem [cấu hình từng nhà cung cấp và giới hạn hỗ trợ](AI_SETUP.md). API có giao
+thức riêng cần thêm adapter triển khai `LLMClient.generate()`.
 
 Cấu hình để trống không làm backend lỗi khi khởi động. Key/URL được ẩn khỏi `repr`,
 không trả về API và không đưa vào prompt. Adapter không tự theo redirect, giới hạn
-thời gian 1–120 giây, phản hồi tối đa 256 KiB và nội dung tối đa 8.000 ký tự.
+thời gian 1–120 giây, phản hồi tối đa 256 KiB và text client tối đa 32.000 ký tự
+để nhận JSON quiz; service chat giới hạn phản hồi riêng ở 8.000 ký tự.
 Các log HTTP của lời gọi model được lọc theo execution context, không in URL/header/key.
 Thông báo lỗi không chứa nội dung lỗi thô của nhà cung cấp.
 
@@ -71,7 +78,7 @@ system prompt và ngữ cảnh môn học. Dữ liệu học tập không đư�
 Phản hồi cho câu hỏi mới dùng mức 1. Hai lần xin gợi ý tiếp theo lần lượt là mức 2 và 3;
 sau đó API trả 409 `HINT_LIMIT_REACHED`. Gửi câu hỏi mới bắt đầu lại ở mức 1.
 Mức 1 gợi mở khái niệm; mức 2 cụ thể hóa hướng kiểm tra; mức 3 chỉ dẫn một bước tiếp
-theo. Các mức vẫn yêu cầu người học tự suy luận, chưa mở luồng lời giải đầy đủ.
+theo. Các mức vẫn yêu cầu người học tự suy luận; lời giải đầy đủ dùng endpoint xác nhận riêng.
 Mức đã thực sự trả về được lưu vào `chat_messages.hint_level`.
 
 Trong một tiến trình, gửi chồng vào phiên đang chờ trả 409 `CHAT_BUSY`. Ở MySQL,
@@ -102,5 +109,8 @@ người học sang dịch vụ ngoài. Các kiểm thử MySQL tùy chọn dùn
 tra lưu phiên/tin, rollback, mức gợi ý và tranh chấp ghi. Chất lượng câu trả lời
 Socratic thực tế cần đánh giá tiếp khi có model theo [các tình huống prompt](SOCRATIC_PROMPT.md).
 
-Frontend chat hiện vẫn là giao diện minh họa; các nút gửi/hint/sidebar chưa gọi bộ
-API mới. Quota hằng ngày, RAG và luồng xác nhận lời giải đầy đủ là các phần riêng.
+Frontend chat của tài khoản đăng nhập đã nối tạo phiên theo chủ đề, gửi tin,
+sidebar lịch sử, retry đúng thao tác, hints, giải thích, xác nhận lời giải và feedback.
+Nguồn ready/active được tìm theo từ khóa và lưu refs thật trên assistant; đọc lịch
+sử kiểm tra nguồn còn khả dụng. Quota dùng chung với sinh quiz, 30 lượt thành công
+mỗi ngày UTC. Chế độ xem thử vẫn là dữ liệu minh họa riêng. Xem [AI_SETUP.md](AI_SETUP.md).

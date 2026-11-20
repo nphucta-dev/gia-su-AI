@@ -1,14 +1,18 @@
 """API chat riêng từng tài khoản; model chỉ được gọi qua service ở backend."""
 
 from typing import Annotated
-
 from fastapi import APIRouter, Depends, Path, Query, Request
-
 from app.dependencies.auth import get_current_user
 from app.dependencies.quota import require_ai_quota
 from app.repositories.user_repository import User
 from app.routes.auth import require_json
 from app.schemas.auth import ErrorResponse
+from app.schemas.chat import (
+    ChatMessageListResponse, ChatReplyResponse, ChatSessionListResponse, ChatSessionResponse,
+    CreateChatSessionRequest, RequestFullSolutionRequest, SendChatMessageRequest,
+    RequestExplanation, UpdateFeedbackRequest, ChatMessageResponse,
+)
+from app.services.chat_service import ChatService
 from app.schemas.chat import (
     ChatMessageListResponse, ChatMessageResponse, ChatReplyResponse, ChatSessionListResponse, ChatSessionResponse,
     CreateChatSessionRequest, RequestFullSolutionRequest, SendChatMessageRequest, UpdateMessageFeedbackRequest,
@@ -16,7 +20,8 @@ from app.schemas.chat import (
     ChatMessageListResponse, ChatMessageSourcesResponse, ChatReplyResponse, ChatSessionListResponse,
     ChatSessionResponse, CreateChatSessionRequest, RequestFullSolutionRequest, SendChatMessageRequest,
 )
-from app.services.chat_service import ChatService
+
+
 
 router = APIRouter(prefix="/api/chat", tags=["chat"], responses={code: {"model": ErrorResponse} for code in (401, 403, 404, 409, 422, 429, 502, 503, 504)})
 CurrentUser = Annotated[User, Depends(get_current_user)]
@@ -51,23 +56,9 @@ async def list_messages(session_id: SessionId, user: CurrentUser, service: Servi
     return await service.list_messages(user, session_id, limit=limit, offset=offset)
 
 
-@router.get("/messages/{message_id}/sources", response_model=ChatMessageSourcesResponse, summary="Nguồn trích dẫn hợp lệ của tin nhắn AI hoặc thông báo khi không có chunk")
-async def get_message_sources(
-    message_id: Annotated[int, Path(ge=1, le=2**31 - 1)],
-    user: CurrentUser,
-    service: Service,
-) -> ChatMessageSourcesResponse:
-    return await service.get_message_sources(user, message_id)
-
-
 @router.post("/sessions/{session_id}/messages", status_code=201, response_model=ChatReplyResponse, dependencies=[Depends(require_json), Depends(require_ai_quota)], summary="Lưu câu hỏi và gọi gia sư với ngữ cảnh gần nhất")
 async def send_message(session_id: SessionId, payload: SendChatMessageRequest, user: CurrentUser, service: Service) -> ChatReplyResponse:
     return await service.send_message(user, session_id, payload.content)
-
-
-@router.post("/sessions/{session_id}/retry", status_code=201, response_model=ChatReplyResponse, summary="Thử gọi lại AI cho câu hỏi gần nhất đã lưu sau lỗi timeout/429/mất mạng")
-async def retry_last_message(session_id: SessionId, user: CurrentUser, service: Service) -> ChatReplyResponse:
-    return await service.retry_last_message(user, session_id)
 
 
 @router.post("/sessions/{session_id}/hints", status_code=201, response_model=ChatReplyResponse, dependencies=[Depends(require_ai_quota)], summary="Gợi ý tiếp theo; server quyết định mức 1–3")
@@ -87,6 +78,35 @@ async def request_full_solution(
 ) -> ChatReplyResponse:
     return await service.request_full_solution(user, session_id, confirmed=payload.confirmed)
 
+
+@router.post("/sessions/{session_id}/retry", status_code=201, response_model=ChatReplyResponse, summary="Thử lại câu hỏi chưa có phản hồi, không lưu câu hỏi lần nữa")
+async def retry_message(session_id: SessionId, user: CurrentUser, service: Service) -> ChatReplyResponse:
+    return await service.retry_message(user, session_id)
+
+
+@router.post("/sessions/{session_id}/explanations", status_code=201, response_model=ChatReplyResponse, dependencies=[Depends(require_json)], summary="Giải thích đơn giản hơn hoặc cho ví dụ theo hội thoại")
+async def explain(session_id: SessionId, payload: RequestExplanation, user: CurrentUser, service: Service) -> ChatReplyResponse:
+    return await service.explain(user, session_id, payload.mode)
+
+
+@router.patch("/sessions/{session_id}/messages/{message_id}/feedback", response_model=ChatMessageResponse, dependencies=[Depends(require_json)])
+async def update_feedback(
+    session_id: SessionId, message_id: Annotated[int, Path(ge=1, le=2**31 - 1)],
+    payload: UpdateFeedbackRequest, user: CurrentUser, service: Service,
+) -> ChatMessageResponse:
+    return await service.update_feedback(user, session_id, message_id, payload.feedback)
+
+
+@router.get("/messages/{message_id}/sources", response_model=ChatMessageSourcesResponse, summary="Nguồn trích dẫn hợp lệ của tin nhắn AI hoặc thông báo khi không có chunk")
+async def get_message_sources(
+    message_id: Annotated[int, Path(ge=1, le=2**31 - 1)],
+    user: CurrentUser,
+    service: Service,
+) -> ChatMessageSourcesResponse:
+    return await service.get_message_sources(user, message_id)
+
+async def retry_last_message(session_id: SessionId, user: CurrentUser, service: Service) -> ChatReplyResponse:
+    return await service.retry_last_message(user, session_id)
 
 @router.patch(
     "/messages/{message_id}/feedback",

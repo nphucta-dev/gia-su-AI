@@ -39,14 +39,27 @@ không trả đáp án đúng hoặc giải thích trước khi nộp. Lỗi `QU
 (502), `QUIZ_SAVE_FAILED` (503), `TOPIC_NOT_FOUND` (404) và `ACCOUNT_INACTIVE`
 (401) dùng thông báo cố định, không đính kèm nội dung AI hay lỗi SQL.
 
-Phạm vi này chưa sinh câu hỏi bằng LLM (TK-051), chưa có API công khai nhận đáp án
-chuẩn từ trình duyệt, chưa nối giao diện luyện tập và chưa chấm/nộp quiz. Luồng sinh
-quiz sau này gọi service này sau khi nhận dữ liệu model; không cần đổi bộ kiểm tra
-hay cách lưu. Không tạo bài giả khi chưa cấu hình model.
+TK-052 là bộ kiểm tra/lưu phía server; trình duyệt không được gửi đáp án chuẩn.
+Theo yêu cầu tích hợp AI bổ sung, `POST /api/quizzes` nhận
+`{"topicId":1,"difficulty":"easy"}` (hoặc `medium`/`hard`), gọi model dùng cấu hình
+chung với chat rồi chuyển kết quả qua bộ kiểm tra này. Prompt dùng chủ đề active,
+nguồn phù hợp đã bật nếu có, lọc thông tin cá nhân; không tạo bài giả khi thiếu model.
+Phản hồi 201 là `{"quiz":...}` không lộ đáp án/giải thích. Lỗi provider hoặc JSON
+không hợp lệ không tạo quiz và không tiêu thêm quota.
+
+`GET /api/quizzes/{id}/result` chỉ cho chủ sở hữu đọc quiz `completed`, trả
+`{"result":...}` gồm điểm, số đúng/tổng, thời gian và từng câu với lựa chọn đã nộp,
+đáp án, `isCorrect`, giải thích. Quiz chưa nộp trả 409; ID thiếu/khác chủ cùng 404.
+Frontend đăng nhập đã nối sinh đề, làm bài, nộp và mở kết quả lưu thật qua các API;
+chế độ xem thử vẫn dùng bài mẫu. Cấu hình model và quota tại [AI_SETUP.md](AI_SETUP.md).
 
 TK-082 bổ sung `GET /api/quizzes/{quiz_id}` để đọc quiz và câu hỏi của tài khoản
 đang đăng nhập, giữ response không chứa đáp án/giải thích. ID khác chủ và ID thiếu
 cùng trả 404, kể cả với ADMIN; xem [quyền sở hữu](OWNERSHIP.md).
+
+TK-059 mở rộng `/api/quizzes/{quiz_id}/submit` để nộp và chấm một lần, ghi điểm,
+trạng thái hoàn tất và tiến độ cùng transaction. `/api/quizzes/{quiz_id}/grade`
+chấm các đáp án cũ đã lưu theo TK-058. Xem [API chấm quiz](QUIZ_GRADING.md).
 
 Kiểm thử offline:
 

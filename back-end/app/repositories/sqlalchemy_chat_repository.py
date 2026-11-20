@@ -1,21 +1,22 @@
 """Kho chat MySQL: lưu tin bằng transaction ngắn, không giữ khóa lúc gọi model."""
 
 from __future__ import annotations
-
 import asyncio
 from collections.abc import Sequence
 from typing import Any
-from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
-
 from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.subject import Subject
 from app.models.topic import Topic
+from app.repositories.chat_repository import ChatChangedError, ChatMessageRecord, ChatSessionRecord, utc_timestamp
+from datetime import datetime, timezone
 from app.repositories.chat_repository import (
     ChatChangedError, ChatMessageRecord, ChatSessionRecord, FeedbackTargetError, utc_timestamp,
 )
+
+
 
 
 class SqlAlchemyChatRepository:
@@ -37,9 +38,6 @@ class SqlAlchemyChatRepository:
     async def recent_messages(self, user_id: int, session_id: int, *, limit: int = 12) -> list[ChatMessageRecord]:
         return await asyncio.to_thread(self._recent_messages, user_id, session_id, limit=limit)
 
-    async def find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None:
-        return await asyncio.to_thread(self._find_message, user_id, message_id)
-
     async def append_user_message(self, user_id: int, session_id: int, content: str) -> ChatMessageRecord | None:
         return await asyncio.to_thread(self._append_message, user_id, session_id, content, role="user")
 
@@ -54,11 +52,8 @@ class SqlAlchemyChatRepository:
             token_count=token_count, expected_last_id=expected_last_id,
         )
 
-    async def count_assistant_messages_since(self, user_id: int, since: datetime) -> int:
-        return await asyncio.to_thread(self._count_assistant_messages_since, user_id, since)
-
-    async def update_message_feedback(self, user_id: int, message_id: int, feedback: int) -> ChatMessageRecord | None:
-        return await asyncio.to_thread(self._update_message_feedback, user_id, message_id, feedback)
+    async def update_feedback(self, user_id: int, session_id: int, message_id: int, feedback: int | None) -> ChatMessageRecord | None:
+        return await asyncio.to_thread(self._update_feedback, user_id, session_id, message_id, feedback)
 
     @staticmethod
     def _session_query(user_id: int):
@@ -92,11 +87,8 @@ class SqlAlchemyChatRepository:
         return ChatMessageRecord(
             id=message.id, session_id=message.session_id, role=message.role, content=message.content,
             created_at=utc_timestamp(message.created_at), hint_level=message.hint_level,
-            is_full_solution=message.is_full_solution,
-            source_refs=[dict(item) for item in (message.source_refs or [])],
-            token_count=message.token_count,
-            feedback=message.feedback,
-
+            is_full_solution=message.is_full_solution, token_count=message.token_count,
+            source_refs=tuple(message.source_refs or ()), feedback=message.feedback,
         )
 
     def _create_session(self, user_id: int, topic_id: int, title: str | None) -> ChatSessionRecord | None:
@@ -139,15 +131,6 @@ class SqlAlchemyChatRepository:
             rows = list(db.scalars(self._message_query(user_id, session_id).order_by(ChatMessage.id.desc()).limit(limit)))
             return [self._message_record(message) for message in reversed(rows)]
 
-    def _find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None:
-        with self._sessions() as db:
-            row = db.scalar(
-                select(ChatMessage)
-                .join(ChatSession, ChatSession.id == ChatMessage.session_id)
-                .where(ChatMessage.id == message_id, ChatSession.user_id == user_id)
-            )
-            return self._message_record(row) if row is not None else None
-
     def _append_message(
         self, user_id: int, session_id: int, content: str, *, role: str,
         hint_level: int | None = None, is_full_solution: bool = False,
@@ -178,6 +161,40 @@ class SqlAlchemyChatRepository:
             db.flush()
             return self._message_record(message)
 
+    def _update_feedback(self, user_id: int, session_id: int, message_id: int, feedback: int | None) -> ChatMessageRecord | None:
+        with self._sessions.begin() as db:
+            message = db.scalar(self._message_query(user_id, session_id).where(
+                ChatMessage.id == message_id, ChatMessage.role == "assistant",
+            ).with_for_update())
+            if message is None:
+                return None
+            message.feedback = feedback
+            db.flush()
+            return self._message_record(message)
+
+
+    async def find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None:
+        return await asyncio.to_thread(self._find_message, user_id, message_id)
+
+
+    async def count_assistant_messages_since(self, user_id: int, since: datetime) -> int:
+        return await asyncio.to_thread(self._count_assistant_messages_since, user_id, since)
+
+
+    async def update_message_feedback(self, user_id: int, message_id: int, feedback: int) -> ChatMessageRecord | None:
+        return await asyncio.to_thread(self._update_message_feedback, user_id, message_id, feedback)
+
+
+    def _find_message(self, user_id: int, message_id: int) -> ChatMessageRecord | None:
+        with self._sessions() as db:
+            row = db.scalar(
+                select(ChatMessage)
+                .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+                .where(ChatMessage.id == message_id, ChatSession.user_id == user_id)
+            )
+            return self._message_record(row) if row is not None else None
+
+
     def _count_assistant_messages_since(self, user_id: int, since: datetime) -> int:
         cutoff = since.astimezone(timezone.utc) if since.tzinfo is not None else since.replace(tzinfo=timezone.utc)
         with self._sessions() as db:
@@ -192,6 +209,7 @@ class SqlAlchemyChatRepository:
                     )
                 ) or 0
             )
+
 
     def _update_message_feedback(self, user_id: int, message_id: int, feedback: int) -> ChatMessageRecord | None:
         with self._sessions.begin() as db:

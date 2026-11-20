@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Protocol
 
-from sqlalchemy import and_, delete, func, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.models.document import Document as DocumentModel
@@ -16,6 +16,7 @@ from app.models.document_chunk import DocumentChunk
 from app.models.subject import Subject as SubjectModel
 from app.models.topic import Topic as TopicModel
 from app.utils.errors import AppError
+from app.utils.keywords import fold_text, literal_contains_pattern
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,10 @@ class DocumentRepository(Protocol):
 
     async def list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]: ...
 
+    async def set_document_active(self, document_id: int, is_active: bool) -> DocumentRecord | None: ...
+
+    async def search_eligible_chunks(self, topic_id: int, terms: tuple[str, ...]) -> list[DocumentChunkRecord]: ...
+
 
 ProtocolDocumentRepository = DocumentRepository
 
@@ -172,6 +177,16 @@ class InMemoryDocumentRepository:
     async def find_document(self, document_id: int) -> DocumentRecord | None:
         return self._documents.get(document_id)
 
+    async def set_document_active(self, document_id: int, is_active: bool) -> DocumentRecord | None:
+        document = self._documents.get(document_id)
+        if document is None:
+            return None
+        if is_active and (document.status != "ready" or not self._chunks.get(document_id)):
+            raise AppError(409, "DOCUMENT_NOT_READY", "Chỉ bật được tài liệu đã xử lý xong và có nội dung.")
+        updated = replace(document, is_active=is_active)
+        self._documents[document_id] = updated
+        return updated
+
     async def finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None:
         document = self._documents.get(document_id)
         if document is None:
@@ -223,10 +238,37 @@ class InMemoryDocumentRepository:
                 chunk_id += 1
         return results
 
+    async def search_eligible_chunks(self, topic_id: int, terms: tuple[str, ...]) -> list[DocumentChunkRecord]:
+        if not terms or await self.find_upload_topic(topic_id) is None:
+            return []
+        matches = []
+        for chunk in await self.list_eligible_chunks(topic_id):
+            normalized = fold_text(chunk.content)
+            if any(term in normalized for term in terms):
+                matches.append(chunk)
+        return matches
+
 
 class SqlAlchemyDocumentRepository:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._sessions = session_factory
+
+    async def set_document_active(self, document_id: int, is_active: bool) -> DocumentRecord | None:
+        return await asyncio.to_thread(self._set_document_active, document_id, is_active)
+
+    def _set_document_active(self, document_id: int, is_active: bool) -> DocumentRecord | None:
+        with self._sessions.begin() as db:
+            document = db.scalar(select(DocumentModel).where(DocumentModel.id == document_id).with_for_update())
+            if document is None:
+                return None
+            count = db.scalar(select(func.count(DocumentChunk.id)).where(DocumentChunk.document_id == document_id))
+            if is_active and (document.status != "ready" or not count):
+                raise AppError(409, "DOCUMENT_NOT_READY", "Chỉ bật được tài liệu đã xử lý xong và có nội dung.")
+            document.is_active = is_active
+            topic = db.get(TopicModel, document.topic_id)
+            subject = db.get(SubjectModel, topic.subject_id)
+            db.flush()
+            return self._to_record(document, topic.name, subject.name, count)
 
     async def list_subjects(self) -> list[UploadSubject]:
         return await asyncio.to_thread(self._list_subjects)
@@ -251,6 +293,11 @@ class SqlAlchemyDocumentRepository:
 
     async def list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]:
         return await asyncio.to_thread(self._list_eligible_chunks, topic_id)
+
+    async def search_eligible_chunks(self, topic_id: int, terms: tuple[str, ...]) -> list[DocumentChunkRecord]:
+        if not terms:
+            return []
+        return await asyncio.to_thread(self._search_eligible_chunks, topic_id, terms)
 
     def _list_subjects(self) -> list[UploadSubject]:
         with self._sessions() as db:
@@ -370,6 +417,36 @@ class SqlAlchemyDocumentRepository:
                 )
                 for chunk, title, doc_topic_id, source_url in rows
             ]
+
+    def _search_eligible_chunks(self, topic_id: int, terms: tuple[str, ...]) -> list[DocumentChunkRecord]:
+        content = DocumentChunk.content
+        contains_term = or_(*(
+            content.collate("utf8mb4_0900_ai_ci").like(literal_contains_pattern(term), escape="!")
+            for term in terms
+        ))
+        # LIKE can disagree with Python normalization for decomposed characters or
+        # casefold expansions (e.g. ß -> ss). Keep all Unicode candidates so the
+        # exact whole-word scorer never loses a valid match. No pre-ranking cap.
+        unicode_content = func.length(content) > func.char_length(content)
+        with self._sessions() as db:
+            rows = db.execute(
+                select(DocumentChunk, DocumentModel.title, DocumentModel.topic_id, DocumentModel.source_url)
+                .join(DocumentModel, DocumentModel.id == DocumentChunk.document_id)
+                .join(TopicModel, TopicModel.id == DocumentModel.topic_id)
+                .join(SubjectModel, SubjectModel.id == TopicModel.subject_id)
+                .where(
+                    DocumentModel.topic_id == topic_id,
+                    DocumentModel.status == "ready", DocumentModel.is_active.is_(True),
+                    TopicModel.is_active.is_(True), SubjectModel.is_active.is_(True),
+                    or_(contains_term, unicode_content),
+                )
+                .order_by(DocumentModel.id, DocumentChunk.chunk_index, DocumentChunk.id)
+            )
+            return [DocumentChunkRecord(
+                id=chunk.id, document_id=chunk.document_id, document_title=title,
+                topic_id=doc_topic_id, chunk_index=chunk.chunk_index, content=chunk.content,
+                source_url=source_url,
+            ) for chunk, title, doc_topic_id, source_url in rows]
 
     def _create(self, *, topic_id: int, title: str, file_path: str) -> DocumentRecord:
         with self._sessions.begin() as db:
