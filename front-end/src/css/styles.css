@@ -80,6 +80,43 @@
  .chat-hint-controls > .button { justify-self: end; }
 }
 
+/* TK-090: let content shrink and wrap inside catalog/chat tracks. */
+.catalog-page { overflow-wrap: anywhere; }
+.catalog-page .catalog-layout { grid-template-columns: minmax(0, 1fr); }
+.catalog-page .catalog-layout > *, .catalog-page .topic-row > *, .catalog-page .panel-header > * { min-width: 0; }
+.catalog-page .panel-header { flex-wrap: wrap; }
+.catalog-page .topic-actions { flex-wrap: wrap; }
+.catalog-page .button { white-space: normal; }
+.chat-view .chat-header > * { min-width: 0; overflow-wrap: anywhere; }
+.chat-view .chat-hint-status { grid-column: 1 / -1; }
+.chat-view .chat-session-header { grid-template-columns: minmax(0, 1fr); }
+.chat-view .chat-hint-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.chat-view .chat-hint-controls .button { padding-inline: 10px; }
+.chat-view .chat-main, .chat-view .chat-sidebar-body, .chat-view .composer-row > * { min-width: 0; }
+.chat-view .chat-composer .textarea { font-size: 16px; }
+.chat-view .message-actions .button, .chat-view .chat-header .button { white-space: normal; }
+.chat-sidebar-toggle { display: none; }
+body:has(.chat-view) #app-modal { max-height: calc(100dvh - 24px); overflow-y: auto; overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+ .chat-sidebar-toggle { display: flex; width: 100%; justify-content: space-between; }
+ .chat-sidebar-toggle::after { content: '+'; }
+ .chat-sidebar-toggle[aria-expanded="true"]::after { content: '−'; }
+ .chat-sidebar-body:not([hidden]) { margin-top: 16px; }
+ .chat-sidebar-body h2 { display: none; }
+ .chat-view .session-list { display: grid; max-height: 320px; overflow-y: auto; }
+ .chat-view .session-list .session-button { min-width: 0; max-width: none; width: 100%; white-space: normal; overflow-wrap: anywhere; }
+ .chat-view .messages { min-height: min(330px, 50dvh); max-height: min(600px, 60dvh); }
+ body:has(.chat-view) #app-modal .modal-content { padding: 28px 20px 20px; }
+}
+@media (min-width: 768px) {
+ .catalog-page .catalog-layout { grid-template-columns: 280px minmax(0, 1fr); }
+}
+@media (min-width: 1100px) {
+ .catalog-page .catalog-layout { grid-template-columns: 340px minmax(0, 1fr); }
+ .chat-view .chat-session-header { grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); }
+ .chat-view .chat-hint-controls { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* TK-050: active catalog selection before opening the fixed quiz preview. */
 .quiz-setup { max-width: 800px; }
 .quiz-setup-form { display: grid; gap: 20px; }

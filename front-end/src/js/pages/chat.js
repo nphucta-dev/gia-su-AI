@@ -4,6 +4,7 @@ import { getSession } from '../session.js';
 import { setupValidation, validateFields } from '../components/validation.js';
 import { renderLiveChat } from './chat-live.js';
 import { validateChatQuestion } from '../chat-question.js';
+import { chatSidebar } from '../components/chat-sidebar.js';
 export { validateChatQuestion };
 
 function renderPreviewChat() {
@@ -23,7 +24,7 @@ function renderPreviewChat() {
   add('Làm sao tìm nghiệm của ax² + bx + c = 0?', 'user');
  };
  preview();
- const sidebar = el('aside', { className: 'chat-sidebar', 'aria-label': 'Lịch sử phiên minh họa' },
+ const sidebar = chatSidebar('Lịch sử phiên minh họa',
   el('h2', {}, 'Lịch sử phiên'),
   button('+ Phiên mới', () => {
    messages.replaceChildren(el('div', { className: 'empty-state' }, 'Phiên mới. Bạn có thể thử nhập một câu hỏi.'));
@@ -92,7 +93,7 @@ function renderPreviewChat() {
  });
  const sources = el('details', {}, el('summary', {}, 'Nguồn tham khảo minh hoạ'),
   el('p', { className: 'helper' }, 'Ví dụ cách hiển thị: Tài liệu Đại số · phần Phương trình bậc hai. Chưa có tài liệu thực được truy xuất.'));
- return el('div', {},
+ return el('div', { className: 'chat-view' },
   heading('Hỏi gia sư AI', 'Gợi mở từng bước, hiểu bài bằng chính cách nghĩ của bạn.'),
   notice('Dữ liệu minh họa — chưa kết nối tài khoản thật.', 'warning'),
   el('div', { className: 'chat-layout' }, sidebar,

@@ -77,7 +77,7 @@ export function renderHome() {
  }
  grade.addEventListener('change', () => load());
  search.addEventListener('input', () => { if (subjects.length) drawBody(); });
- const root = el('div', {}, heading('Hôm nay bạn muốn học gì?', 'Chọn môn học và chủ đề để bắt đầu. Mỗi câu hỏi là một bước hiểu sâu hơn.'),
+ const root = el('div', { className: 'catalog-page' }, heading('Hôm nay bạn muốn học gì?', 'Chọn môn học và chủ đề để bắt đầu. Mỗi câu hỏi là một bước hiểu sâu hơn.'),
   el('div', { className: 'catalog-filters' }, field('Cấp học', grade)),
   el('div', { className: 'catalog-layout' }, aside, el('section', {}, el('div', { className: 'panel-header' }, el('h2', {}, 'Chủ đề theo chương'), search), body)),
   el('div', { className: 'study-note' }, el('h2', {}, 'Hiểu bài theo từng bước'), el('p', {}, 'Gia sư đặt câu hỏi gợi mở trước khi hiện lời giải. Bạn có thể yêu cầu ví dụ hoặc cách giải thích đơn giản hơn.'), link('Bắt đầu phiên học', '#chat', 'button primary')));
