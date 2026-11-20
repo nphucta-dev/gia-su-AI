@@ -42,6 +42,7 @@ from app.routes.quiz import router as quiz_router
 from app.routes.progress import router as progress_router
 from app.routes.me import router as me_router
 from app.routes.profile import router as profile_router
+from app.routes.quota import router as quota_router
 from app.routes.documents import router as documents_router
 from app.services.auth_service import AuthService, UserRepository
 from app.services.admin_catalog_service import AdminCatalogService
@@ -49,6 +50,7 @@ from app.services.catalog_service import CatalogRepository, CatalogService
 from app.services.chat_service import ChatService
 from app.services.quiz_service import QuizService
 from app.services.progress_service import ProgressService
+from app.services.quota_service import QuotaService
 from app.services.llm_client import ChatCompletionsClient, LLMClient
 from app.services.token_service import TokenService
 from app.utils.password import hash_password
@@ -120,6 +122,7 @@ def create_app(
         chat, llm_client or ChatCompletionsClient(settings), settings,
         document_repository=app.state.document_repository,
     )
+    app.state.quota_service = QuotaService(chat)
     quiz = quiz_repository
     if quiz is None:
         quiz = (
@@ -146,6 +149,7 @@ def create_app(
     app.include_router(progress_router)
     app.include_router(admin_catalog_router)
     app.include_router(profile_router)
+    app.include_router(quota_router)
     app.include_router(documents_router)
 
     @app.get("/api/health", tags=["system"])

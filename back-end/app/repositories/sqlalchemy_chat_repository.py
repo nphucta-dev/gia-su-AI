@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 from typing import Any
+from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -47,6 +48,9 @@ class SqlAlchemyChatRepository:
             hint_level=hint_level, is_full_solution=is_full_solution, source_refs=source_refs,
             token_count=token_count, expected_last_id=expected_last_id,
         )
+
+    async def count_assistant_messages_since(self, user_id: int, since: datetime) -> int:
+        return await asyncio.to_thread(self._count_assistant_messages_since, user_id, since)
 
     @staticmethod
     def _session_query(user_id: int):
@@ -154,3 +158,18 @@ class SqlAlchemyChatRepository:
             db.add(message)
             db.flush()
             return self._message_record(message)
+
+    def _count_assistant_messages_since(self, user_id: int, since: datetime) -> int:
+        cutoff = since.astimezone(timezone.utc) if since.tzinfo is not None else since.replace(tzinfo=timezone.utc)
+        with self._sessions() as db:
+            return int(
+                db.scalar(
+                    select(func.count(ChatMessage.id))
+                    .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+                    .where(
+                        ChatSession.user_id == user_id,
+                        ChatMessage.role == "assistant",
+                        ChatMessage.created_at >= cutoff,
+                    )
+                ) or 0
+            )

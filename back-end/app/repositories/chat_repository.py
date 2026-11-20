@@ -74,6 +74,8 @@ class ChatRepository(Protocol):
         token_count: int | None, expected_last_id: int,
     ) -> ChatMessageRecord | None: ...
 
+    async def count_assistant_messages_since(self, user_id: int, since: datetime) -> int: ...
+
 
 class InMemoryChatRepository:
     def __init__(self, catalog_repository: InMemoryCatalogRepository | None = None) -> None:
@@ -185,4 +187,12 @@ class InMemoryChatRepository:
         return self._append(
             session, content, role="assistant", hint_level=hint_level,
             is_full_solution=is_full_solution, source_refs=source_refs, token_count=token_count,
+        )
+
+    async def count_assistant_messages_since(self, user_id: int, since: datetime) -> int:
+        since_iso = utc_timestamp(since)
+        owned_session_ids = {s.id for s in self._sessions.values() if s.user_id == user_id}
+        return sum(
+            1 for m in self._messages.values()
+            if m.session_id in owned_session_ids and m.role == "assistant" and m.created_at >= since_iso
         )
