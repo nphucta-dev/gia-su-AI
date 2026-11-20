@@ -2,6 +2,7 @@ import { api, ApiError } from '../api.js';
 import { loadCatalog, flattenTopics } from '../catalog.js';
 import { el, button, heading, notice, confirmDialog, link } from '../components/ui.js';
 import { validateChatQuestion } from '../chat-question.js';
+import { createMessageFeedback } from '../components/message-feedback.js';
 
 let activeController;
 
@@ -62,6 +63,7 @@ export function renderLiveChat() {
     el('div', {}, title, description, quotaStatus), controls, actionStatus), messages, form)));
 
  function current() { return !controller.signal.aborted && root.isConnected; }
+ const renderFeedback = createMessageFeedback({ signal: controller.signal, isCurrent: sessionId => current() && selectedSession?.id === sessionId });
  function openTopic() { return topics.find(item => Number(item.id) === Number(selectedSession?.topicId || topicId)); }
  function hasQuestion() { return selectedMessages.some(item => item.role === 'user'); }
  function hintLevel() {
@@ -100,24 +102,7 @@ export function renderLiveChat() {
    node.append(refs.length ? el('details', { className: 'message-sources' }, el('summary', {}, 'Nguồn tham khảo'),
     el('ul', {}, ...refs.map(ref => el('li', {}, `${ref.title || 'Tài liệu'} · đoạn ${Number(ref.chunkIndex) + 1}${ref.available === false ? ' · Nguồn hiện không khả dụng' : ''}`))))
     : el('p', { className: 'helper' }, 'Chưa có nguồn tài liệu phù hợp.'));
-   const feedback = el('div', { className: 'message-actions', 'aria-label': 'Đánh giá phản hồi' });
-   for (const [label, value] of [['Hữu ích', 1], ['Chưa hữu ích', -1]]) {
-    const control = button(label, async () => {
-     const next = message.feedback === value ? null : value;
-     feedback.querySelectorAll('button').forEach(item => { item.disabled = true; });
-     try {
-      const result = await api(`/chat/sessions/${selectedSession.id}/messages/${message.id}/feedback`, { method: 'PATCH', body: { feedback: next }, signal: controller.signal });
-      if (!current()) return;
-      message.feedback = result.message.feedback;
-      for (const item of feedback.querySelectorAll('button')) item.setAttribute('aria-pressed', String(Number(item.dataset.value) === message.feedback));
-     } catch (error) { if (error.name !== 'AbortError' && current()) actionStatus.replaceChildren(notice(error.message, 'error')); }
-     finally { if (current()) feedback.querySelectorAll('button').forEach(item => { item.disabled = false; }); }
-    }, 'ghost small');
-    control.dataset.value = value;
-    control.setAttribute('aria-pressed', String(message.feedback === value));
-    feedback.append(control);
-   }
-   node.append(feedback);
+   node.append(renderFeedback(message, selectedSession.id));
   }
   return node;
  }
