@@ -1,11 +1,20 @@
-"""Dữ liệu công khai cho API tải tài liệu, không trả đường dẫn file nội bộ."""
+"""Dữ liệu công khai cho API quản trị tài liệu, không trả đường dẫn file nội bộ."""
+
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class UpdateDocumentActiveRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
-    is_active: bool = Field(alias="isActive", strict=True)
+    is_active: bool = Field(
+        alias="isActive", strict=True,
+        description="Bật/tắt nguồn; chỉ bật tài liệu ready đã có nội dung. Không nhận status do client đặt.",
+    )
+
+
+# Giữ tên đã dùng trong code tích hợp trước đây, dùng chung quy tắc kiểm tra.
+UpdateDocumentRequest = UpdateDocumentActiveRequest
 
 
 class DocumentInfo(BaseModel):
@@ -14,7 +23,7 @@ class DocumentInfo(BaseModel):
     title: str
     subject_name: str = Field(serialization_alias="subjectName")
     topic_name: str = Field(serialization_alias="topicName")
-    status: str
+    status: Literal["pending", "ready", "error"] = Field(description="Trạng thái do bước xử lý tài liệu cập nhật.")
     is_active: bool = Field(serialization_alias="isActive")
     created_at: str = Field(serialization_alias="createdAt")
     size_bytes: int | None = Field(serialization_alias="sizeBytes")
@@ -26,11 +35,6 @@ class DocumentInfo(BaseModel):
 class DocumentResponse(BaseModel):
     message: str
     document: DocumentInfo
-
-
-class UpdateDocumentRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    is_active: bool = Field(alias="isActive", strict=True)
 
 
 class DocumentListResponse(BaseModel):

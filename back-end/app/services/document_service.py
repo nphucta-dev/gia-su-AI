@@ -11,9 +11,7 @@ from uuid import uuid4
 
 from starlette.datastructures import UploadFile
 
-from app.repositories.document_repository import (
-    DocumentNotReadyError, DocumentRecord, DocumentRepository, missing_topic_error,
-)
+from app.repositories.document_repository import DocumentRecord, DocumentRepository, missing_topic_error
 from app.repositories.user_repository import parse_user_id
 from app.schemas.document import DocumentInfo, UploadSubjectInfo, UploadTopicInfo
 from app.services.document_text import DocumentTextError, extract_document_text, split_document_text
@@ -23,6 +21,10 @@ from sqlalchemy.exc import SQLAlchemyError
 MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 READ_CHUNK_BYTES = 64 * 1024
 _MIME_TYPES = {".pdf": "application/pdf", ".txt": "text/plain"}
+
+
+def database_unavailable() -> AppError:
+    return AppError(503, "DATABASE_UNAVAILABLE", "Chưa thể truy cập dữ liệu tài liệu. Vui lòng thử lại.")
 
 
 def invalid_field(field: str, message: str) -> AppError:
@@ -35,6 +37,10 @@ class DocumentService:
         self.upload_dir = upload_dir.resolve()
 
     async def options(self) -> list[UploadSubjectInfo]:
+        try:
+            subjects = await self.repository.list_subjects()
+        except SQLAlchemyError:
+            raise database_unavailable() from None
         return [
             UploadSubjectInfo(
                 id=subject.id,
@@ -42,11 +48,14 @@ class DocumentService:
                 grade_level=subject.grade_level,
                 topics=[UploadTopicInfo(id=topic.id, name=topic.name, chapter_name=topic.chapter_name) for topic in subject.topics],
             )
-            for subject in await self.repository.list_subjects()
+            for subject in subjects
         ]
 
     async def list_documents(self) -> list[DocumentInfo]:
-        records = await self.repository.list_documents()
+        try:
+            records = await self.repository.list_documents()
+        except SQLAlchemyError:
+            raise database_unavailable() from None
         return await asyncio.to_thread(lambda: [self._public_document(record) for record in records])
 
     async def set_active(self, document_id: int, is_active: bool) -> DocumentInfo:
@@ -69,7 +78,11 @@ class DocumentService:
             raise invalid_field("title", "Tiêu đề tài liệu phải có từ 1 đến 200 ký tự.")
         if any(unicodedata.category(char) in {"Cc", "Cs"} for char in title):
             raise invalid_field("title", "Tiêu đề tài liệu chứa ký tự không hợp lệ.")
-        if await self.repository.find_upload_topic(parsed_id) is None:
+        try:
+            topic = await self.repository.find_upload_topic(parsed_id)
+        except SQLAlchemyError:
+            raise database_unavailable() from None
+        if topic is None:
             raise missing_topic_error()
 
         filename = (file.filename or "").replace("\\", "/").rsplit("/", 1)[-1]
@@ -112,14 +125,19 @@ class DocumentService:
         await asyncio.to_thread(self._save_file, saved_path, payload)
         try:
             record = await self.repository.create(topic_id=parsed_id, title=title, file_path=storage_name)
-        except Exception:
+        except Exception as error:
             # Chỉ xóa đúng file vừa tạo khi transaction metadata không thành công.
             await asyncio.to_thread(saved_path.unlink, missing_ok=True)
+            if isinstance(error, SQLAlchemyError):
+                raise database_unavailable() from None
             raise
         return await self.process(record.id)
 
     async def process(self, document_id: int) -> DocumentInfo:
-        record = await self.repository.find_document(document_id)
+        try:
+            record = await self.repository.find_document(document_id)
+        except SQLAlchemyError:
+            raise database_unavailable() from None
         if record is None:
             raise AppError(404, "DOCUMENT_NOT_FOUND", "Tài liệu không tồn tại.")
         if record.status == "ready" and record.chunk_count:
@@ -128,7 +146,10 @@ class DocumentService:
             chunks = await asyncio.to_thread(self._extract_chunks, record.file_path)
         except (DocumentTextError, OSError):
             chunks = None
-        saved = await self.repository.finish_processing(document_id, chunks=chunks)
+        try:
+            saved = await self.repository.finish_processing(document_id, chunks=chunks)
+        except SQLAlchemyError:
+            raise database_unavailable() from None
         if saved is None:
             raise AppError(404, "DOCUMENT_NOT_FOUND", "Tài liệu không tồn tại.")
         return await asyncio.to_thread(self._public_document, saved)

@@ -257,4 +257,11 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   đây là lựa chọn triển khai cho các điểm tài liệu gốc chưa quy định rõ ở trên.
   Không đổi schema, MySQL/ID/scrypt, không cấu hình hay gọi model thật khi chưa có key.
   Hướng dẫn và giới hạn tại `docs/AI_SETUP.md`.
+- TK-070 “API quản trị tài liệu” đã hoàn thiện listing và PATCH isActive chỉ cho
+  ADMIN active. Danh sách gồm pending/ready/error và tài liệu thuộc nội dung đã tắt.
+  Status chỉ do upload/process tính từ kết quả xử lý; client không tự đặt ready.
+  PATCH nhận JSON boolean, chỉ bật ready đã có chunk; hai tên hàm repository bật/tắt
+  dùng chung kiểm tra này, giữ tương thích code đã merge. Các lỗi SQL ở listing,
+  options, upload, xử lý và cập nhật trả 503 cố định; rollback giữ file/chunk/lịch sử.
+  Giao diện quản trị đã gọi các API này. Không thêm schema, xóa tài liệu hoặc gọi model.
 

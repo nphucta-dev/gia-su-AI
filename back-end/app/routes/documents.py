@@ -12,13 +12,16 @@ from app.schemas.auth import ErrorResponse
 from app.schemas.document import (
     DocumentListResponse, DocumentOptionsResponse, DocumentResponse, UpdateDocumentActiveRequest,
 )
-from app.schemas.document import UpdateDocumentRequest
 from app.routes.auth import require_json
 from app.services.document_service import DocumentService, invalid_field
 from app.utils.errors import AppError
 
-router = APIRouter(prefix="/api/admin/documents", tags=["documents"])
-AdminUser = Annotated[User, Depends(require_roles("ADMIN"))]
+require_admin = require_roles("ADMIN")
+AdminUser = Annotated[User, Depends(require_admin)]
+router = APIRouter(
+    prefix="/api/admin/documents", tags=["documents"], dependencies=[Depends(require_admin)],
+    responses={code: {"model": ErrorResponse} for code in (401, 403, 503)},
+)
 
 
 def get_document_service(request: Request) -> DocumentService:
@@ -33,7 +36,11 @@ async def options(user: AdminUser, service: Annotated[DocumentService, Depends(g
     return DocumentOptionsResponse(subjects=await service.options())
 
 
-@router.get("", response_model=DocumentListResponse, summary="Danh sách tài liệu đã tải")
+@router.get(
+    "", response_model=DocumentListResponse,
+    summary="ADMIN xem tài liệu, trạng thái xử lý và bật/tắt nguồn",
+    description="Gồm mọi tài liệu pending/ready/error, đang bật hoặc tắt, kể cả thuộc môn/chủ đề đã tắt.",
+)
 async def list_documents(user: AdminUser, service: Annotated[DocumentService, Depends(get_document_service)]) -> DocumentListResponse:
     return DocumentListResponse(documents=await service.list_documents())
 
@@ -66,12 +73,16 @@ async def process_document(
 @router.patch(
     "/{document_id}",
     response_model=DocumentResponse,
-    summary="ADMIN bật/tắt tài liệu nguồn (chỉ cho bật khi status=ready)",
+    dependencies=[Depends(require_json)],
+    summary="ADMIN bật/tắt tài liệu nguồn ready có nội dung",
+    description="Chỉ cập nhật isActive. Trạng thái xử lý được cập nhật qua upload hoặc POST /{document_id}/process.",
     responses={
         401: {"model": ErrorResponse, "description": "Chưa đăng nhập"},
         403: {"model": ErrorResponse, "description": "Chỉ ADMIN đang hoạt động"},
         404: {"model": ErrorResponse, "description": "Tài liệu không tồn tại"},
-        409: {"model": ErrorResponse, "description": "Không thể bật tài liệu có trạng thái khác ready"},
+        409: {"model": ErrorResponse, "description": "Tài liệu chưa ready hoặc chưa có chunk"},
+        415: {"model": ErrorResponse, "description": "Body phải là JSON"},
+        422: {"model": ErrorResponse, "description": "ID hoặc dữ liệu cập nhật không hợp lệ"},
     },
 )
 async def update_document_active(

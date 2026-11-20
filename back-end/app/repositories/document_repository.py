@@ -206,14 +206,12 @@ class InMemoryDocumentRepository:
         return result
 
     async def set_active(self, document_id: int, *, is_active: bool) -> DocumentRecord | None:
-        current = self._documents.get(document_id)
-        if current is None:
-            return None
-        if is_active and current.status != "ready":
-            raise DocumentNotReadyError()
-        updated = replace(current, is_active=is_active)
-        self._documents[document_id] = updated
-        return updated
+        try:
+            return await self.set_document_active(document_id, is_active)
+        except AppError as error:
+            if error.code == "DOCUMENT_NOT_READY":
+                raise DocumentNotReadyError() from None
+            raise
 
     async def list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]:
         eligible_docs = sorted(
@@ -380,18 +378,12 @@ class SqlAlchemyDocumentRepository:
             return self._to_record(document, topic.name, subject.name, len(chunks or ()))
 
     def _set_active(self, document_id: int, *, is_active: bool) -> DocumentRecord | None:
-        with self._sessions.begin() as db:
-            document = db.get(DocumentModel, document_id, with_for_update=True)
-            if document is None:
-                return None
-            if is_active and document.status != "ready":
-                raise DocumentNotReadyError()
-            document.is_active = is_active
-            count = db.scalar(select(func.count(DocumentChunk.id)).where(DocumentChunk.document_id == document_id)) or 0
-            topic = db.get(TopicModel, document.topic_id)
-            subject = db.get(SubjectModel, topic.subject_id)
-            db.flush()
-            return self._to_record(document, topic.name, subject.name, count)
+        try:
+            return self._set_document_active(document_id, is_active)
+        except AppError as error:
+            if error.code == "DOCUMENT_NOT_READY":
+                raise DocumentNotReadyError() from None
+            raise
 
     def _list_eligible_chunks(self, topic_id: int) -> list[DocumentChunkRecord]:
         with self._sessions() as db:

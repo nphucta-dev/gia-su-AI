@@ -278,17 +278,32 @@ Có thể gửi riêng từng trường; bỏ qua năm sinh để giữ nguyên 
 
 `GET /api/auth/me` giữ định dạng cũ để khôi phục phiên; hồ sơ đầy đủ dùng `/api/profile`. Không cần migration mới vì cột `birth_year` đã có trong bảng `users`.
 
-## Tải tài liệu ADMIN
+## Quản trị tài liệu ADMIN (TK-070)
 
 Các API sau yêu cầu token của **ADMIN đang hoạt động**; LEARNER nhận `403`, thiếu token nhận `401`:
 
 | API | Công dụng |
 | --- | --- |
 | `GET /api/admin/documents/options` | Môn và chủ đề active từ MySQL cho form upload; trả `subjects`, mỗi môn có `topics`. |
-| `GET /api/admin/documents` | Danh sách tài liệu đã lưu; trả `documents`. |
+| `GET /api/admin/documents` | Danh sách mọi tài liệu đã lưu, gồm `status`, `isActive`, `processedAt`, `chunkCount`; trả `documents`. |
 | `POST /api/admin/documents` | Tải PDF/TXT, trích văn bản và lưu các đoạn; trả `201` với `message`, `document`. |
 | `POST /api/admin/documents/{id}/process` | Xử lý tài liệu cũ đang chờ hoặc thử lại tài liệu lỗi; không cần body, trả `200`. |
 | `PATCH /api/admin/documents/{id}` | `{"isActive":true}` hoặc `false`; chỉ bật nguồn ready đã có chunk. |
+
+Đối chiếu mô tả TK-070 và SRS FR-08.2/08.3: ADMIN xem trạng thái và bật/tắt nguồn;
+trạng thái `pending`/`ready`/`error` do upload hoặc `/process` cập nhật sau khi xử lý
+file. PATCH yêu cầu `Content-Type: application/json`, chỉ nhận boolean `isActive`
+(giữ tương thích tên `is_active` đã có), từ chối `status`, `topicId`, đường dẫn file
+hoặc trường khác do client gửi. Bật tài liệu chưa ready/chưa có chunk trả
+`409 DOCUMENT_NOT_READY`; ID thiếu trả 404, ID hoặc body sai trả 422, sai Content-Type
+trả 415. Tắt tài liệu không xóa file, chunk hay lịch sử; gửi lại cùng trạng thái
+không xử lý lại file hoặc tạo thêm chunk.
+
+Danh sách quản trị dùng chung cho các ADMIN, gồm cả tài liệu lỗi/chờ xử lý, đang
+tắt và thuộc môn/chủ đề đã tắt; danh sách rỗng trả `{"documents":[]}`. Không trả
+đường dẫn lưu trữ nội bộ, nội dung chunk hoặc embedding. Lỗi truy cập/ghi database
+trả `503 DATABASE_UNAVAILABLE` với thông báo cố định; lỗi ghi bật/tắt được rollback.
+Giao diện quản trị hiện có gọi các API listing, xử lý và PATCH này.
 
 POST dùng **multipart/form-data** với `file`, `topic_id`, `title` (1–200 ký tự). File tối đa **10 MiB**, không rỗng, đuôi và MIME phải khớp PDF/TXT. PDF kiểm tra chữ ký `%PDF-`; TXT phải là UTF-8 hợp lệ. Chủ đề và môn cha phải tồn tại, đang active. Swagger `/docs` có form chọn file sau khi Authorize bằng token ADMIN.
 
@@ -301,6 +316,10 @@ Các đoạn được lưu vào `document_chunks` theo `chunk_index` bắt đầ
 Đặt `UPLOAD_DIR` để đổi nơi lưu; đường dẫn tương đối tính từ `back-end/`. Khi chuyển môi trường cần mang theo cả kho file và database. Tài liệu cũ đang `pending` có thể gọi API `/process` hoặc bấm **Xử lý** ở trang quản trị. Không cần migration mới.
 
 Middleware giữ giới hạn 10 KB cho JSON; riêng POST upload nhận tối đa 10 MiB cộng 64 KiB multipart. Service vẫn kiểm tra giới hạn file riêng, kể cả request chunked. CORS cho phép PATCH. Phản hồi tài khoản, hồ sơ và tài liệu quản trị có `Cache-Control: no-store`.
+
+Kiểm thử task: `tests/test_admin_documents_api.py` và
+`tests/test_admin_documents_database_integration.py`; kiểm thử MySQL sử dụng
+database tạm tên ngẫu nhiên và tự dọn sau khi chạy, không ghi database dự án.
 
 ## Prompt Socratic (TK-030)
 
