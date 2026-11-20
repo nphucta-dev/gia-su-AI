@@ -3,6 +3,7 @@ import { getSession, onSessionCleared } from '../session.js';
 import { loadCatalog, flattenTopics } from '../catalog.js';
 import { questions as demoQuestions, topics as demoTopics } from '../data.js';
 import { submitQuizAnswers } from '../quiz-submission.js';
+import { quizGenerationError } from '../quiz-generation-error.js';
 import { el, button, link, heading, panel, field, badge, confirmDialog, notice } from '../components/ui.js';
 
 const difficulties = { easy: 'Dễ', medium: 'Vừa', hard: 'Khó' };
@@ -13,12 +14,18 @@ function validId(value) { const number = Number(value); return /^[1-9]\d*$/.test
 function previewQuiz(topicId, difficulty) {
  return { id: 57001, topicId, difficulty, status: 'in_progress', questions: demoQuestions.map((item, index) => ({ id: item.id, position: index + 1, questionText: item.text, options: Object.fromEntries(item.options.map((value, position) => ['ABCD'[position], value])) })) };
 }
-function safeQuiz(quiz) {
- if (!quiz || !validId(quiz.id) || !difficulties[quiz.difficulty] || !Array.isArray(quiz.questions) || quiz.questions.length !== 5) throw new ApiError('Bài luyện tập từ máy chủ chưa hợp lệ.');
- const ids = new Set();
+function safeQuiz(quiz, expected) {
+ const invalid = () => new ApiError('Bài luyện tập từ máy chủ chưa hợp lệ.', 0, 'INVALID_QUIZ_RESPONSE');
+ if (!quiz || !validId(quiz.id) || !difficulties[quiz.difficulty] || !['in_progress', 'completed'].includes(quiz.status) || !Array.isArray(quiz.questions) || quiz.questions.length !== 5) throw invalid();
+ if (expected && (quiz.topicId !== expected.topicId || quiz.difficulty !== expected.difficulty || quiz.status !== 'in_progress')) throw invalid();
+ const ids = new Set(), positions = new Set();
  for (const question of quiz.questions) {
-  if (!validId(question.id) || ids.has(question.id) || typeof question.questionText !== 'string' || !['A', 'B', 'C', 'D'].every(key => typeof question.options?.[key] === 'string')) throw new ApiError('Câu hỏi từ máy chủ chưa hợp lệ.');
+  if (!validId(question?.id) || ids.has(question.id) || typeof question.questionText !== 'string' || !question.questionText.trim()
+   || !Number.isInteger(question.position) || question.position < 1 || question.position > 5 || positions.has(question.position)
+   || !question.options || Object.keys(question.options).length !== 4
+   || !['A', 'B', 'C', 'D'].every(key => typeof question.options[key] === 'string' && question.options[key].trim())) throw invalid();
   ids.add(question.id);
+  positions.add(question.position);
  }
  return quiz;
 }
@@ -36,7 +43,7 @@ export function renderPractice() {
  const setupForm = el('form', { className: 'quiz-setup-form', novalidate: true }, el('div', { className: 'quiz-setup-fields' }, field('Chủ đề', topic), field('Độ khó', difficulty)), setupStatus, el('div', { className: 'quiz-setup-actions' }, startButton));
  const setup = panel('Tạo bài luyện tập', el('p', {}, preview ? 'Dữ liệu minh họa, không gọi model hoặc lưu bài.' : 'AI tạo 5 câu hỏi theo chủ đề và độ khó bạn chọn.'), setupForm);
  const root = el('div', { className: 'practice-page' }, heading('Luyện tập kiến thức', 'Chọn chủ đề, làm bài và xem kết quả được chấm trên máy chủ.'), setup);
- let topics = [], generating = false;
+ let topics = [], generating = false, failure = null, retrying = false;
  function current() { return root.isConnected && !controller.signal.aborted; }
  function selection() {
   return topics.find(item => String(item.id) === topic.value) && difficulties[difficulty.value]
@@ -44,11 +51,12 @@ export function renderPractice() {
  }
  function setupControls() {
   topic.disabled = generating || !topics.length; difficulty.disabled = generating || !topics.length;
-  startButton.disabled = generating || !selection();
-  startButton.textContent = generating ? 'Đang tạo 5 câu hỏi…' : preview ? 'Mở bài xem thử' : 'Tạo bài luyện tập';
+  startButton.disabled = generating || !selection() || (failure && !failure.retryable);
+  startButton.textContent = generating ? retrying ? 'Đang tạo lại bài…' : 'Đang tạo 5 câu hỏi…' : preview ? 'Mở bài xem thử' : 'Tạo bài luyện tập';
+  setupForm.setAttribute('aria-busy', String(generating));
  }
- topic.addEventListener('change', () => { setupStatus.replaceChildren(); setupControls(); });
- difficulty.addEventListener('change', () => { setupStatus.replaceChildren(); setupControls(); });
+ topic.addEventListener('change', () => { failure = null; setupStatus.replaceChildren(); setupControls(); });
+ difficulty.addEventListener('change', () => { failure = null; setupStatus.replaceChildren(); setupControls(); });
  async function loadTopics(force = false) {
   setupStatus.replaceChildren(el('p', {}, 'Đang tải danh sách chủ đề…'));
   try {
@@ -71,23 +79,33 @@ export function renderPractice() {
    if (error.name !== 'AbortError' && current()) setupStatus.replaceChildren(notice(error.message, 'error'), button('Thử lại', () => loadTopics(true), 'secondary'));
   } finally { if (current()) setupControls(); }
  }
- setupForm.addEventListener('submit', async event => {
-  event.preventDefault();
-  const chosen = selection();
-  if (generating) return;
+ async function generate(chosen, isRetry = false) {
+  if (generating || !current() || (failure && !failure.retryable)) return;
   if (!chosen) { setupStatus.replaceChildren(notice('Vui lòng chọn đầy đủ chủ đề và độ khó.', 'error')); return; }
-  generating = true; lastSelection = chosen; setupControls();
-  setupStatus.replaceChildren(notice('Đang chuẩn bị bài luyện tập…'));
+  const restoreFocus = setupStatus.contains(document.activeElement);
+  generating = true; retrying = isRetry; lastSelection = { ...chosen }; setupControls();
+  setupStatus.querySelectorAll('button').forEach(control => { control.disabled = true; });
+  setupStatus.replaceChildren(notice(isRetry ? 'Đang tạo lại bài…' : 'Đang chuẩn bị bài luyện tập…'));
   try {
    const result = preview ? { quiz: previewQuiz(chosen.topicId, chosen.difficulty) }
     : await api('/quizzes', { method: 'POST', body: chosen, signal: controller.signal });
    if (!current()) return;
-   const quiz = safeQuiz(result.quiz);
+   const quiz = safeQuiz(result?.quiz, chosen);
    if (!preview) history.replaceState(null, '', `#practice?quiz=${quiz.id}`);
-   setupStatus.replaceChildren(); openQuiz(quiz);
+   failure = null; setupStatus.replaceChildren(); openQuiz(quiz);
   } catch (error) {
-   if (error.name !== 'AbortError' && current()) setupStatus.replaceChildren(notice(error.message || 'Chưa tạo được bài. Vui lòng thử lại.', 'error'));
+   if (error.name !== 'AbortError' && current()) {
+    failure = quizGenerationError(error);
+    const retry = failure.retryable ? button('Tạo lại bài', () => generate({ ...chosen }, true), 'secondary') : null;
+    setupStatus.replaceChildren(el('div', { className: 'notice error quiz-generation-error' },
+     el('strong', {}, 'Chưa tạo được bài luyện tập'), el('p', {}, failure.message), retry));
+    if (restoreFocus && retry) retry.focus({ preventScroll: true });
+   }
   } finally { generating = false; if (current()) setupControls(); }
+ }
+ setupForm.addEventListener('submit', event => {
+  event.preventDefault();
+  generate(selection(), Boolean(failure));
  });
 
  function openQuiz(quiz) {
