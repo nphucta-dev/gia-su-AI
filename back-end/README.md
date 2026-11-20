@@ -316,6 +316,41 @@ Prompt lượt đầu nằm ở `app/prompts/socratic_system.txt`; `build_first_
 
 Backend có tạo phiên, gửi/lưu tin, lịch sử có phân trang, ngữ cảnh gần nhất, gợi ý 1–3, giải thích/ví dụ, xác nhận lời giải và feedback tại `/api/chat`. Lọc dữ liệu cá nhân áp dụng cho payload gửi model. Chưa cấu hình model thì gửi tin trả 503 và giữ câu hỏi; `/retry` phản hồi lại mà không tạo tin trùng. Frontend chat và quiz đã nối API thật. `POST /api/quizzes` sinh/validate/lưu đề; nộp bài chấm bằng backend; `GET /api/quizzes/{id}/result` đọc kết quả của mình. `GET /api/ai/quota` trả hạn mức chung 30 lượt thành công/ngày UTC. Chi tiết: [AI_SETUP.md](../docs/AI_SETUP.md).
 
+## API thống kê dashboard (TK-065)
+
+`GET /api/dashboard` yêu cầu Bearer token của tài khoản đang hoạt động, lấy user ID
+từ token. LEARNER và ADMIN chỉ đọc thống kê của chính mình; query `userId`/`user_id`
+không đổi chủ sở hữu. Có thể thử tại Swagger `/docs` sau khi Authorize.
+
+```json
+{
+  "dashboard": {
+    "totalQuizzes": 3,
+    "averageScore": 53.33,
+    "totalChatSessions": 4
+  }
+}
+```
+
+- `totalQuizzes`: số quiz có `status=completed`, không tính bài đang làm.
+- `averageScore`: trung bình `score` của quiz completed trên thang 0–100, làm tròn
+  hai chữ số theo ROUND_HALF_UP. Điểm `NULL` của dữ liệu cũ không tham gia trung
+  bình; chưa có điểm thì trả 0. Quiz completed có điểm 0 vẫn được tính.
+- `totalChatSessions`: số bản ghi `chat_sessions`, kể cả phiên chưa có tin nhắn;
+  số tin nhắn không làm tăng số phiên.
+
+Chưa có hoạt động trả cả ba số bằng 0. Môn/chủ đề đã tắt vẫn nằm trong thống kê
+lịch sử. MySQL tổng hợp trong một câu SQL, không tải nội dung câu hỏi/tin nhắn,
+không lấy tổng từ `learning_progress`. API không gọi model, không kiểm tra hay
+tiêu quota AI, vẫn đọc được khi hết quota. Phản hồi có `Cache-Control: no-store`.
+Thiếu/sai token trả 401, tài khoản bị tắt trả 403, lỗi database trả 503
+`DASHBOARD_UNAVAILABLE` với thông báo cố định.
+
+Đối chiếu mô tả TK-065, SRS FR-07.4/FR-10.1 và backlog SF-07.2.3. Task này bổ sung
+API backend; trang dashboard frontend hiện vẫn dùng dữ liệu minh họa (TK-064).
+Không cần migration mới. Kiểm thử: `tests/test_dashboard_api.py` và
+`tests/test_dashboard_database_integration.py` (MySQL dùng database thử nghiệm ngẫu nhiên).
+
 ## Việc cần làm tiếp
 
 - Các API ghi danh mục, chat và quiz sử dụng model trong `app/models/` và session transaction của `app/db/database.py`; kiểm tra chủ sở hữu và quy tắc nghiệp vụ theo tài liệu SRS trước khi lưu dữ liệu.
