@@ -71,6 +71,21 @@ class ChatMessageListResponse(BaseModel):
     has_more: bool = Field(serialization_alias="hasMore")
 
 
+class ChatSourceRefItem(BaseModel):
+    document_id: int = Field(serialization_alias="documentId")
+    chunk_id: int = Field(serialization_alias="chunkId")
+    title: str
+    chunk_index: int | None = Field(default=None, serialization_alias="chunkIndex")
+    source_url: str | None = Field(default=None, serialization_alias="sourceUrl")
+
+
+class ChatMessageSourcesResponse(BaseModel):
+    message_id: int = Field(serialization_alias="messageId")
+    has_sources: bool = Field(serialization_alias="hasSources")
+    source_refs: list[ChatSourceRefItem] = Field(serialization_alias="sourceRefs")
+    notice: str | None = None
+
+
 class ChatReplyResponse(BaseModel):
     session: ChatSessionItem
     user_message: ChatMessageItem | None = Field(default=None, serialization_alias="userMessage")

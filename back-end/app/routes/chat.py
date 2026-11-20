@@ -12,6 +12,9 @@ from app.schemas.auth import ErrorResponse
 from app.schemas.chat import (
     ChatMessageListResponse, ChatMessageResponse, ChatReplyResponse, ChatSessionListResponse, ChatSessionResponse,
     CreateChatSessionRequest, RequestFullSolutionRequest, SendChatMessageRequest, UpdateMessageFeedbackRequest,
+
+    ChatMessageListResponse, ChatMessageSourcesResponse, ChatReplyResponse, ChatSessionListResponse,
+    ChatSessionResponse, CreateChatSessionRequest, RequestFullSolutionRequest, SendChatMessageRequest,
 )
 from app.services.chat_service import ChatService
 
@@ -46,6 +49,15 @@ async def get_session(session_id: SessionId, user: CurrentUser, service: Service
 @router.get("/sessions/{session_id}/messages", response_model=ChatMessageListResponse, summary="Tin nhắn trong phiên chat của chính mình")
 async def list_messages(session_id: SessionId, user: CurrentUser, service: Service, limit: Annotated[int, Query(ge=1, le=200)] = 50, offset: Offset = 0) -> ChatMessageListResponse:
     return await service.list_messages(user, session_id, limit=limit, offset=offset)
+
+
+@router.get("/messages/{message_id}/sources", response_model=ChatMessageSourcesResponse, summary="Nguồn trích dẫn hợp lệ của tin nhắn AI hoặc thông báo khi không có chunk")
+async def get_message_sources(
+    message_id: Annotated[int, Path(ge=1, le=2**31 - 1)],
+    user: CurrentUser,
+    service: Service,
+) -> ChatMessageSourcesResponse:
+    return await service.get_message_sources(user, message_id)
 
 
 @router.post("/sessions/{session_id}/messages", status_code=201, response_model=ChatReplyResponse, dependencies=[Depends(require_json), Depends(require_ai_quota)], summary="Lưu câu hỏi và gọi gia sư với ngữ cảnh gần nhất")
