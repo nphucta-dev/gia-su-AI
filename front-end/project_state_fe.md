@@ -55,6 +55,7 @@ Các mục trên chỉ xác nhận phần UI hoặc client behavior; task nghi�
 | TK-069 | Trang quản trị tài liệu | Chưa xong và đang bị hồi quy; upload/trạng thái/bật tắt chỉ ở preview |
 | TK-073 | UI đánh giá phản hồi AI | Hoàn thành FE: chọn/đổi/bỏ đánh giá 1/-1/null qua PATCH /api/chat/sessions/{sessionId}/messages/{messageId}/feedback; state/loading/lỗi/retry riêng từng message, chống gửi chồng qua redraw, validate response và xử lý response muộn. Browser test API mock PASS; chưa kiểm chứng MySQL thật. Không sửa backend TK-074. |
 | TK-076 | UI hiển thị quota | Hoàn thành phạm vi FE: hiển thị lượt còn lại và thời điểm reset có timezone, xử lý loading/còn ít/hết lượt/lỗi/retry/response sai và cache theo phiên tài khoản. Browser test dùng API mock theo hợp đồng FE dự kiến; backend đếm lượt và API quota TK-075/TK-077 chưa được triển khai nên chưa hoàn thành end-to-end. |
+| TK-078 | UI truy cập khi hết quota | Hoàn thành phạm vi FE: hết quota vẫn đọc/chuyển/phân trang/retry lịch sử chat, đánh giá phản hồi và truy cập dashboard; chỉ khóa hành động gọi AI, giữ draft, xử lý AI_QUOTA_EXCEEDED và kiểm tra lại hạn mức. Dùng GET /api/ai/quota và API lịch sử chat hiện có. Browser test API mock PASS; dashboard và #history còn dữ liệu mẫu, chỉ xác minh truy cập route, chưa xác minh backend/database thật. |
 | TK-083 | Nhãn cảnh báo nội dung AI | Có phần UI |
 | TK-091 | Responsive quiz/dashboard/admin | Một phần; có CSS/ảnh/test mới nhưng các trang vẫn dùng dữ liệu mẫu |
 

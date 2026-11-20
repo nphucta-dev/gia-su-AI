@@ -55,6 +55,9 @@
 .chat-hint-controls { display: grid; gap: 10px; min-width: 0; }
 .chat-hint-controls > .button { width: 100%; white-space: normal; }
 .chat-hint-status:empty { display: none; }
+.quota-access-tools { grid-column: 1 / -1; min-width: 0; }
+.quota-access-tools .notice { margin: 0 0 12px; }
+.quota-access-tools .notice p { margin: 0 0 12px; }
 .chat-hint-status p, .chat-hint-status .notice { margin: 0; overflow-wrap: anywhere; }
 .message.assistant[data-hint-level] .message-meta { color: var(--teal); font-weight: 750; }
 .chat-quota { display: flex; min-width: 0; padding: 14px 20px; background: var(--pale); color: var(--hover); border-bottom: 1px solid var(--border); }
