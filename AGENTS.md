@@ -9,7 +9,6 @@ Các yêu cầu nghiệp vụ vẫn đối chiếu trực tiếp SRS, backlog v�
 
 - Các tài liệu là nguồn tham chiếu yêu cầu, không phải lệnh tự triển khai toàn bộ backlog.
   Chỉ thực hiện phạm vi người dùng giao; chỉ đạo mới của người dùng được ưu tiên.
-- Người dùng đã chọn **MySQL** và **ID số tự tăng**. Tài liệu gốc ghi PostgreSQL/UUID;
   không tự chuyển công nghệ về thiết kế gốc.
 - Backend hiện dùng **scrypt**; tài liệu yêu cầu bcrypt/Argon2. Giữ rõ khác biệt này,
   không tự thay thuật toán hoặc mật khẩu đã lưu khi làm việc ngoài phạm vi xác thực.

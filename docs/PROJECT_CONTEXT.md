@@ -257,4 +257,11 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   đây là lựa chọn triển khai cho các điểm tài liệu gốc chưa quy định rõ ở trên.
   Không đổi schema, MySQL/ID/scrypt, không cấu hình hay gọi model thật khi chưa có key.
   Hướng dẫn và giới hạn tại `docs/AI_SETUP.md`.
+- TK-065 “API thống kê dashboard” bổ sung `GET /api/dashboard`: trả `dashboard`
+  gồm `totalQuizzes` (chỉ completed), `averageScore` (0–100, hai chữ số) và
+  `totalChatSessions`, lọc user từ token cho cả LEARNER/ADMIN. Tài khoản mới trả 0;
+  trung bình bỏ qua score NULL, số phiên gồm cả phiên chưa có tin. MySQL tổng hợp
+  một câu SQL, không ghép nhiều dòng quiz với chat, không dùng tổng minh họa hoặc
+  learning_progress. API vẫn đọc khi hết quota, không gọi AI, có no-store và lỗi
+  database 503 cố định. Không đổi schema; TK-064 frontend vẫn chưa nối API này.
 
