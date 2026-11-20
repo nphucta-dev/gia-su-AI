@@ -278,4 +278,11 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   database mỗi request; hạ quyền có hiệu lực ngay với token cũ. Header/query/body và
   claim role trong JWT không cấp thêm quyền. Test bao phủ đủ route, không đọc/ghi
   dữ liệu quản trị khi bị chặn; MySQL dùng database tạm kiểm chứng thay đổi quyền.
+- TK-034 “API giải thích bổ sung” hoàn thiện POST `/api/chat/sessions/{id}/explanations`
+  với mode simplify/example. Prompt dựa trên câu hỏi/phản hồi mới nhất và nguồn phù hợp;
+  khi đầy ngữ cảnh, rút gọn phản hồi thay vì loại mất phản hồi đang cần giải thích.
+  Lưu một assistant với hint_level NULL, is_full_solution false, không thêm tin user,
+  không tăng thang gợi ý; lời giải đầy đủ vẫn cần xác nhận riêng. Kiểm tra ownership,
+  nội dung active, quota và request chồng; lỗi ngữ cảnh SQL trả 503 cố định. UI hiện có
+  đã gọi API; kiểm thử dùng model giả lập và MySQL tạm, không đổi schema hoặc gọi model thật.
 

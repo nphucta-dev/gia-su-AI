@@ -288,15 +288,20 @@ class ChatService:
             return await self._reply(user, session, expected_last_id=history[-1].id, hint_level=1, history=history)
 
     async def explain(self, user: User, session_id: int, mode: str) -> ChatReplyResponse:
-        session = await self._find(user.id, session_id)
-        self._require_open(session)
-        if mode not in {"simplify", "example"}:
+        if not isinstance(mode, str) or mode not in {"simplify", "example"}:
             raise AppError(422, "VALIDATION_ERROR", "Kiểu giải thích không hợp lệ.")
-        async with self._operation(user.id, session_id):
-            history = await self._repository.recent_messages(user.id, session_id, limit=24)
-            if not history or not any(item.role == "user" for item in history):
-                raise AppError(409, "CHAT_QUESTION_REQUIRED", "Hãy gửi một câu hỏi trước khi xin giải thích.")
-            return await self._reply(user, session, expected_last_id=history[-1].id, explanation=mode, history=history)
+        try:
+            session = await self._find(user.id, session_id)
+            self._require_open(session)
+            async with self._operation(user.id, session_id):
+                history = await self._repository.recent_messages(user.id, session_id, limit=24)
+                if not history or not any(item.role == "user" for item in history):
+                    raise AppError(409, "CHAT_QUESTION_REQUIRED", "Hãy gửi một câu hỏi trước khi xin giải thích.")
+                return await self._reply(user, session, expected_last_id=history[-1].id, explanation=mode, history=history)
+        except SQLAlchemyError:
+            raise AppError(
+                503, "CHAT_UNAVAILABLE", "Chưa thể hoàn tất yêu cầu giải thích. Vui lòng tải lại hội thoại và thử lại.",
+            ) from None
 
     async def update_feedback(self, user: User, session_id: int, message_id: int, feedback: int | None) -> ChatMessageResponse:
         session = await self._find(user.id, session_id)

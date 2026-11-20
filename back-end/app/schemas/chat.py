@@ -23,7 +23,7 @@ class RequestFullSolutionRequest(BaseModel):
 
 class RequestExplanation(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    mode: Literal["simplify", "example"]
+    mode: Literal["simplify", "example"] = Field(description="simplify: Đơn giản hơn; example: Cho ví dụ.")
 
 
 class UpdateFeedbackRequest(BaseModel):

@@ -365,6 +365,12 @@ Prompt lượt đầu nằm ở `app/prompts/socratic_system.txt`; `build_first_
 
 Backend có tạo phiên, gửi/lưu tin, lịch sử có phân trang, ngữ cảnh gần nhất, gợi ý 1–3, giải thích/ví dụ, xác nhận lời giải và feedback tại `/api/chat`. Lọc dữ liệu cá nhân áp dụng cho payload gửi model. Chưa cấu hình model thì gửi tin trả 503 và giữ câu hỏi; `/retry` phản hồi lại mà không tạo tin trùng. Frontend chat và quiz đã nối API thật. `POST /api/quizzes` sinh/validate/lưu đề; nộp bài chấm bằng backend; `GET /api/quizzes/{id}/result` đọc kết quả của mình. `GET /api/ai/quota` trả hạn mức chung 30 lượt thành công/ngày UTC. Chi tiết: [AI_SETUP.md](../docs/AI_SETUP.md).
 
+TK-034: `POST /api/chat/sessions/{id}/explanations` nhận `{"mode":"simplify"}`
+hoặc `{"mode":"example"}` để giải thích lại/cho ví dụ dựa trên ngữ cảnh hiện tại.
+Trả 201 và lưu một assistant, giữ nguyên câu hỏi, mức gợi ý và luồng xác nhận lời giải.
+Prompt giữ phản hồi cần giải thích khi ngữ cảnh dài; một lượt lưu thành công tính vào
+quota chung. Xem [hợp đồng API và lỗi](../docs/CHAT_BACKEND.md#giải-thích-bổ-sung-tk-034).
+
 ## API thống kê dashboard (TK-065)
 
 `GET /api/dashboard` yêu cầu Bearer token của tài khoản đang hoạt động, lấy user ID

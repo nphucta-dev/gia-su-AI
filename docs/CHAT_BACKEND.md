@@ -1,7 +1,8 @@
 # Backend hội thoại và gợi ý
 
 Phạm vi thực hiện: TK-018 tạo phiên, TK-021 ngữ cảnh, TK-023 lưu tin nhắn,
-TK-025 lịch sử, TK-032 điều phối gợi ý, TK-081 bảo vệ key và TK-084 lọc PII.
+TK-025 lịch sử, TK-032 điều phối gợi ý, TK-034 giải thích bổ sung,
+TK-081 bảo vệ key và TK-084 lọc PII.
 Dữ liệu dùng các bảng `chat_sessions`/`chat_messages` hiện có trong MySQL, không thêm migration.
 
 ## API
@@ -89,6 +90,36 @@ Thời gian hoạt động của phiên cập nhật cùng transaction ghi tin n
 
 Tắt môn/chủ đề không làm mất lịch sử; phiên cũ vẫn đọc được. Gửi tin hoặc xin gợi ý
 cho nội dung đã tắt trả 409 `TOPIC_CLOSED`.
+
+## Giải thích bổ sung (TK-034)
+
+`POST /api/chat/sessions/{id}/explanations` nhận JSON `{"mode":"simplify"}`
+(Đơn giản hơn) hoặc `{"mode":"example"}` (Cho ví dụ), cùng Bearer token.
+Backend lấy ngữ cảnh của đúng phiên: chủ đề, câu hỏi mới nhất, phản hồi gần nhất
+và nguồn phù hợp. Nếu câu hỏi cuối chưa có phản hồi, yêu cầu hướng đến câu hỏi đó.
+Client chỉ chọn mode; các trường tự đặt owner, ngữ cảnh hoặc xác nhận lời giải bị từ chối.
+
+Prompt có chỉ dẫn riêng cho từng cách giải thích, tiếp tục gợi mở bằng tiếng Việt.
+Trong giới hạn 12 messages/20.000 ký tự, câu hỏi và phản hồi cần giải thích được giữ;
+phản hồi dài có thể rút gọn kèm dấu báo thay vì bị loại hoàn toàn. Bản gốc trong
+database giữ nguyên. Chủ đề, lịch sử và nguồn đều qua bộ lọc dữ liệu nhạy cảm.
+
+Thành công trả 201 `{session,userMessage:null,assistantMessage}` và lưu đúng một
+tin assistant với `hintLevel:null`, `isFullSolution:false`, nguồn thực tế nếu có.
+Thao tác không thêm tin user hoặc tăng thang gợi ý; lời giải đầy đủ vẫn dùng
+`/solution` với xác nhận riêng. Một phản hồi lưu thành công tiêu một lượt quota chung.
+
+Mode/body không hợp lệ trả 422, sai Content-Type trả 415; phiên thiếu/khác chủ cùng
+404 (kể cả với ADMIN), chưa có câu hỏi trả 409 `CHAT_QUESTION_REQUIRED`, môn/chủ đề
+đã đóng trả 409 `TOPIC_CLOSED`. Request chồng bị chặn bằng 409; hết quota trả 429.
+Lỗi đọc ngữ cảnh trả 503 `CHAT_UNAVAILABLE`, lỗi lưu trả 503 `CHAT_SAVE_FAILED`.
+Lỗi model, text không hợp lệ hoặc giao dịch lưu bị rollback không tiêu thêm quota;
+thử lại cùng endpoint/mode. Chưa cấu hình model trả 503 `LLM_NOT_CONFIGURED`.
+
+Nút Đơn giản hơn/Cho ví dụ trong chat đăng nhập đã gọi endpoint này. Kiểm thử riêng:
+`test_chat_explanations_context.py`, `test_chat_explanations_api.py` và
+`test_chat_explanations_database_integration.py` trong `back-end/tests/`.
+Kiểm thử dùng model giả lập; chất lượng nội dung cần đánh giá bằng model thật.
 
 ## Dữ liệu cá nhân
 

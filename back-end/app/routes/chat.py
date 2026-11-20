@@ -84,7 +84,12 @@ async def retry_message(session_id: SessionId, user: CurrentUser, service: Servi
     return await service.retry_message(user, session_id)
 
 
-@router.post("/sessions/{session_id}/explanations", status_code=201, response_model=ChatReplyResponse, dependencies=[Depends(require_json)], summary="Giải thích đơn giản hơn hoặc cho ví dụ theo hội thoại")
+@router.post(
+    "/sessions/{session_id}/explanations", status_code=201, response_model=ChatReplyResponse,
+    dependencies=[Depends(require_json)], summary="Giải thích đơn giản hơn hoặc cho ví dụ theo hội thoại",
+    description="Dùng ngữ cảnh phiên thuộc tài khoản đăng nhập, lưu một phản hồi assistant; giữ nguyên mức gợi ý và luồng xác nhận lời giải.",
+    responses={415: {"model": ErrorResponse, "description": "Yêu cầu phải gửi JSON"}},
+)
 async def explain(session_id: SessionId, payload: RequestExplanation, user: CurrentUser, service: Service) -> ChatReplyResponse:
     return await service.explain(user, session_id, payload.mode)
 
