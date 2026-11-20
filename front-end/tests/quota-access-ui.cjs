@@ -118,7 +118,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.equal(await page.locator('.chat-hint-status button').count(), 0);
   assert.equal(await page.getByText('Phản hồi đã lưu 1', { exact: true }).count(), 1);
   remaining = 1; await refresh().click(); await page.getByRole('status', { name: 'Hạn mức AI' }).filter({ hasText: 'Còn 1/30' }).waitFor();
-  actionCode = 'LLM_RATE_LIMITED'; await send.click(); await page.getByText('Dịch vụ model đang giới hạn yêu cầu.', { exact: true }).waitFor();
+  actionCode = 'LLM_RATE_LIMITED'; await send.click(); await page.getByText('Dịch vụ AI đang giới hạn yêu cầu. Hãy thử lại sau.', { exact: true }).waitFor();
   assert.equal(await exhausted().count(), 1); assert.equal(await exhausted().isVisible(), false);
   assert.equal(await input.inputValue(), 'Bản nháp cần giữ');
 

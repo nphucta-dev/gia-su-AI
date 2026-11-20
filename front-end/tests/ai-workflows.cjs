@@ -100,7 +100,7 @@ async function runAIWorkflowChecks({ browser, baseUrl }) {
   let generation = waitPost('/quizzes');
   await page.getByRole('button', { name: 'Tạo bài luyện tập', exact: true }).click();
   assert.equal((await generation).status(), 502);
-  await page.getByText('Bài sinh chưa hợp lệ kiểm thử.', { exact: true }).waitFor();
+  await page.getByText('AI chưa tạo được bộ câu hỏi hợp lệ. Hãy thử tạo lại bài.', { exact: true }).waitFor();
   assert.equal(await page.getByLabel('Độ khó', { exact: true }).inputValue(), 'easy');
   generation = waitPost('/quizzes');
   await page.getByRole('button', { name: 'Tạo bài luyện tập', exact: true }).click();

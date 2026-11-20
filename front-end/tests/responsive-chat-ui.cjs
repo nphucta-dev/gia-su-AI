@@ -45,13 +45,19 @@ const stored = [
    }
    const read = endpoint.match(/\/chat\/sessions\/(\d+)\/messages$/);
    if (read && request.method() === 'GET') return json({ session: sessions[Number(read[1]) - 1], messages: emptyMessages ? [] : stored.map(item => ({ ...item, sessionId: Number(read[1]) })), hasMore: false });
-   if (endpoint.endsWith('/feedback')) return json({ message: { feedback: request.postDataJSON().feedback } });
+   const feedback = endpoint.match(/\/chat\/sessions\/(\d+)\/messages\/(\d+)\/feedback$/);
+   if (feedback) return json({ message: { id: Number(feedback[2]), sessionId: Number(feedback[1]), role: 'assistant', feedback: request.postDataJSON().feedback } });
    if (request.method() === 'POST' && endpoint.includes('/chat/sessions/')) {
     if (actionMode === 'held') await new Promise(resolve => { releaseAction = resolve; });
-    if (actionMode === 'fail') return json({ error: { code: 'LLM_UNAVAILABLE', message: `Chưa thể nhận phản hồi, bạn có thể thử lại. ${longWord}` } }, 503);
+    if (actionMode === 'fail') {
+     stored.push({ id: ++replyId, sessionId: 1, role: 'user', content: request.postDataJSON().content });
+     return json({ error: { code: 'LLM_UNAVAILABLE', message: `Chưa thể nhận phản hồi, bạn có thể thử lại. ${longWord}`, fields: { messageSaved: 'true' } } }, 503);
+    }
     const isSend = endpoint.endsWith('/messages'), isSolution = endpoint.endsWith('/solution');
     const id = replyId += 2;
-    return json({ session: sessions[0], userMessage: isSend ? { id: id - 1, sessionId: 1, role: 'user', content: request.postDataJSON().content } : undefined, assistantMessage: { id, sessionId: 1, role: 'assistant', content: `Phản hồi mới ${id} ${longWord}`, hintLevel: isSolution ? null : 2, isFullSolution: isSolution } });
+    const result = { session: sessions[0], userMessage: isSend ? { id: id - 1, sessionId: 1, role: 'user', content: request.postDataJSON().content } : undefined, assistantMessage: { id, sessionId: 1, role: 'assistant', content: `Phản hồi mới ${id} ${longWord}`, hintLevel: isSolution ? null : 2, isFullSolution: isSolution } };
+    stored.push(...[result.userMessage, result.assistantMessage].filter(Boolean));
+    return json(result);
    }
    return json({ error: { code: 'UNMOCKED', message: endpoint } }, 404);
   });
@@ -199,7 +205,7 @@ const stored = [
   await page.locator('.message.assistant').first().waitFor();
   remaining = 0; await page.reload(); await page.getByLabel('Hạn mức AI').filter({ hasText: 'Còn 0/30' }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Gửi câu hỏi', exact: true }).isDisabled(), true);
-  assert.equal(await page.getByRole('button', { name: 'Gợi ý tiếp · Mức 2', exact: true }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: 'Gợi ý tiếp · Mức 3', exact: true }).isDisabled(), true);
   await input.fill('Vẫn soạn được bản nháp khi hết lượt.'); await fits(page, 'quota zero 360');
   emptyMessages = true; await page.reload(); await page.getByText('Phiên này chưa có tin nhắn.', { exact: true }).waitFor(); await fits(page, 'chat empty 360'); emptyMessages = false;
 
