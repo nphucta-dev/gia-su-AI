@@ -26,10 +26,11 @@ export function renderLiveChat() {
  const requestedTopic = positiveId(params.get('topic'));
  let topics = [], sessions = [], selectedSession = null, selectedMessages = [];
  let topicId = requestedTopic, nextOffset = 0, hasMore = false, listPending = false;
- let busy = false, confirming = false, loaded = false, quota = null;
+ let busy = false, confirming = false, loaded = false;
+ let quotaPending = false, quotaExhausted = false, quotaVersion = 0;
  const topic = el('select', { className: 'select', 'aria-label': 'Chủ đề học', disabled: true });
  const sidebarStatus = el('div', { role: 'status' });
- const sessionList = el('nav', { className: 'session-list', 'aria-label': 'Các phiên chat đã lưu' });
+ const sessionList = el('nav', { className: 'session-list', 'aria-label': 'Các phiên chat đã lưu', tabindex: '-1' });
  const pagination = el('div', { className: 'session-pagination' });
  const title = el('h2', {}, 'Chọn chủ đề để bắt đầu');
  const description = el('p', { className: 'helper' });
@@ -43,6 +44,13 @@ export function renderLiveChat() {
  const simplify = button('Giải thích đơn giản', () => runAction('simplify'), 'ghost small');
  const example = button('Cho ví dụ', () => runAction('example'), 'ghost small');
  const controls = el('div', { className: 'chat-hint-controls' }, hint, solution, simplify, example);
+ const quotaReadNotice = el('div', { className: 'notice warning', hidden: true },
+  el('p', { role: 'status', 'aria-live': 'polite' }, 'Bạn đã dùng hết lượt AI hôm nay. Bạn vẫn có thể xem lại hội thoại và tiến độ học tập.'),
+  el('div', { className: 'page-actions' }, button('Xem lịch sử trò chuyện', () => {
+   (sessionList.querySelector('a') || sessionList).focus();
+  }, 'ghost small'), link('Xem tiến độ', '#dashboard', 'button ghost small')));
+ const quotaRefresh = button('Kiểm tra lại hạn mức', () => loadQuota(), 'ghost small');
+ const quotaTools = el('div', { className: 'quota-access-tools' }, quotaReadNotice, quotaRefresh);
  const form = el('form', { className: 'chat-composer', novalidate: true },
   el('div', { className: 'composer-row' }, input, send),
   el('p', { className: 'chat-footer' }, 'Câu trả lời do AI tạo, hãy đối chiếu với tài liệu học tập.'));
@@ -59,7 +67,7 @@ export function renderLiveChat() {
     el('div', { className: 'chat-sidebar-header' }, el('h2', {}, 'Lịch sử phiên'), newSession, link('Chọn chủ đề mới', '#home', 'button ghost small')),
     topic, sidebarStatus, sessionList, pagination),
    el('section', { className: 'chat-main' }, el('div', { className: 'chat-header chat-session-header' },
-    el('div', {}, title, description, quotaStatus), controls, actionStatus), messages, form)));
+    el('div', {}, title, description, quotaStatus), controls, actionStatus, quotaTools), messages, form)));
 
  function current() { return !controller.signal.aborted && root.isConnected; }
  function openTopic() { return topics.find(item => Number(item.id) === Number(selectedSession?.topicId || topicId)); }
@@ -70,7 +78,7 @@ export function renderLiveChat() {
   return Math.max(0, ...selectedMessages.slice(start + 1).filter(item => item.role === 'assistant').map(item => Number(item.hintLevel) || 0));
  }
  function drawControls() {
-  const blocked = busy || confirming || !loaded || !openTopic() || quota?.remaining === 0;
+  const blocked = busy || confirming || !loaded || !openTopic() || quotaExhausted;
   input.disabled = busy || confirming || !loaded || !openTopic();
   send.disabled = blocked;
   send.textContent = busy ? 'Đang xử lý…' : 'Gửi câu hỏi';
@@ -80,15 +88,28 @@ export function renderLiveChat() {
   hint.disabled = blocked || !hasQuestion() || hintLevel() >= 3;
   for (const control of [solution, simplify, example]) control.disabled = blocked || !hasQuestion();
   form.setAttribute('aria-busy', String(busy));
+  quotaReadNotice.hidden = !quotaExhausted;
+  quotaRefresh.disabled = quotaPending;
+  quotaRefresh.textContent = quotaPending ? 'Đang kiểm tra hạn mức…' : 'Kiểm tra lại hạn mức';
  }
  async function loadQuota() {
+  if (quotaPending || !current()) return;
+  quotaPending = true;
+  const version = ++quotaVersion;
+  drawControls();
   try {
    const result = await api('/ai/quota', { signal: controller.signal });
-   if (!current()) return;
-   quota = result;
+   if (!current() || version !== quotaVersion) return;
+   if (!Number.isSafeInteger(result?.limit) || result.limit <= 0 || !Number.isSafeInteger(result.remaining)
+    || result.remaining < 0 || result.remaining > result.limit || typeof result.nextResetAt !== 'string'
+    || !/(?:Z|[+-]\d{2}:\d{2})$/.test(result.nextResetAt) || !Number.isFinite(Date.parse(result.nextResetAt))) {
+    throw new ApiError('Hạn mức từ máy chủ chưa hợp lệ.', 0, 'INVALID_QUOTA');
+   }
+   quotaExhausted = result.remaining === 0;
    quotaStatus.textContent = `Còn ${result.remaining}/${result.limit} lượt AI · Đặt lại ${timeFor(result.nextResetAt)}`;
-   drawControls();
-  } catch (error) { if (error.name !== 'AbortError' && current()) quotaStatus.textContent = ''; }
+  } catch (error) {
+   if (error.name !== 'AbortError' && current() && version === quotaVersion) quotaStatus.textContent = 'Chưa kiểm tra được hạn mức. Bạn vẫn có thể đọc lịch sử và xem tiến độ.';
+  } finally { quotaPending = false; if (current()) drawControls(); }
  }
  function renderMessage(message) {
   if (!message || !['user', 'assistant'].includes(message.role) || typeof message.content !== 'string') throw new ApiError('Tin nhắn từ máy chủ chưa hợp lệ.');
@@ -209,7 +230,7 @@ export function renderLiveChat() {
   drawSession();
  }
  async function runAction(kind, content = '') {
-  if (busy || confirming || !loaded || !openTopic() || quota?.remaining === 0) return;
+  if (busy || confirming || !loaded || !openTopic() || quotaExhausted) return;
   busy = true; actionStatus.replaceChildren(el('p', {}, 'Đang chuẩn bị phản hồi…')); drawControls();
   let retryKind = kind;
   try {
@@ -226,6 +247,13 @@ export function renderLiveChat() {
    actionStatus.replaceChildren();
   } catch (error) {
    if (error.name === 'AbortError' || !current()) return;
+   if (error.code === 'AI_QUOTA_EXCEEDED') {
+    quotaExhausted = true;
+    ++quotaVersion;
+    quotaStatus.textContent = 'Hạn mức AI đã hết. Kiểm tra lại hạn mức khi bạn muốn tiếp tục.';
+    actionStatus.replaceChildren();
+    return;
+   }
    if (kind === 'send' && error.fields?.messageSaved === 'true') {
     input.value = ''; retryKind = 'retry';
     try { await loadMessages(selectedSession.id); } catch { /* Câu hỏi đã lưu vẫn đọc lại được bằng lịch sử. */ }
@@ -237,11 +265,11 @@ export function renderLiveChat() {
      : error.status === 404 || error.code === 'TOPIC_CLOSED' ? null : button('Thử lại', retry, 'secondary small'));
   } finally {
    busy = false;
-   if (current()) { drawControls(); loadQuota(); }
+   if (current()) { drawControls(); if (!quotaExhausted) loadQuota(); }
   }
  }
  async function requestSolution() {
-  if (busy || confirming || !hasQuestion() || !openTopic()) return;
+  if (busy || confirming || !hasQuestion() || !openTopic() || quotaExhausted) return;
   confirming = true; drawControls();
   const confirmed = await confirmDialog('Xem lời giải đầy đủ?', 'Bạn có chắc muốn xem lời giải đầy đủ cho câu hỏi này?', 'Xem lời giải');
   confirming = false;
@@ -258,6 +286,19 @@ export function renderLiveChat() {
   runAction('send', validation.text);
  });
  topic.addEventListener('change', () => { location.hash = `chat?topic=${topic.value}`; });
+ function showHistoryReadError() {
+  const retry = button('Thử tải lại hội thoại', async () => {
+   if (retry.disabled || !current()) return;
+   retry.disabled = true;
+   try {
+    await loadMessages(requestedSession);
+    if (current()) { loaded = true; drawControls(); }
+   } catch (error) {
+    if (error.name !== 'AbortError' && current()) showHistoryReadError();
+   }
+  }, 'secondary');
+  messages.replaceChildren(notice('Chưa tải được hội thoại. Bạn có thể thử lại; danh sách phiên vẫn truy cập được.', 'error'), retry);
+ }
  queueMicrotask(async () => {
   if (!current()) return;
   const observer = new MutationObserver(() => { if (!root.isConnected) { controller.abort(); observer.disconnect(); } });
@@ -281,7 +322,8 @@ export function renderLiveChat() {
   } catch (error) {
    if (error.name !== 'AbortError' && current()) {
     loaded = false; title.textContent = 'Chưa thể mở phiên học';
-    messages.replaceChildren(notice(error.message, 'error'), link('Về trang học', '#home', 'button secondary'));
+    if (requestedSession) showHistoryReadError();
+    else messages.replaceChildren(notice(error.message, 'error'), link('Về trang học', '#home', 'button secondary'));
    }
   } finally { if (current()) drawControls(); }
  });

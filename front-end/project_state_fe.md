@@ -52,6 +52,7 @@ Các mục trên chỉ xác nhận phần UI hoặc client behavior; task nghi�
 | TK-068 | Trang quản trị môn/chủ đề | Đã nối API CRUD cho môn học/chủ đề và trạng thái active; có loading, lỗi/thử lại, validation, tìm kiếm và responsive 360px. Preview vẫn tách riêng, không ghi API. |
 | TK-069 | Trang quản trị tài liệu | Chưa xong và đang bị hồi quy; upload/trạng thái/bật tắt chỉ ở preview |
 | TK-076 | UI hiển thị quota | Hoàn thành phạm vi FE: hiển thị lượt còn lại và thời điểm reset có timezone, xử lý loading/còn ít/hết lượt/lỗi/retry/response sai và cache theo phiên tài khoản. Browser test dùng API mock theo hợp đồng FE dự kiến; backend đếm lượt và API quota TK-075/TK-077 chưa được triển khai nên chưa hoàn thành end-to-end. |
+| TK-078 | UI truy cập khi hết quota | Hoàn thành phạm vi FE: hết quota vẫn đọc/chuyển/phân trang/retry lịch sử chat, đánh giá phản hồi và truy cập dashboard; chỉ khóa hành động gọi AI, giữ draft, xử lý AI_QUOTA_EXCEEDED và kiểm tra lại hạn mức. Dùng GET /api/ai/quota và API lịch sử chat hiện có. Browser test API mock PASS; dashboard và #history còn dữ liệu mẫu, chỉ xác minh truy cập route, chưa xác minh backend/database thật. |
 | TK-083 | Nhãn cảnh báo nội dung AI | Có phần UI |
 | TK-091 | Responsive quiz/dashboard/admin | Một phần; có CSS/ảnh/test mới nhưng các trang vẫn dùng dữ liệu mẫu |
 
