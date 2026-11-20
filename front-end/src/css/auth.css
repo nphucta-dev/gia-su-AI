@@ -115,6 +115,7 @@
 }
 
 .account-screen .auth-layout{width:100%;padding-top:0;min-height:0;}
+.account-screen .auth-layout--login .password-toggle { top: 2px; min-height: 44px; }
 .account-screen [hidden]{display:none!important;}
 
 .account-screen .preview-login{margin-top:24px;padding-top:24px;border-top:1px solid var(--color-border-soft)}.account-screen .preview-login h2{font-size:18px;margin-bottom:8px}.account-screen .preview-login p{color:var(--color-muted);font-size:14px;margin-bottom:16px}.account-screen .preview-login .button{min-height:44px;white-space:normal}

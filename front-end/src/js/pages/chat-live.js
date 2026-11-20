@@ -2,6 +2,7 @@ import { api, ApiError } from '../api.js';
 import { loadCatalog, flattenTopics } from '../catalog.js';
 import { el, button, heading, notice, confirmDialog, link } from '../components/ui.js';
 import { validateChatQuestion } from '../chat-question.js';
+import { chatSidebar } from '../components/chat-sidebar.js';
 
 let activeController;
 
@@ -52,10 +53,10 @@ export function renderLiveChat() {
   history.replaceState(null, '', topicId ? `#chat?topic=${topicId}` : '#chat');
   drawSession();
  });
- const root = el('div', {},
+ const root = el('div', { className: 'chat-view' },
   heading('Hỏi gia sư AI', 'Gợi mở từng bước và mở lại hội thoại đã lưu của bạn.'),
   el('div', { className: 'chat-layout chat-history-layout' },
-   el('aside', { className: 'chat-sidebar', 'aria-label': 'Lịch sử phiên chat' },
+   chatSidebar('Lịch sử phiên chat',
     el('div', { className: 'chat-sidebar-header' }, el('h2', {}, 'Lịch sử phiên'), newSession, link('Chọn chủ đề mới', '#home', 'button ghost small')),
     topic, sidebarStatus, sessionList, pagination),
    el('section', { className: 'chat-main' }, el('div', { className: 'chat-header chat-session-header' },
@@ -121,19 +122,20 @@ export function renderLiveChat() {
   }
   return node;
  }
- function drawMessages() {
+ function drawMessages(followLatest = true) {
+  const previousTop = messages.scrollTop;
   messages.replaceChildren(...selectedMessages.map(renderMessage));
   if (!selectedMessages.length) messages.append(el('div', { className: 'empty-state' }, selectedSession ? 'Phiên này chưa có tin nhắn.' : 'Nhập câu hỏi để bắt đầu phiên học mới.'));
-  requestAnimationFrame(() => { if (current()) messages.scrollTop = messages.scrollHeight; });
+  requestAnimationFrame(() => { if (current()) messages.scrollTop = followLatest ? messages.scrollHeight : previousTop; });
  }
- function drawSession() {
+ function drawSession(followLatest = true) {
   const selected = openTopic();
   title.textContent = selectedSession ? titleFor(selectedSession) : selected?.name || 'Chưa có chủ đề đang mở';
   description.textContent = selectedSession
    ? [selectedSession.subjectName, selectedSession.chapterName, selectedSession.topicName].filter(Boolean).join(' · ')
    : selected ? [selected.subjectName, selected.chapterName, selected.name].filter(Boolean).join(' · ') : 'Chọn chủ đề trên trang học để bắt đầu.';
   if (selectedSession && !selected) description.textContent += ' · Chủ đề đã đóng, bạn vẫn có thể đọc lịch sử.';
-  drawMessages(); drawSessions(); drawControls();
+  drawMessages(followLatest); drawSessions(); drawControls();
  }
  function drawSessions() {
   const visible = [...sessions];
@@ -194,6 +196,7 @@ export function renderLiveChat() {
   drawSession();
  }
  function acceptReply(result, kind) {
+  const followLatest = messages.scrollHeight - messages.clientHeight - messages.scrollTop < 48;
   const assistant = result?.assistantMessage;
   if (!result?.session || result.session.id !== selectedSession?.id || !assistant || !positiveId(assistant.id)
    || assistant.sessionId !== selectedSession.id || assistant.role !== 'assistant' || typeof assistant.content !== 'string'
@@ -206,7 +209,7 @@ export function renderLiveChat() {
   const position = sessions.findIndex(item => item.id === selectedSession.id);
   if (position >= 0) sessions.splice(position, 1);
   sessions.unshift(selectedSession);
-  drawSession();
+  drawSession(followLatest);
  }
  async function runAction(kind, content = '') {
   if (busy || confirming || !loaded || !openTopic() || quota?.remaining === 0) return;
@@ -247,6 +250,7 @@ export function renderLiveChat() {
   confirming = false;
   if (!current()) return;
   drawControls();
+  if (!confirmed && !solution.disabled) solution.focus({ preventScroll: true });
   if (confirmed) await runAction('solution');
  }
  form.addEventListener('submit', event => {
