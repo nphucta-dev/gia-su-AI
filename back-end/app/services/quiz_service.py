@@ -8,7 +8,7 @@ from app.repositories.quiz_repository import (
 )
 from app.repositories.user_repository import User, parse_user_id
 from app.schemas.quiz import (
-    QuizItem, QuizQuestionItem, QuizResponse,
+    QuizItem, QuizQuestionItem, QuizResponse, QuizResultItem, QuizResultQuestionItem, QuizResultResponse,
     QuizSubmissionItem, QuizSubmissionResponse, SavedQuizAnswerItem, SubmitQuizAnswersRequest,
 )
 from app.utils.errors import AppError
@@ -84,4 +84,50 @@ class QuizService:
             status="accepted",
             saved_count=len(saved),
             answers=[SavedQuizAnswerItem(question_id=item.question_id, user_answer=item.user_answer) for item in saved],
+        ))
+
+    async def get_quiz_result(self, user: User, quiz_id: int) -> QuizResultResponse:
+        """TK-061: Trả kết quả từng câu (lựa chọn, đáp án đúng, đúng/sai, explanation) sau khi nộp bài."""
+        if not user.is_active or parse_user_id(user.id) is None:
+            raise AppError(401, "ACCOUNT_INACTIVE", "Tài khoản không còn hoạt động.")
+        if not isinstance(quiz_id, int) or parse_user_id(quiz_id) is None:
+            raise AppError(422, "VALIDATION_ERROR", "Mã bài luyện tập không hợp lệ.")
+        try:
+            record = await self._repository.find_quiz(user.id, quiz_id)
+            answers = await self._repository.find_quiz_answers(user.id, quiz_id) if record is not None else None
+        except SQLAlchemyError:
+            raise AppError(503, "QUIZ_UNAVAILABLE", "Chưa thể tải kết quả bài luyện tập. Vui lòng thử lại sau.") from None
+        if record is None or record.user_id != user.id or answers is None:
+            raise AppError(404, "QUIZ_NOT_FOUND", "Không tìm thấy bài luyện tập của bạn.")
+        answer_by_question = {item.question_id: item for item in answers}
+        if len(answer_by_question) != len(record.questions):
+            raise AppError(409, "QUIZ_NOT_COMPLETED", "Bài luyện tập chưa được nộp nên chưa có kết quả.")
+        items: list[QuizResultQuestionItem] = []
+        correct_count = 0
+        for question in record.questions:
+            ans = answer_by_question[question.id]
+            if ans.is_correct:
+                correct_count += 1
+            items.append(QuizResultQuestionItem(
+                id=question.id,
+                position=question.position,
+                question_text=question.question_text,
+                options=question.options,
+                user_answer=ans.user_answer,
+                correct_answer=question.correct_answer,
+                is_correct=ans.is_correct,
+                explanation=question.explanation,
+            ))
+        total_count = len(record.questions)
+        score = record.score if record.score is not None else round(correct_count / total_count * 100, 2)
+        return QuizResultResponse(result=QuizResultItem(
+            id=record.id,
+            topic_id=record.topic_id,
+            difficulty=record.difficulty,
+            status=record.status,
+            score=score,
+            correct_count=correct_count,
+            total_count=total_count,
+            completed_at=record.completed_at,
+            questions=items,
         ))

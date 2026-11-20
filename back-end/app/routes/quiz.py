@@ -8,7 +8,7 @@ from app.dependencies.auth import get_current_user
 from app.repositories.user_repository import User
 from app.routes.auth import require_json
 from app.schemas.auth import ErrorResponse
-from app.schemas.quiz import QuizResponse, QuizSubmissionResponse, SubmitQuizAnswersRequest
+from app.schemas.quiz import QuizResponse, QuizResultResponse, QuizSubmissionResponse, SubmitQuizAnswersRequest
 from app.services.quiz_service import QuizService
 
 
@@ -44,3 +44,16 @@ async def submit_quiz_answers(
     service: Annotated[QuizService, Depends(get_service)],
 ) -> QuizSubmissionResponse:
     return await service.submit_answers(user, quiz_id, payload)
+
+
+@router.get(
+    "/{quiz_id}/result",
+    response_model=QuizResultResponse,
+    summary="Xem kết quả bài luyện tập: lựa chọn, đúng/sai và lời giải thích",
+)
+async def get_quiz_result(
+    quiz_id: QuizId,
+    user: CurrentUser,
+    service: Annotated[QuizService, Depends(get_service)],
+) -> QuizResultResponse:
+    return await service.get_quiz_result(user, quiz_id)
