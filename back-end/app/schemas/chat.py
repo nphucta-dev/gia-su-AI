@@ -21,6 +21,11 @@ class RequestFullSolutionRequest(BaseModel):
     confirmed: bool = Field(strict=True)
 
 
+class UpdateMessageFeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    feedback: Literal[-1, 1]
+
+
 class ChatSessionItem(BaseModel):
     id: int
     topic_id: int = Field(serialization_alias="topicId")
@@ -41,6 +46,8 @@ class ChatMessageItem(BaseModel):
     hint_level: int | None = Field(default=None, serialization_alias="hintLevel")
     is_full_solution: bool = Field(default=False, serialization_alias="isFullSolution")
     source_refs: list[dict[str, Any]] = Field(default_factory=list, serialization_alias="sourceRefs")
+
+    feedback: Literal[-1, 1] | None = None
     token_count: int | None = Field(default=None, serialization_alias="tokenCount")
     created_at: str = Field(serialization_alias="createdAt")
 
@@ -68,3 +75,7 @@ class ChatReplyResponse(BaseModel):
     session: ChatSessionItem
     user_message: ChatMessageItem | None = Field(default=None, serialization_alias="userMessage")
     assistant_message: ChatMessageItem = Field(serialization_alias="assistantMessage")
+
+
+class ChatMessageResponse(BaseModel):
+    message: ChatMessageItem

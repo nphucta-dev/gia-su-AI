@@ -13,7 +13,9 @@ from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.subject import Subject
 from app.models.topic import Topic
-from app.repositories.chat_repository import ChatChangedError, ChatMessageRecord, ChatSessionRecord, utc_timestamp
+from app.repositories.chat_repository import (
+    ChatChangedError, ChatMessageRecord, ChatSessionRecord, FeedbackTargetError, utc_timestamp,
+)
 
 
 class SqlAlchemyChatRepository:
@@ -52,6 +54,9 @@ class SqlAlchemyChatRepository:
     async def count_assistant_messages_since(self, user_id: int, since: datetime) -> int:
         return await asyncio.to_thread(self._count_assistant_messages_since, user_id, since)
 
+    async def update_message_feedback(self, user_id: int, message_id: int, feedback: int) -> ChatMessageRecord | None:
+        return await asyncio.to_thread(self._update_message_feedback, user_id, message_id, feedback)
+
     @staticmethod
     def _session_query(user_id: int):
         return (
@@ -87,6 +92,7 @@ class SqlAlchemyChatRepository:
             is_full_solution=message.is_full_solution,
             source_refs=[dict(item) for item in (message.source_refs or [])],
             token_count=message.token_count,
+            feedback=message.feedback,
         )
 
     def _create_session(self, user_id: int, topic_id: int, title: str | None) -> ChatSessionRecord | None:
@@ -173,3 +179,19 @@ class SqlAlchemyChatRepository:
                     )
                 ) or 0
             )
+
+    def _update_message_feedback(self, user_id: int, message_id: int, feedback: int) -> ChatMessageRecord | None:
+        with self._sessions.begin() as db:
+            message = db.scalar(
+                select(ChatMessage)
+                .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+                .where(ChatMessage.id == message_id, ChatSession.user_id == user_id)
+                .with_for_update()
+            )
+            if message is None:
+                return None
+            if message.role != "assistant":
+                raise FeedbackTargetError()
+            message.feedback = feedback
+            db.flush()
+            return self._message_record(message)

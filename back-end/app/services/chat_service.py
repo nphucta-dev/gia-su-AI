@@ -10,9 +10,13 @@ from app.config import Settings
 from app.prompts import SocraticTopic
 from app.repositories.chat_repository import ChatChangedError, ChatMessageRecord, ChatRepository, ChatSessionRecord
 from app.repositories.document_repository import DocumentChunkRecord, DocumentRepository
+
+from app.repositories.chat_repository import (
+    ChatChangedError, ChatMessageRecord, ChatRepository, ChatSessionRecord, FeedbackTargetError,
+)
 from app.repositories.user_repository import User
 from app.schemas.chat import (
-    ChatMessageItem, ChatMessageListResponse, ChatReplyResponse, ChatSessionItem,
+    ChatMessageItem, ChatMessageListResponse, ChatMessageResponse, ChatReplyResponse, ChatSessionItem,
     ChatSessionListResponse, ChatSessionResponse,
 )
 from app.services.chat_context import build_chat_messages, build_full_solution_messages, redact_sensitive_text
@@ -212,6 +216,21 @@ class ChatService:
                 user, session, expected_last_id=history[-1].id,
                 hint_level=None, is_full_solution=True, history=history,
             )
+
+    async def update_message_feedback(self, user: User, message_id: int, feedback: int) -> ChatMessageResponse:
+        """TK-074: Cập nhật feedback (-1/1) trên cùng tin nhắn assistant, không tạo bản ghi mới."""
+        if feedback not in (-1, 1) or isinstance(feedback, bool):
+            raise AppError(
+                422, "VALIDATION_ERROR", "Giá trị đánh giá không hợp lệ.",
+                {"feedback": "Đánh giá phải là 1 (hữu ích) hoặc -1 (chưa hữu ích)."},
+            )
+        try:
+            updated = await self._repository.update_message_feedback(user.id, message_id, feedback)
+        except FeedbackTargetError:
+            raise AppError(409, "FEEDBACK_ASSISTANT_ONLY", "Chỉ được đánh giá phản hồi của gia sư AI.") from None
+        if updated is None:
+            raise AppError(404, "CHAT_MESSAGE_NOT_FOUND", "Không tìm thấy tin nhắn của bạn.")
+        return ChatMessageResponse(message=message_item(updated))
 
     async def _reply(
         self, user: User, session: ChatSessionRecord, *, expected_last_id: int,
