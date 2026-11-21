@@ -1,0 +1,10 @@
+CÔNG CỦA LỰC KHÔNG ĐỔI VÀ CÔNG SUẤT TRUNG BÌNH
+Nguồn: nội dung giáo dục minh họa gốc đi kèm Gia Sư AI; giấy phép CC0 1.0. Không phải sách giáo khoa chính thức.
+
+Công của một lực không đổi khi điểm đặt dịch chuyển thẳng một đoạn s được tính bằng A = Fs cos α. Ở đây F là độ lớn lực, s là độ lớn độ dời và α là góc giữa lực với vectơ độ dời. Công có đơn vị joule; 1 J = 1 N.m. Công không phải lúc nào cũng bằng tích Fs vì còn phụ thuộc hướng lực.
+
+Lực sinh công dương khi cos α > 0, công âm khi cos α < 0, và công bằng 0 khi lực vuông góc độ dời. Ví dụ, khi vật trượt ngang trên mặt phẳng ngang, trọng lực không sinh công vì vuông góc chuyển dời. Ma sát trượt ngược hướng chuyển động thường sinh công âm.
+
+Ví dụ, lực kéo không đổi 20 N hợp với hướng dịch chuyển góc 60°, vật đi thẳng 3 m. Công của lực kéo là A = 20 × 3 × cos 60° = 30 J. Nếu quá trình kéo kéo dài 2 s, công suất trung bình của lực là Ptb = A/Δt = 15 W. Một watt bằng một joule mỗi giây.
+
+Công suất cho biết tốc độ thực hiện công, không phải tổng lượng công. Tự kiểm tra: hai máy thực hiện cùng công 600 J trong thời gian lần lượt 3 s và 6 s. Máy nào có công suất trung bình lớn hơn? Khi lực giữ nguyên nhưng hướng lực vuông góc độ dời, công suất trung bình do công đó là bao nhiêu?

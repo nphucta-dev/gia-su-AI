@@ -15,6 +15,10 @@ Schema hiện tại dùng `INT AUTO_INCREMENT` cho ID của 11 bảng; API trả
 
 Xem [hướng dẫn database](../database/README.md) để kết nối MySQL, cấu hình `.env`, tạo đủ 11 bảng bằng migration và seed dữ liệu.
 
+Seed demo có 2 môn, mỗi môn 5 chủ đề, 10 tài liệu TXT gốc đã trích/chia đoạn và
+tài khoản LEARNER/ADMIN. Chạy `python -m app.db.seed` để bổ sung; chạy lại giữ
+dữ liệu đã có. Nội dung và nguồn tại [demo_documents](app/db/demo_documents/README.md).
+
 ## Chạy
 
 Trong Git Bash (Windows), từ thư mục `back-end/`:

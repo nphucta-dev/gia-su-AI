@@ -1,0 +1,10 @@
+HÀM SỐ BẬC HAI: ĐỈNH VÀ CHIỀU BIẾN THIÊN
+Nguồn: nội dung giáo dục minh họa gốc đi kèm Gia Sư AI; giấy phép CC0 1.0. Không phải sách giáo khoa chính thức.
+
+Hàm số bậc hai có dạng y = ax² + bx + c, với a khác 0. Tập xác định là toàn bộ số thực. Đồ thị là một parabol có trục đối xứng x = -b/(2a). Đỉnh có hoành độ x0 = -b/(2a) và tung độ y0 = f(x0). Luôn thay x0 vào biểu thức ban đầu để kiểm tra phép tính.
+
+Khi a > 0, parabol mở lên: hàm giảm trên khoảng (-∞; x0), tăng trên khoảng (x0; +∞), và giá trị nhỏ nhất bằng y0. Khi a < 0, parabol mở xuống; hai chiều biến thiên đảo lại và y0 là giá trị lớn nhất. Không được xác định chiều biến thiên chỉ từ dấu của b.
+
+Ví dụ, y = x² - 4x + 3 = (x - 2)² - 1. Đỉnh là I(2; -1), trục đối xứng x = 2. Hàm đạt giá trị nhỏ nhất -1 tại x = 2. Hai điểm có hoành độ 1 và 3 cùng cho tung độ 0, phù hợp tính đối xứng.
+
+Tự kiểm tra: với y = -2x² + 8x - 5, hãy tìm hoành độ đỉnh trước, rồi xác định đồ thị mở lên hay xuống. Vì sao giá trị tại đỉnh là lớn nhất? Hãy chọn hai hoành độ cách đều trục để kiểm tra kết quả.

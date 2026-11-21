@@ -1,0 +1,10 @@
+PHƯƠNG TRÌNH BẬC HAI: BIỆT THỨC VÀ KIỂM TRA NGHIỆM
+Nguồn: nội dung giáo dục minh họa gốc đi kèm Gia Sư AI; giấy phép CC0 1.0. Không phải sách giáo khoa chính thức.
+
+Phương trình bậc hai một ẩn có dạng ax² + bx + c = 0 với a khác 0. Nếu a bằng 0, cần xét phương trình bậc nhất hoặc phương trình hằng thay vì dùng công thức nghiệm bậc hai. Trong phạm vi số thực, số nghiệm được quyết định bởi biệt thức Δ = b² - 4ac.
+
+Nếu Δ > 0, phương trình có hai nghiệm phân biệt x1 = (-b + √Δ)/(2a) và x2 = (-b - √Δ)/(2a). Nếu Δ = 0, phương trình có nghiệm kép x = -b/(2a). Nếu Δ < 0, phương trình không có nghiệm thực. Dấu căn phải áp dụng cho toàn bộ Δ và mẫu số phải là 2a.
+
+Ví dụ, x² - 5x + 6 = 0 có Δ = 25 - 24 = 1, nên nghiệm là 2 và 3. Có thể kiểm tra bằng cách thế từng nghiệm vào biểu thức ban đầu hoặc phân tích (x - 2)(x - 3) = 0. Định lý Vi-ét cho x1 + x2 = -b/a và x1x2 = c/a khi phương trình có nghiệm thực.
+
+Tự kiểm tra: phương trình 2x² + 4x + 2 = 0 thuộc trường hợp biệt thức nào? Nếu chia cả hai vế cho 2 trước khi giải, tập nghiệm có đổi không? Hãy kiểm tra nghiệm bằng phép thế thay vì chỉ dựa vào công thức.

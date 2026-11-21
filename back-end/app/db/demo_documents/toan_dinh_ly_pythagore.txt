@@ -1,0 +1,10 @@
+ĐỊNH LÝ PYTHAGORE: CẠNH HUYỀN VÀ TAM GIÁC VUÔNG
+Nguồn: nội dung giáo dục minh họa gốc đi kèm Gia Sư AI; giấy phép CC0 1.0. Không phải sách giáo khoa chính thức.
+
+Trong một tam giác vuông, bình phương độ dài cạnh huyền bằng tổng bình phương độ dài hai cạnh góc vuông. Nếu hai cạnh góc vuông có độ dài a, b và cạnh huyền có độ dài c thì a² + b² = c². Cạnh huyền nằm đối diện góc vuông và là cạnh dài nhất. Công thức không áp dụng cho một tam giác bất kỳ chưa biết có góc vuông.
+
+Khi biết hai cạnh góc vuông, tính c = √(a² + b²), lấy căn dương vì độ dài dương. Khi biết cạnh huyền c và một cạnh góc vuông a, cạnh còn lại là b = √(c² - a²), với c > a. Các độ dài phải được đổi về cùng đơn vị trước khi bình phương.
+
+Ví dụ, tam giác vuông có hai cạnh góc vuông dài 3 cm và 4 cm thì cạnh huyền dài √(9 + 16) = 5 cm. Theo định lý đảo, một tam giác có các cạnh 5 cm, 12 cm và 13 cm là tam giác vuông vì cạnh lớn nhất thỏa 13² = 5² + 12². Góc vuông nằm đối diện cạnh 13 cm.
+
+Tự kiểm tra: một thang dài 10 m tựa vào tường thẳng đứng, chân thang cách tường 6 m. Nếu nền và tường vuông góc, đầu thang cao bao nhiêu? Hãy vẽ hình và xác định cạnh huyền trước khi tính.

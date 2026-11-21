@@ -1,0 +1,10 @@
+ĐỊNH LUẬT OHM CHO ĐIỆN TRỞ THUẦN
+Nguồn: nội dung giáo dục minh họa gốc đi kèm Gia Sư AI; giấy phép CC0 1.0. Không phải sách giáo khoa chính thức.
+
+Với điện trở thuần tuân theo định luật Ohm và các điều kiện vật lý như nhiệt độ được giữ không đổi, cường độ dòng điện qua điện trở tỉ lệ thuận với hiệu điện thế hai đầu: I = U/R. Trong cách tính độ lớn, U đo bằng volt, I bằng ampere và R bằng ohm, với R > 0. Không áp dụng tùy tiện quan hệ tuyến tính này cho mọi linh kiện điện tử.
+
+Ví dụ, điện trở 6 Ω được đặt dưới hiệu điện thế 12 V thì dòng điện có cường độ 2 A. Nếu hiệu điện thế tăng lên 18 V và điện trở vẫn giữ 6 Ω, dòng điện tăng lên 3 A. Khi giữ nguyên U nhưng tăng R gấp đôi, cường độ dòng điện giảm còn một nửa.
+
+Hai điện trở mắc nối tiếp có điện trở tương đương Rtd = R1 + R2 và cùng cường độ dòng điện. Khi mắc song song, chúng có cùng hiệu điện thế và 1/Rtd = 1/R1 + 1/R2. Chỉ dùng các công thức tương đương này sau khi xác định đúng các nút nối của mạch.
+
+Tự kiểm tra: điện trở 4 Ω nối tiếp điện trở 2 Ω rồi đặt vào nguồn hiệu điện thế 12 V lý tưởng. Hãy tìm điện trở tương đương, dòng điện và hiệu điện thế trên từng điện trở. Tổng hai hiệu điện thế thành phần cần bằng bao nhiêu để kiểm tra kết quả?

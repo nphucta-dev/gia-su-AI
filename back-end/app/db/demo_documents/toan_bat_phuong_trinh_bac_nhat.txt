@@ -1,0 +1,10 @@
+BẤT PHƯƠNG TRÌNH BẬC NHẤT VÀ QUY TẮC ĐỔI CHIỀU
+Nguồn: nội dung giáo dục minh họa gốc đi kèm Gia Sư AI; giấy phép CC0 1.0. Không phải sách giáo khoa chính thức.
+
+Bất phương trình bậc nhất một ẩn có thể đưa về ax + b > 0, ax + b ≥ 0, ax + b < 0 hoặc ax + b ≤ 0, trong đó a khác 0. Mục tiêu là tìm mọi số thực x làm mệnh đề đúng, thường biểu diễn bằng khoảng hoặc nửa khoảng trên trục số.
+
+Cộng hoặc trừ cùng một số ở hai vế giữ nguyên chiều bất đẳng thức. Nhân hoặc chia hai vế cho số dương cũng giữ nguyên chiều. Nhân hoặc chia cho số âm bắt buộc đổi chiều. Nếu hệ số của x bằng 0 sau khi rút gọn, hãy xét mệnh đề còn lại đúng với mọi x hay sai với mọi x; không chia cho 0.
+
+Ví dụ, 3 - 2x > 7 tương đương -2x > 4. Chia hai vế cho -2 và đổi chiều, ta được x < -2. Thế x = -3 thì vế trái ban đầu bằng 9, lớn hơn 7; thế x = 0 thì vế trái bằng 3, không thỏa. Điểm -2 không thuộc tập nghiệm vì dấu ban đầu là dấu lớn hơn nghiêm ngặt.
+
+Tự kiểm tra: giải 5x + 1 ≤ 16 và biểu diễn tập nghiệm. Khi thay dấu ≤ bằng <, điểm biên thay đổi thế nào? Hãy giải thích quy tắc đổi chiều bằng hai số cụ thể trước khi áp dụng vào biểu thức chứa x.

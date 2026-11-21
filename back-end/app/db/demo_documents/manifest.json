@@ -1,0 +1,82 @@
+[
+  {
+    "subject": "Toán",
+    "grade_level": "THPT",
+    "chapter_name": "Hàm số",
+    "topic_name": "Hàm số bậc hai",
+    "title": "Hàm số bậc hai: đỉnh và chiều biến thiên",
+    "file_name": "toan_ham_so_bac_hai.txt"
+  },
+  {
+    "subject": "Toán",
+    "grade_level": "THPT",
+    "chapter_name": "Đại số",
+    "topic_name": "Phương trình bậc hai",
+    "title": "Phương trình bậc hai: biệt thức và kiểm tra nghiệm",
+    "file_name": "toan_phuong_trinh_bac_hai.txt"
+  },
+  {
+    "subject": "Toán",
+    "grade_level": "THPT",
+    "chapter_name": "Đại số",
+    "topic_name": "Bất phương trình bậc nhất",
+    "title": "Bất phương trình bậc nhất và quy tắc đổi chiều",
+    "file_name": "toan_bat_phuong_trinh_bac_nhat.txt"
+  },
+  {
+    "subject": "Toán",
+    "grade_level": "THPT",
+    "chapter_name": "Hình học",
+    "topic_name": "Định lý Pythagore",
+    "title": "Định lý Pythagore: cạnh huyền và tam giác vuông",
+    "file_name": "toan_dinh_ly_pythagore.txt"
+  },
+  {
+    "subject": "Toán",
+    "grade_level": "THPT",
+    "chapter_name": "Xác suất",
+    "topic_name": "Xác suất cổ điển",
+    "title": "Xác suất cổ điển trong không gian mẫu hữu hạn",
+    "file_name": "toan_xac_suat_co_dien.txt"
+  },
+  {
+    "subject": "Vật lí",
+    "grade_level": "THPT",
+    "chapter_name": "Cơ học",
+    "topic_name": "Chuyển động thẳng đều",
+    "title": "Chuyển động thẳng đều: vận tốc và phương trình tọa độ",
+    "file_name": "vat_li_chuyen_dong_thang_deu.txt"
+  },
+  {
+    "subject": "Vật lí",
+    "grade_level": "THPT",
+    "chapter_name": "Cơ học",
+    "topic_name": "Chuyển động thẳng biến đổi đều",
+    "title": "Chuyển động thẳng biến đổi đều với gia tốc không đổi",
+    "file_name": "vat_li_chuyen_dong_bien_doi_deu.txt"
+  },
+  {
+    "subject": "Vật lí",
+    "grade_level": "THPT",
+    "chapter_name": "Cơ học",
+    "topic_name": "Định luật II Newton",
+    "title": "Định luật II Newton: hợp lực và gia tốc",
+    "file_name": "vat_li_dinh_luat_ii_newton.txt"
+  },
+  {
+    "subject": "Vật lí",
+    "grade_level": "THPT",
+    "chapter_name": "Cơ học",
+    "topic_name": "Công và công suất",
+    "title": "Công của lực không đổi và công suất trung bình",
+    "file_name": "vat_li_cong_va_cong_suat.txt"
+  },
+  {
+    "subject": "Vật lí",
+    "grade_level": "THPT",
+    "chapter_name": "Điện học",
+    "topic_name": "Định luật Ohm",
+    "title": "Định luật Ohm cho điện trở thuần",
+    "file_name": "vat_li_dinh_luat_ohm.txt"
+  }
+]

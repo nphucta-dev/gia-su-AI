@@ -13,7 +13,8 @@ back-end/
 │   │   ├── database.py                 # Engine, SessionLocal, get_db
 │   │   ├── types.py                    # DATETIME(6), chuyển đổi UTC
 │   │   ├── init_db.py                  # Tạo database và chạy migration
-│   │   └── seed.py                     # Seed môn/chủ đề, ADMIN tùy chọn
+│   │   ├── seed.py                     # Seed danh mục, tài liệu, tài khoản mẫu
+│   │   └── demo_documents/             # 10 TXT gốc + manifest và thông tin nguồn
 │   ├── models/                        # Mỗi bảng một model riêng
 │   └── repositories/
 │       └── sqlalchemy_user_repository.py
@@ -56,7 +57,9 @@ Khởi tạo database, bảng và dữ liệu mẫu:
 
 Sau khi khởi tạo, mở MySQL Workbench, refresh Schemas rồi xem `gia_su_ai`: có 11 bảng nghiệp vụ và bảng hạ tầng `alembic_version`.
 
-Seed thêm 2 môn, 3 chủ đề và hai tài khoản mẫu để thử chức năng:
+Seed thêm **2 môn (Toán, Vật lí), mỗi môn 5 chủ đề**, 10 tài liệu TXT và hai tài
+khoản mẫu để thử chức năng (TK-095). Giữ tên/chương của ba chủ đề cũ để bổ sung
+vào database đã có dữ liệu mà không tạo lại các chủ đề đó:
 
 | Vai trò | Email | Mật khẩu mẫu |
 | --- | --- | --- |
@@ -64,6 +67,27 @@ Seed thêm 2 môn, 3 chủ đề và hai tài khoản mẫu để thử chức n
 | ADMIN | `admin@example.com` | `Admin@123` |
 
 Mật khẩu được băm trước khi lưu. Chạy lại không tạo trùng, không đổi mật khẩu, tên, vai trò hoặc trạng thái tài khoản đã có. Nếu email đã thuộc một vai trò khác, seed báo lỗi để tránh nâng quyền ngoài ý muốn.
+
+Nguồn gốc, danh mục và nội dung TXT nằm trong
+[`back-end/app/db/demo_documents`](../back-end/app/db/demo_documents/README.md).
+Đây là nội dung demo gốc, có ghi nguồn và CC0 trong từng file, không sao chép sách
+hoặc tạo URL nguồn giả (`source_url=NULL`). Seed kiểm tra và chia đoạn bằng cùng
+bộ trích văn bản của luồng tải tài liệu, không cần model AI.
+
+File được sao chép vào `UPLOAD_DIR` (mặc định `back-end/storage/documents`) với
+tên `demo-*.txt`; metadata chỉ lưu tên file tương đối. **Tài liệu demo mới** có
+`status=ready`, `processed_at`, các chunks đánh số từ 0 và `is_active=true` để
+tra cứu được ngay. Luồng upload thông thường vẫn giữ quy tắc ADMIN bật nguồn.
+
+Chạy lại seed giữ nguyên môn/chủ đề đã tắt, tài liệu đã sửa tiêu đề/trạng thái hoặc
+đã tắt, nội dung chunks và các tài khoản có sẵn. Không tự tạo lịch sử chat, bài quiz
+hay tiến độ học giả. Nếu file đích đã có nội dung khác, seed báo lỗi thay vì ghi đè;
+giao dịch database hủy và chỉ dọn các file vừa tạo trong lượt seed bị lỗi.
+
+Seed không tự chạy khi bật Uvicorn. Sau khi cập nhật code, chạy lại
+`python -m app.db.seed` từ `back-end` để nạp phần dữ liệu demo còn thiếu. Khi gọi
+`seed_data` trong mã Python, dùng session trong transaction như CLI; test có thể
+truyền `upload_dir=tmp_path` để tách kho file khỏi dữ liệu đang dùng.
 
 `--admin` tạo thêm ADMIN bằng email/mật khẩu tự nhập (ẩn mật khẩu lúc nhập), hoặc đọc `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` từ môi trường/`.env`. Trên database chưa có tài khoản, nếu dùng đúng email ADMIN mẫu thì mật khẩu tự nhập được ưu tiên. Nếu ADMIN đó đã tồn tại, seed giữ nguyên mật khẩu đang lưu.
 
@@ -172,8 +196,17 @@ Test không cần server kiểm tra mapping, DDL MySQL, SQL migration, timezone 
 ```powershell
 $env:TEST_DATABASE_URL = 'mysql+pymysql://root:your_password@localhost:3306/gia_su_ai?charset=utf8mb4'
 .\venv\Scripts\python.exe -m pytest tests/test_database_integration.py -q
+.\venv\Scripts\python.exe -m pytest tests/test_migration_database_integration.py tests/test_seed_demo_database_integration.py -q
 ```
 
 Test tạo database tạm `gia_su_ai_test_<uuid>` trên cùng server rồi xóa đúng database tạm đó sau khi chạy; không sửa database trong URL. Không đặt `TEST_DATABASE_URL` thì các test tích hợp được skipped.
+
+`test_migration_schema_delivery.py` đối chiếu đủ 11 bảng, 12 FK, ràng buộc và
+index của `schema.sql` với models/Alembic head. `test_migration_database_integration.py`
+nạp dữ liệu UUID vào đủ 11 bảng trước khi nâng revision, kiểm tra giữ nguyên bản ghi,
+liên kết và ID trong nguồn trích dẫn, rồi kiểm tra ID tự tăng sau migration.
+`test_seed_demo.py` kiểm tra nguồn TXT/manifest; `test_seed_demo_database_integration.py`
+kiểm tra seed, API danh mục/tài liệu, retrieval, chạy lại giữ dữ liệu và rollback
+khi gặp file có sẵn khác nội dung.
 
 Mật khẩu hiện có của backend tiếp tục dùng scrypt; yêu cầu bcrypt/Argon2 trong SRS cần được xử lý trong phần xác thực kèm phương án tương thích hash đã lưu.

@@ -1,0 +1,10 @@
+CHUYỂN ĐỘNG THẲNG ĐỀU: VẬN TỐC VÀ PHƯƠNG TRÌNH TỌA ĐỘ
+Nguồn: nội dung giáo dục minh họa gốc đi kèm Gia Sư AI; giấy phép CC0 1.0. Không phải sách giáo khoa chính thức.
+
+Chuyển động thẳng đều là chuyển động trên đường thẳng với vận tốc không đổi. Trước khi lập phương trình, chọn trục tọa độ, chiều dương và mốc thời gian. Nếu tại t = 0 vật ở tọa độ x0 và có vận tốc v thì x = x0 + vt. Công thức dùng khi v giữ nguyên trong khoảng thời gian đang xét.
+
+Vận tốc một chiều có dấu theo chiều chuyển động: v dương khi vật đi theo chiều dương, v âm khi vật đi ngược chiều dương. Tốc độ là độ lớn |v| và không âm. Độ dời là Δx = vΔt. Quãng đường trong chuyển động thẳng đều là s = |v|Δt, với Δt không âm. Không đánh đồng tọa độ, độ dời và quãng đường.
+
+Ví dụ, chọn chiều dương từ A đến B. Một vật có x0 = 10 m và v = -2 m/s. Sau 3 s, tọa độ là x = 10 - 2 × 3 = 4 m; độ dời bằng -6 m, còn quãng đường bằng 6 m. Vật chuyển động theo chiều âm nhưng tốc độ vẫn là 2 m/s.
+
+Tự kiểm tra: hai xe xuất phát cùng lúc tại x = 0 m và x = 100 m, chạy đối đầu với vận tốc lần lượt 5 m/s và -5 m/s. Hãy viết hai phương trình tọa độ và tìm thời điểm gặp nhau bằng điều kiện hai tọa độ bằng nhau.

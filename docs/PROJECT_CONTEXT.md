@@ -295,4 +295,14 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   kể cả hai yêu cầu khác đáp án đồng thời. Sửa fixture cũ cho đúng hợp đồng API;
   giữ scrypt và logic xác thực. Test offline dùng repository/provider giả lập;
   test MySQL cần TEST_DATABASE_URL và database tạm riêng. Xem `docs/QUIZ_BACKEND.md`.
+- TK-095 seed bổ sung 2 môn Toán/Vật lí, 5 chủ đề mỗi môn và 10 TXT demo gốc có
+  ghi nguồn/CC0 trong `app/db/demo_documents`. Giữ tên 3 chủ đề cũ; file sao chép
+  vào UPLOAD_DIR, metadata basename tương đối; trích/chia chunks bằng pipeline có
+  sẵn, nguồn demo mới ready/active có processed_at. Chạy lại giữ dữ liệu/chỉnh sửa
+  và trạng thái ADMIN, không ghi đè file khác nội dung, không tạo lịch sử/điểm giả.
+  Không tự nạp dữ liệu khi khởi động; chạy `python -m app.db.seed` sau cập nhật.
+- TK-085 giữ nguyên migration MySQL 0001/0002 và 11 bảng/12 FK với UNIQUE/CHECK,
+  ID INT AUTO_INCREMENT theo yêu cầu sử dụng. Test bổ sung đối chiếu schema.sql,
+  models và Alembic head; test MySQL dùng database tạm, không migration database
+  dự án chỉ để kiểm thử. Hướng dẫn seed/migration tại `database/README.md`.
 

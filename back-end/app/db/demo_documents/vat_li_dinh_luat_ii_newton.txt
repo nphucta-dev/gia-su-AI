@@ -1,0 +1,10 @@
+ĐỊNH LUẬT II NEWTON: HỢP LỰC VÀ GIA TỐC
+Nguồn: nội dung giáo dục minh họa gốc đi kèm Gia Sư AI; giấy phép CC0 1.0. Không phải sách giáo khoa chính thức.
+
+Trong hệ quy chiếu quán tính, với vật có khối lượng không đổi, định luật II Newton cho biết tổng các vectơ lực tác dụng lên vật bằng khối lượng nhân vectơ gia tốc: ΣF = ma. Gia tốc cùng hướng với hợp lực. Khối lượng đo bằng kg, gia tốc bằng m/s² và lực bằng newton; 1 N = 1 kg.m/s².
+
+Khi giải bài một chiều, cần chọn trục và xét dấu của từng lực. Vẽ các lực tác dụng lên đúng vật đang xét, sau đó chiếu phương trình vectơ lên trục. Lực kéo, lực ma sát và trọng lực không được cộng độ lớn một cách tùy ý. Lực do vật này tác dụng lên vật khác không đưa vào cùng sơ đồ lực của vật ban đầu.
+
+Ví dụ, vật khối lượng 2 kg nằm trên mặt phẳng ngang, chịu lực kéo ngang 8 N và ma sát 2 N ngược chiều chuyển động. Hợp lực ngang là 6 N, nên gia tốc ngang là 3 m/s² theo chiều kéo. Nếu không có gia tốc thẳng đứng, phản lực của mặt phẳng cân bằng trọng lực theo phương đó.
+
+Nếu hợp lực bằng 0 thì gia tốc bằng 0; vật có thể đứng yên hoặc chuyển động thẳng đều. Tự kiểm tra: giữ nguyên hợp lực nhưng tăng khối lượng gấp đôi, gia tốc thay đổi thế nào? Vì sao vật đang chuyển động không nhất thiết phải có hợp lực cùng chiều vận tốc?

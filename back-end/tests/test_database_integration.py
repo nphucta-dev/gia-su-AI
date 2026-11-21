@@ -707,10 +707,10 @@ def test_restrict_catalog_and_cascade_user_history(database):
         assert db.get(Topic, topic_id) is not None
 
 
-def test_seed_can_run_twice(database):
+def test_seed_can_run_twice(database, tmp_path):
     _, sessions = database
     with sessions.begin() as db:
-        seed_data(db)
+        seed_data(db, upload_dir=tmp_path)
         counts = (
             db.scalar(select(func.count()).select_from(Subject)),
             db.scalar(select(func.count()).select_from(Topic)),
@@ -724,7 +724,7 @@ def test_seed_can_run_twice(database):
             assert user.password_hash != sample["password"]
             assert verify_password(sample["password"], user.password_hash)
             accounts[user.email] = (user.id, user.password_hash)
-        seed_data(db)
+        seed_data(db, upload_dir=tmp_path)
         assert counts == (
             db.scalar(select(func.count()).select_from(Subject)),
             db.scalar(select(func.count()).select_from(Topic)),
@@ -735,25 +735,25 @@ def test_seed_can_run_twice(database):
             assert (user.id, user.password_hash) == expected
 
 
-def test_seed_preserves_existing_user_password_profile_and_status(database):
+def test_seed_preserves_existing_user_password_profile_and_status(database, tmp_path):
     _, sessions = database
     with sessions() as db:
         with db.begin():
-            seed_data(db)
+            seed_data(db, upload_dir=tmp_path)
             learner = db.scalar(select(User).where(User.email == "learner@example.com"))
             learner.full_name = "Tên đã thay đổi"
             learner.password_hash = hash_password("ChangedPassword@123", n=1024, r=8, p=1)
             learner.is_active = False
             db.flush()
             expected = (learner.full_name, learner.password_hash, learner.role, learner.is_active)
-            seed_data(db)
+            seed_data(db, upload_dir=tmp_path)
             db.refresh(learner)
             assert (learner.full_name, learner.password_hash, learner.role, learner.is_active) == expected
             # Không giữ thay đổi trạng thái này cho các test khác trong cùng database.
             db.rollback()
 
 
-def test_seed_custom_admin_uses_requested_password_for_new_sample_email(database, monkeypatch):
+def test_seed_custom_admin_uses_requested_password_for_new_sample_email(database, monkeypatch, tmp_path):
     _, sessions = database
     samples = tuple(
         {**sample, "email": f"seed-{uuid4().hex}@example.com"} for sample in SAMPLE_USERS
@@ -761,14 +761,14 @@ def test_seed_custom_admin_uses_requested_password_for_new_sample_email(database
     monkeypatch.setattr("app.db.seed.SAMPLE_USERS", samples)
     admin_email = next(sample["email"] for sample in samples if sample["role"] == "ADMIN")
     with sessions.begin() as db:
-        seed_data(db, admin_email=admin_email.upper(), admin_password="CustomAdmin@123")
+        seed_data(db, admin_email=admin_email.upper(), admin_password="CustomAdmin@123", upload_dir=tmp_path)
         admin = db.scalar(select(User).where(User.email == admin_email))
         assert admin.role == "ADMIN"
         assert verify_password("CustomAdmin@123", admin.password_hash)
         assert not verify_password("Admin@123", admin.password_hash)
 
 
-def test_seed_does_not_promote_an_existing_learner(database):
+def test_seed_does_not_promote_an_existing_learner(database, tmp_path):
     _, sessions = database
     with sessions.begin() as db:
         email = f"seed-conflict-{uuid4().hex}@example.com"
@@ -776,7 +776,7 @@ def test_seed_does_not_promote_an_existing_learner(database):
         db.add(learner)
         db.flush()
         with pytest.raises(ValueError, match="vai trò khác"):
-            seed_data(db, admin_email=email, admin_password="Admin@123")
+            seed_data(db, admin_email=email, admin_password="Admin@123", upload_dir=tmp_path)
         db.refresh(learner)
         assert learner.role == "LEARNER" and learner.password_hash == "unchanged"
 

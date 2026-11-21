@@ -1,0 +1,10 @@
+CHUYỂN ĐỘNG THẲNG BIẾN ĐỔI ĐỀU VỚI GIA TỐC KHÔNG ĐỔI
+Nguồn: nội dung giáo dục minh họa gốc đi kèm Gia Sư AI; giấy phép CC0 1.0. Không phải sách giáo khoa chính thức.
+
+Trong chuyển động thẳng biến đổi đều, gia tốc a không đổi. Sau khi chọn chiều dương và mốc t = 0, gọi x0 là tọa độ đầu, v0 là vận tốc đầu. Các công thức là v = v0 + at, x = x0 + v0t + (1/2)at², và v² - v0² = 2a(x - x0). Đơn vị SI của gia tốc là m/s².
+
+Vật nhanh dần khi vận tốc và gia tốc cùng dấu, chậm dần khi chúng trái dấu. Dấu âm của gia tốc không tự động có nghĩa là chậm dần. Nếu vận tốc đổi dấu, vật đổi chiều; công thức tọa độ vẫn cho độ dời, còn muốn tính quãng đường phải chia khoảng thời gian tại thời điểm đổi chiều.
+
+Ví dụ, một xe đang đi theo chiều dương với v0 = 10 m/s, hãm đều với a = -2 m/s². Xe dừng sau 5 s. Trong giai đoạn hãm đến lúc dừng, độ dời bằng 10 × 5 - (1/2) × 2 × 25 = 25 m. Không tiếp tục mô tả xe đã dừng bằng cùng gia tốc hãm nếu đề không cho xe chuyển động ngược lại.
+
+Tự kiểm tra: vật xuất phát từ nghỉ, gia tốc 3 m/s² trong 4 s. Hãy tính vận tốc cuối và độ dời. Vì sao lấy vận tốc cuối nhân thời gian sẽ cho kết quả quãng đường sai trong ví dụ này?

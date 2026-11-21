@@ -1,0 +1,10 @@
+XÁC SUẤT CỔ ĐIỂN TRONG KHÔNG GIAN MẪU HỮU HẠN
+Nguồn: nội dung giáo dục minh họa gốc đi kèm Gia Sư AI; giấy phép CC0 1.0. Không phải sách giáo khoa chính thức.
+
+Một phép thử ngẫu nhiên có nhiều kết quả có thể xảy ra. Tập hợp các kết quả gọi là không gian mẫu Ω. Một biến cố A là tập con của Ω. Khi Ω hữu hạn, không rỗng và các kết quả đồng khả năng, xác suất cổ điển được tính bằng P(A) = n(A)/n(Ω). Điều kiện đồng khả năng phải được kiểm tra, không suy ra chỉ vì đã liệt kê được kết quả.
+
+Ví dụ, gieo một con xúc xắc cân đối sáu mặt một lần. Không gian mẫu có sáu kết quả 1, 2, 3, 4, 5, 6. Biến cố xuất hiện số chẵn gồm 2, 4, 6, nên xác suất bằng 3/6 = 1/2. Biến cố xuất hiện số lớn hơn 4 gồm 5 và 6, có xác suất 2/6 = 1/3.
+
+Xác suất luôn nằm từ 0 đến 1. Biến cố chắc chắn có xác suất 1; biến cố không thể có xác suất 0. Biến cố đối của A gồm mọi kết quả không thuộc A và có xác suất 1 - P(A). Với hai lần gieo, có thể dùng các cặp có thứ tự để tránh bỏ sót; không coi các tổng điểm là đồng khả năng.
+
+Tự kiểm tra: gieo hai đồng xu cân đối độc lập. Hãy liệt kê bốn kết quả có thứ tự rồi tính xác suất có đúng một mặt ngửa. Vì sao không thể chỉ đếm ba trường hợp “không ngửa, một ngửa, hai ngửa” như ba kết quả đồng khả năng?
