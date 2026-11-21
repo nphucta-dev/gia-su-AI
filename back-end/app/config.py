@@ -52,6 +52,12 @@ class Settings:
     llm_provider: str = field(default="auto", repr=False)
     llm_max_tokens: int = 4096
     llm_api_version: str = "2023-06-01"
+    # Tùy chọn, dành cho TK-046 tìm kiếm vector (embedding 768 chiều).
+    embedding_api_key: str = field(default="", repr=False)
+    embedding_api_url: str = field(default="", repr=False)
+    embedding_model: str = field(default="", repr=False)
+    embedding_dimensions: int = 768
+    embedding_timeout_seconds: float = 15.0
 
 
 def _load_jwt_secret() -> str:
@@ -142,7 +148,38 @@ def load_settings() -> Settings:
         llm_provider=os.environ.get("LLM_PROVIDER", "auto").strip().lower() or "auto",
         llm_max_tokens=_load_llm_max_tokens(),
         llm_api_version=os.environ.get("LLM_API_VERSION", "2023-06-01").strip() or "2023-06-01",
+        embedding_api_key=os.environ.get("EMBEDDING_API_KEY", "").strip(),
+        embedding_api_url=os.environ.get("EMBEDDING_API_URL", "").strip(),
+        embedding_model=os.environ.get("EMBEDDING_MODEL", "").strip(),
+        embedding_dimensions=_load_embedding_dimensions(),
+        embedding_timeout_seconds=_load_embedding_timeout(),
     )
+
+
+def _load_embedding_dimensions() -> int:
+    raw = os.environ.get("EMBEDDING_DIMENSIONS", "").strip()
+    if not raw:
+        return 768
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError("EMBEDDING_DIMENSIONS phải là số nguyên dương.") from None
+    if value <= 0:
+        raise ValueError("EMBEDDING_DIMENSIONS phải là số nguyên dương.")
+    return value
+
+
+def _load_embedding_timeout() -> float:
+    raw = os.environ.get("EMBEDDING_TIMEOUT_SECONDS", "").strip()
+    if not raw:
+        return 15.0
+    try:
+        timeout = float(raw)
+    except ValueError:
+        raise ValueError("EMBEDDING_TIMEOUT_SECONDS phải là số từ 1 đến 120.") from None
+    if not math.isfinite(timeout) or not 1 <= timeout <= 120:
+        raise ValueError("EMBEDDING_TIMEOUT_SECONDS phải là số từ 1 đến 120.")
+    return timeout
 
 
 def _load_llm_max_tokens() -> int:

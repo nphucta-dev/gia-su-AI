@@ -77,6 +77,7 @@ class DocumentChunkRecord:
     chunk_index: int
     content: str
     source_url: str | None = None
+    embedding: tuple[float, ...] | None = None
 
 
 class DocumentNotReadyError(Exception):
@@ -99,7 +100,13 @@ class DocumentRepository(Protocol):
 
     async def find_document(self, document_id: int) -> DocumentRecord | None: ...
 
-    async def finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None: ...
+    async def finish_processing(
+        self,
+        document_id: int,
+        *,
+        chunks: list[str] | None,
+        embeddings: list[list[float] | None] | None = None,
+    ) -> DocumentRecord | None: ...
 
     async def set_active(self, document_id: int, *, is_active: bool) -> DocumentRecord | None: ...
 
@@ -126,6 +133,7 @@ class InMemoryDocumentRepository:
         self._topics = {topic.id: topic for topic in topics}
         self._documents: dict[int, DocumentRecord] = {}
         self._chunks: dict[int, tuple[str, ...]] = {}
+        self._embeddings: dict[int, tuple[tuple[float, ...] | None, ...]] = {}
         self._next_id = 1
 
     async def list_subjects(self) -> list[UploadSubject]:
@@ -187,7 +195,13 @@ class InMemoryDocumentRepository:
         self._documents[document_id] = updated
         return updated
 
-    async def finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None:
+    async def finish_processing(
+        self,
+        document_id: int,
+        *,
+        chunks: list[str] | None,
+        embeddings: list[list[float] | None] | None = None,
+    ) -> DocumentRecord | None:
         document = self._documents.get(document_id)
         if document is None:
             return None
@@ -195,13 +209,20 @@ class InMemoryDocumentRepository:
             return document
         if chunks is not None and (not chunks or any(not part.strip() for part in chunks)):
             raise ValueError("Tài liệu sẵn sàng phải có các đoạn văn bản không rỗng.")
+        if chunks is not None and embeddings is not None and len(embeddings) != len(chunks):
+            raise ValueError("Số lượng embedding không khớp số lượng đoạn văn bản.")
         saved_chunks = tuple(chunks or ())
+        saved_embeddings = tuple(
+            tuple(vec) if vec is not None else None
+            for vec in (embeddings if embeddings is not None else [None] * len(saved_chunks))
+        )
         result = replace(
             document, status="ready" if chunks is not None else "error", is_active=False,
             processed_at=datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             chunk_count=len(saved_chunks),
         )
         self._chunks[document_id] = saved_chunks
+        self._embeddings[document_id] = saved_embeddings
         self._documents[document_id] = result
         return result
 
@@ -224,7 +245,9 @@ class InMemoryDocumentRepository:
         results: list[DocumentChunkRecord] = []
         chunk_id = 1
         for doc in eligible_docs:
+            doc_embeddings = self._embeddings.get(doc.id, ())
             for index, content in enumerate(self._chunks.get(doc.id, ())):
+                embedding = doc_embeddings[index] if index < len(doc_embeddings) else None
                 results.append(DocumentChunkRecord(
                     id=chunk_id,
                     document_id=doc.id,
@@ -232,6 +255,7 @@ class InMemoryDocumentRepository:
                     topic_id=doc.topic_id,
                     chunk_index=index,
                     content=content,
+                    embedding=embedding,
                 ))
                 chunk_id += 1
         return results
@@ -283,8 +307,19 @@ class SqlAlchemyDocumentRepository:
     async def find_document(self, document_id: int) -> DocumentRecord | None:
         return await asyncio.to_thread(self._find_document, document_id)
 
-    async def finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None:
-        return await asyncio.to_thread(self._finish_processing, document_id, chunks=chunks)
+    async def finish_processing(
+        self,
+        document_id: int,
+        *,
+        chunks: list[str] | None,
+        embeddings: list[list[float] | None] | None = None,
+    ) -> DocumentRecord | None:
+        return await asyncio.to_thread(
+            self._finish_processing,
+            document_id,
+            chunks=chunks,
+            embeddings=embeddings,
+        )
 
     async def set_active(self, document_id: int, *, is_active: bool) -> DocumentRecord | None:
         return await asyncio.to_thread(self._set_active, document_id, is_active=is_active)
@@ -352,9 +387,17 @@ class SqlAlchemyDocumentRepository:
             row = db.execute(self._document_query().where(DocumentModel.id == document_id)).first()
             return self._to_record(*row) if row is not None else None
 
-    def _finish_processing(self, document_id: int, *, chunks: list[str] | None) -> DocumentRecord | None:
+    def _finish_processing(
+        self,
+        document_id: int,
+        *,
+        chunks: list[str] | None,
+        embeddings: list[list[float] | None] | None = None,
+    ) -> DocumentRecord | None:
         if chunks is not None and (not chunks or any(not part.strip() for part in chunks)):
             raise ValueError("Tài liệu sẵn sàng phải có các đoạn văn bản không rỗng.")
+        if chunks is not None and embeddings is not None and len(embeddings) != len(chunks):
+            raise ValueError("Số lượng embedding không khớp số lượng đoạn văn bản.")
         with self._sessions.begin() as db:
             # Khóa bản ghi cha: các lần xử lý đồng thời không tạo trùng chunk_index.
             document = db.get(DocumentModel, document_id, with_for_update=True)
@@ -366,9 +409,16 @@ class SqlAlchemyDocumentRepository:
             if document.status == "ready" and count:
                 return self._to_record(document, topic.name, subject.name, count)
             db.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document_id))
+            chunk_list = chunks or ()
+            embedding_list = embeddings if embeddings is not None else [None] * len(chunk_list)
             db.add_all([
-                DocumentChunk(document_id=document_id, chunk_index=index, content=content)
-                for index, content in enumerate(chunks or ())
+                DocumentChunk(
+                    document_id=document_id,
+                    chunk_index=index,
+                    content=content,
+                    embedding=embedding_list[index],
+                )
+                for index, content in enumerate(chunk_list)
             ])
             document.status = "ready" if chunks is not None else "error"
             document.is_active = False
@@ -390,12 +440,16 @@ class SqlAlchemyDocumentRepository:
             rows = db.execute(
                 select(DocumentChunk, DocumentModel.title, DocumentModel.topic_id, DocumentModel.source_url)
                 .join(DocumentModel, DocumentModel.id == DocumentChunk.document_id)
+                .join(TopicModel, TopicModel.id == DocumentModel.topic_id)
+                .join(SubjectModel, SubjectModel.id == TopicModel.subject_id)
                 .where(
                     DocumentModel.topic_id == topic_id,
                     DocumentModel.status == "ready",
                     DocumentModel.is_active.is_(True),
+                    TopicModel.is_active.is_(True),
+                    SubjectModel.is_active.is_(True),
                 )
-                .order_by(DocumentModel.id, DocumentChunk.chunk_index)
+                .order_by(DocumentModel.id, DocumentChunk.chunk_index, DocumentChunk.id)
             )
             return [
                 DocumentChunkRecord(
@@ -406,6 +460,7 @@ class SqlAlchemyDocumentRepository:
                     chunk_index=chunk.chunk_index,
                     content=chunk.content,
                     source_url=source_url,
+                    embedding=tuple(chunk.embedding) if isinstance(chunk.embedding, list) else None,
                 )
                 for chunk, title, doc_topic_id, source_url in rows
             ]
