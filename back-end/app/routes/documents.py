@@ -25,7 +25,8 @@ def get_document_service(request: Request) -> DocumentService:
     repository = getattr(request.app.state, "document_repository", None)
     if repository is None:
         raise AppError(503, "DATABASE_UNAVAILABLE", "Chưa có kết nối database cho tài liệu.")
-    return DocumentService(repository, request.app.state.upload_dir)
+    embedding_provider = getattr(request.app.state, "embedding_provider", None)
+    return DocumentService(repository, request.app.state.upload_dir, embedding_provider=embedding_provider)
 
 
 @router.get("/options", response_model=DocumentOptionsResponse, summary="Môn và chủ đề để ADMIN tải tài liệu")
