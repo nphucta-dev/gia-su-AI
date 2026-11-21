@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import codecs
+import logging
 import re
 import unicodedata
 from pathlib import Path
@@ -15,8 +16,11 @@ from app.repositories.document_repository import DocumentRecord, DocumentReposit
 from app.repositories.user_repository import parse_user_id
 from app.schemas.document import DocumentInfo, UploadSubjectInfo, UploadTopicInfo
 from app.services.document_text import DocumentTextError, extract_document_text, split_document_text
+from app.services.embedding_client import EmbeddingError, EmbeddingProvider, validate_embedding
 from app.utils.errors import AppError
 from sqlalchemy.exc import SQLAlchemyError
+
+logger = logging.getLogger(__name__)
 
 MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 READ_CHUNK_BYTES = 64 * 1024
@@ -32,9 +36,15 @@ def invalid_field(field: str, message: str) -> AppError:
 
 
 class DocumentService:
-    def __init__(self, repository: DocumentRepository, upload_dir: Path) -> None:
+    def __init__(
+        self,
+        repository: DocumentRepository,
+        upload_dir: Path,
+        embedding_provider: EmbeddingProvider | None = None,
+    ) -> None:
         self.repository = repository
         self.upload_dir = upload_dir.resolve()
+        self.embedding_provider = embedding_provider
 
     async def options(self) -> list[UploadSubjectInfo]:
         try:
@@ -146,8 +156,21 @@ class DocumentService:
             chunks = await asyncio.to_thread(self._extract_chunks, record.file_path)
         except (DocumentTextError, OSError):
             chunks = None
+        embeddings: list[list[float] | None] | None = None
+        if chunks is not None and self.embedding_provider is not None and self.embedding_provider.is_configured:
+            try:
+                raw_vectors = await self.embedding_provider.embed_texts(chunks)
+                if len(raw_vectors) == len(chunks):
+                    embeddings = [validate_embedding(vec) for vec in raw_vectors]
+            except (EmbeddingError, Exception) as exc:
+                logger.warning("Bỏ qua tạo embedding cho tài liệu %s: %s", document_id, exc)
+                embeddings = None
         try:
-            saved = await self.repository.finish_processing(document_id, chunks=chunks)
+            saved = await self.repository.finish_processing(
+                document_id,
+                chunks=chunks,
+                embeddings=embeddings,
+            )
         except SQLAlchemyError:
             raise database_unavailable() from None
         if saved is None:

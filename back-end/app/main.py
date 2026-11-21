@@ -50,6 +50,7 @@ from app.services.ai_quota import AiQuotaService
 from app.services.admin_catalog_service import AdminCatalogService
 from app.services.catalog_service import CatalogRepository, CatalogService
 from app.services.document_retrieval import DocumentRetrievalService
+from app.services.embedding_client import EmbeddingProvider, HttpEmbeddingClient
 from app.services.chat_service import ChatService
 from app.services.quiz_service import QuizService
 from app.services.progress_service import ProgressService
@@ -82,6 +83,7 @@ def create_app(
     progress_repository: ProgressRepository | None = None,
     ai_quota_service: AiQuotaService | None = None,
     dashboard_repository: DashboardRepository | None = None,
+    embedding_provider: EmbeddingProvider | None = None,
 ) -> FastAPI:
     """Tạo ứng dụng. Các phụ thuộc được truyền vào để dễ thay kho dữ liệu (ví dụ CSDL
     thật) và để test độc lập, không cần mở cổng thật."""
@@ -118,8 +120,10 @@ def create_app(
     app.state.document_repository = document_repository
     if document_repository is None and session_factory is not None:
         app.state.document_repository = SqlAlchemyDocumentRepository(session_factory)
+    embedder = embedding_provider if embedding_provider is not None else HttpEmbeddingClient(settings)
+    app.state.embedding_provider = embedder
     app.state.document_retrieval_service = (
-        DocumentRetrievalService(app.state.document_repository)
+        DocumentRetrievalService(app.state.document_repository, embedding_provider=embedder)
         if app.state.document_repository is not None else None
     )
     app.state.upload_dir = Path(upload_dir) if upload_dir is not None else settings.upload_dir
