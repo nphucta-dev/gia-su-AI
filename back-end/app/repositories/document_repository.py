@@ -66,6 +66,37 @@ class DocumentRecord:
     topic_name: str
     processed_at: str | None = None
     chunk_count: int = 0
+    source_url: str | None = None
+
+
+@dataclass(frozen=True)
+class LearningDocumentRecord:
+    id: int
+    topic_id: int
+    subject_id: int
+    title: str
+    file_path: str
+    source_url: str | None
+    created_at: str
+    processed_at: str | None
+    subject_name: str
+    grade_level: str
+    topic_name: str
+    chapter_name: str
+    chunk_count: int = 0
+
+
+@dataclass(frozen=True)
+class LearningDocumentChunkRecord:
+    id: int
+    chunk_index: int
+    content: str
+
+
+@dataclass(frozen=True)
+class LearningDocumentDetailRecord:
+    document: LearningDocumentRecord
+    chunks: tuple[LearningDocumentChunkRecord, ...]
 
 
 @dataclass(frozen=True)
@@ -115,6 +146,16 @@ class DocumentRepository(Protocol):
     async def set_document_active(self, document_id: int, is_active: bool) -> DocumentRecord | None: ...
 
     async def search_eligible_chunks(self, topic_id: int, terms: tuple[str, ...]) -> list[DocumentChunkRecord]: ...
+
+    async def list_learning_documents(
+        self,
+        *,
+        topic_id: int | None = None,
+        subject_id: int | None = None,
+        grade_level: str | None = None,
+    ) -> list[LearningDocumentRecord]: ...
+
+    async def find_learning_document(self, document_id: int) -> LearningDocumentDetailRecord | None: ...
 
 
 ProtocolDocumentRepository = DocumentRepository
@@ -270,6 +311,63 @@ class InMemoryDocumentRepository:
                 matches.append(chunk)
         return matches
 
+    def _to_learning_record(self, doc: DocumentRecord) -> LearningDocumentRecord | None:
+        if doc.status != "ready" or doc.is_active is not True:
+            return None
+        topic = self._topics.get(doc.topic_id)
+        subject = self._subjects.get(topic.subject_id) if topic is not None else None
+        if topic is None or subject is None or not topic.is_active or not subject.is_active:
+            return None
+        return LearningDocumentRecord(
+            id=doc.id,
+            topic_id=doc.topic_id,
+            subject_id=subject.id,
+            title=doc.title,
+            file_path=doc.file_path,
+            source_url=doc.source_url,
+            created_at=doc.created_at,
+            processed_at=doc.processed_at,
+            subject_name=subject.name,
+            grade_level=subject.grade_level,
+            topic_name=topic.name,
+            chapter_name=topic.chapter_name,
+            chunk_count=len(self._chunks.get(doc.id, ())),
+        )
+
+    async def list_learning_documents(
+        self,
+        *,
+        topic_id: int | None = None,
+        subject_id: int | None = None,
+        grade_level: str | None = None,
+    ) -> list[LearningDocumentRecord]:
+        items: list[LearningDocumentRecord] = []
+        for doc in self._documents.values():
+            record = self._to_learning_record(doc)
+            if record is None:
+                continue
+            if topic_id is not None and record.topic_id != topic_id:
+                continue
+            if subject_id is not None and record.subject_id != subject_id:
+                continue
+            if grade_level is not None and record.grade_level != grade_level:
+                continue
+            items.append(record)
+        return sorted(items, key=lambda item: (item.created_at, item.id), reverse=True)
+
+    async def find_learning_document(self, document_id: int) -> LearningDocumentDetailRecord | None:
+        doc = self._documents.get(document_id)
+        if doc is None:
+            return None
+        record = self._to_learning_record(doc)
+        if record is None:
+            return None
+        chunks = tuple(
+            LearningDocumentChunkRecord(id=index + 1, chunk_index=index, content=content)
+            for index, content in enumerate(self._chunks.get(doc.id, ()))
+        )
+        return LearningDocumentDetailRecord(document=record, chunks=chunks)
+
 
 class SqlAlchemyDocumentRepository:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
@@ -331,6 +429,23 @@ class SqlAlchemyDocumentRepository:
         if not terms:
             return []
         return await asyncio.to_thread(self._search_eligible_chunks, topic_id, terms)
+
+    async def list_learning_documents(
+        self,
+        *,
+        topic_id: int | None = None,
+        subject_id: int | None = None,
+        grade_level: str | None = None,
+    ) -> list[LearningDocumentRecord]:
+        return await asyncio.to_thread(
+            self._list_learning_documents,
+            topic_id=topic_id,
+            subject_id=subject_id,
+            grade_level=grade_level,
+        )
+
+    async def find_learning_document(self, document_id: int) -> LearningDocumentDetailRecord | None:
+        return await asyncio.to_thread(self._find_learning_document, document_id)
 
     def _list_subjects(self) -> list[UploadSubject]:
         with self._sessions() as db:
@@ -510,6 +625,98 @@ class SqlAlchemyDocumentRepository:
         return saved
 
     @staticmethod
+    def _learning_document_query():
+        count = select(func.count(DocumentChunk.id)).where(DocumentChunk.document_id == DocumentModel.id).scalar_subquery()
+        return (
+            select(DocumentModel, TopicModel, SubjectModel, count)
+            .join(TopicModel, TopicModel.id == DocumentModel.topic_id)
+            .join(SubjectModel, SubjectModel.id == TopicModel.subject_id)
+            .where(
+                DocumentModel.status == "ready",
+                DocumentModel.is_active.is_(True),
+                TopicModel.is_active.is_(True),
+                SubjectModel.is_active.is_(True),
+            )
+        )
+
+    def _list_learning_documents(
+        self,
+        *,
+        topic_id: int | None = None,
+        subject_id: int | None = None,
+        grade_level: str | None = None,
+    ) -> list[LearningDocumentRecord]:
+        stmt = self._learning_document_query()
+        if topic_id is not None:
+            stmt = stmt.where(DocumentModel.topic_id == topic_id)
+        if subject_id is not None:
+            stmt = stmt.where(TopicModel.subject_id == subject_id)
+        if grade_level is not None:
+            stmt = stmt.where(SubjectModel.grade_level == grade_level)
+        stmt = stmt.order_by(DocumentModel.created_at.desc(), DocumentModel.id.desc())
+        with self._sessions() as db:
+            rows = db.execute(stmt)
+            return [
+                self._to_learning_record(document, topic, subject, count)
+                for document, topic, subject, count in rows
+            ]
+
+    def _find_learning_document(self, document_id: int) -> LearningDocumentDetailRecord | None:
+        with self._sessions() as db:
+            row = db.execute(
+                self._learning_document_query().where(DocumentModel.id == document_id)
+            ).first()
+            if row is None:
+                return None
+            document, topic, subject, count = row
+            chunk_rows = db.scalars(
+                select(DocumentChunk)
+                .where(DocumentChunk.document_id == document_id)
+                .order_by(DocumentChunk.chunk_index, DocumentChunk.id)
+            )
+            chunks = tuple(
+                LearningDocumentChunkRecord(
+                    id=chunk.id,
+                    chunk_index=chunk.chunk_index,
+                    content=chunk.content,
+                )
+                for chunk in chunk_rows
+            )
+            return LearningDocumentDetailRecord(
+                document=self._to_learning_record(document, topic, subject, count),
+                chunks=chunks,
+            )
+
+    @staticmethod
+    def _to_learning_record(
+        document: DocumentModel,
+        topic: TopicModel,
+        subject: SubjectModel,
+        chunk_count: int = 0,
+    ) -> LearningDocumentRecord:
+        created_at = document.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        return LearningDocumentRecord(
+            id=document.id,
+            topic_id=document.topic_id,
+            subject_id=subject.id,
+            title=document.title,
+            file_path=document.file_path,
+            source_url=document.source_url,
+            created_at=created_at.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+            processed_at=(
+                document.processed_at.replace(tzinfo=timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+                if document.processed_at is not None else None
+            ),
+            subject_name=subject.name,
+            grade_level=subject.grade_level,
+            topic_name=topic.name,
+            chapter_name=topic.chapter_name,
+            chunk_count=chunk_count,
+        )
+
+    @staticmethod
     def _to_record(document: DocumentModel, topic_name: str, subject_name: str, chunk_count: int = 0) -> DocumentRecord:
         created_at = document.created_at
         if created_at.tzinfo is None:
@@ -529,4 +736,5 @@ class SqlAlchemyDocumentRepository:
                 if document.processed_at is not None else None
             ),
             chunk_count=chunk_count,
+            source_url=document.source_url,
         )
