@@ -117,6 +117,16 @@ body:has(.chat-view) #app-modal { max-height: calc(100dvh - 24px); overflow-y: a
  .chat-view .chat-hint-controls { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* TK-064: the live dashboard has three account summary counters. */
+.dashboard-summary { min-height: 240px; }
+.dashboard-page .dashboard-stats { grid-template-columns: minmax(0, 1fr); margin: 0; }
+.dashboard-stats .stat { min-width: 0; }
+.dashboard-stats dt { color: var(--muted); font-size: 14px; }
+.dashboard-stats dd { margin: 8px 0 0; overflow-wrap: anywhere; }
+@media (min-width: 768px) {
+ .dashboard-page .dashboard-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 /* TK-050: active catalog selection before opening the fixed quiz preview. */
 .quiz-setup { max-width: 800px; }
 .quiz-setup-form { display: grid; gap: 20px; }

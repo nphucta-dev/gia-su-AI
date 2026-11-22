@@ -1,6 +1,8 @@
 import { el, link, heading, panel, badge, button, notice, field } from '../components/ui.js';
-import { topics } from '../data.js';            // vẫn dùng cho dashboard (dữ liệu minh họa)
+import { topics } from '../data.js';            // Chỉ dùng cho dashboard preview.
 import { loadCatalog } from '../catalog.js';
+import { getSession } from '../session.js';
+import { renderLiveDashboard } from './dashboard.js';
 
 export function renderHome() {
  const search = el('input', { className: 'input', type: 'search', placeholder: 'Tìm chủ đề học tập…', 'aria-label': 'Tìm chủ đề' });
@@ -86,5 +88,11 @@ export function renderHome() {
 }
 function progress(topic) { return el('div', { className: 'progress-row' }, el('div', {}, el('span', {}, topic.name), el('strong', {}, `${topic.progress}%`)), el('progress', { max: 100, value: topic.progress, 'aria-label': `Mức thành thạo ${topic.name}` })); }
 export function renderDashboard() {
+ if (getSession().reason !== 'preview') return renderLiveDashboard();
+ const preview = renderPreviewDashboard();
+ preview.prepend(notice('Dữ liệu minh họa — chưa kết nối tài khoản thật.', 'warning'));
+ return preview;
+}
+function renderPreviewDashboard() {
  return el('div', {}, heading('Tổng quan học tập', 'Nhìn lại kết quả và chọn kiến thức cần ôn tiếp.'), el('div', { className: 'stats-grid' }, ...[['08', 'Bài đã hoàn thành'], ['82%', 'Điểm trung bình'], ['12', 'Phiên trò chuyện'], ['03', 'Chủ đề đã học']].map(([n, label]) => el('div', { className: 'stat' }, el('div', { className: 'stat-value' }, n), el('p', {}, label)))), el('div', { className: 'grid-2 section-gap' }, panel('Tiến độ theo chủ đề', el('div', { className: 'stack' }, ...topics.map(progress))), panel('Chủ đề cần ôn', el('p', { className: 'helper' }, 'Ưu tiên những chủ đề có mức thành thạo dưới 60%.'), ...topics.filter(t => t.progress < 60).map(t => el('div', { className: 'activity-row' }, el('strong', {}, t.name), link('Ôn tập', '#practice', 'button secondary small'))))), panel('Hoạt động gần đây', el('div', { className: 'activity-list' }, ...[['Phương trình bậc hai', 'Luyện tập · 80 điểm', 'Hôm nay'], ['Hàm số và đồ thị', 'Hội thoại · 6 tin nhắn', 'Hôm qua']].map(([name, desc, date]) => el('div', { className: 'activity-row' }, el('div', {}, el('strong', {}, name), el('p', { className: 'helper' }, desc)), el('span', { className: 'helper' }, date))))));
 }
