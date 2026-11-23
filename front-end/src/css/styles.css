@@ -117,6 +117,25 @@ body:has(.chat-view) #app-modal { max-height: calc(100dvh - 24px); overflow-y: a
  .chat-view .chat-hint-controls { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* Published learning documents: list + authenticated PDF/TXT reader. */
+.learning-documents-page { overflow-wrap: anywhere; }
+.learning-documents-page > .page-actions { margin-bottom: 24px; }
+.learning-documents-layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.learning-documents-layout > *, .learning-document-link > * { min-width: 0; }
+.learning-document-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.learning-document-link { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: var(--ink); }
+.learning-document-link:hover { background: var(--bg); }
+.learning-document-link[aria-current="page"] { border-color: var(--primary); background: var(--pale); }
+.learning-document-link .badge { justify-self: start; }
+.learning-document-reader .page-actions { margin-bottom: 20px; }
+.learning-document-reader [role="status"]:empty { display: none; }
+.learning-document-reader .button { white-space: normal; }
+.learning-document-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.8; margin: 0; padding: 20px; background: var(--bg); border-radius: 10px; }
+.learning-document-pdf { display: block; width: 100%; height: 70vh; min-height: 380px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+@media (min-width: 1000px) { .learning-documents-layout { grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); } }
+@media (max-width: 999px) { .learning-document-list { max-height: 360px; overflow-y: auto; padding: 3px; } }
+@media (max-width: 550px) { .learning-document-reader { padding: 16px; } .learning-document-text { padding: 14px; } }
+
 /* TK-064: the live dashboard has three account summary counters. */
 .dashboard-summary { min-height: 240px; }
 .dashboard-page .dashboard-stats { grid-template-columns: minmax(0, 1fr); margin: 0; }

@@ -8,10 +8,13 @@ import { renderHistory, renderIntro } from './pages/history.js';
 import { el, heading, link, notice, button } from './components/ui.js';
 import { api } from './api.js';
 import { setCurrentUser, loginDestination } from './session.js';
+import { renderLearningDocuments } from './pages/learning-documents.js';
 
 const routes = { intro: renderIntro, history: renderHistory, home: renderHome, chat: renderChat, practice: renderPractice, results: renderResults, dashboard: renderDashboard, profile: renderProfile, admin: renderAdmin, login: () => renderAuth(false), register: () => renderAuth(true) };
 const titles = { intro: 'Giới thiệu', history: 'Lịch sử học tập', home: 'Trang học', chat: 'Hỏi gia sư', practice: 'Luyện tập', results: 'Kết quả', dashboard: 'Tiến độ', profile: 'Hồ sơ', admin: 'Quản trị', login: 'Đăng nhập', register: 'Đăng ký' };
-const protectedRoutes = new Set(['home', 'chat', 'practice', 'results', 'dashboard', 'profile', 'history', 'admin']);
+routes.documents = renderLearningDocuments;
+titles.documents = 'Tài liệu học tập';
+const protectedRoutes = new Set(['home', 'chat', 'practice', 'results', 'dashboard', 'profile', 'history', 'admin', 'documents']);
 const menu = document.querySelector('.mobile-menu-button');
 const accountMenu = document.querySelector('.account-menu');
 let renderVersion = 0;
@@ -149,7 +152,7 @@ async function render() {
    return;
   }
  }
- if(isAdmin() && ['intro','home','chat','practice','results','dashboard','history'].includes(route)) { replaceRoute('admin?tab=subjects'); return; }
+ if(isAdmin() && ['intro','home','chat','practice','results','dashboard','history','documents'].includes(route)) { replaceRoute('admin?tab=subjects'); return; }
  if(session.status === 'authenticated' && ['login','register'].includes(route)) { replaceRoute(loginDestination()); return; }
  if(route === 'admin' && session.reason !== 'preview') {
   main.replaceChildren(el('div', {role:'status'}, 'Đang kiểm tra quyền truy cập…'));
