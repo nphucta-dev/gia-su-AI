@@ -14,6 +14,33 @@ export class ApiError extends Error {
   }
 }
 
+// Authenticated binary download; keep the JSON API contract unchanged.
+export async function apiFile(path, { signal } = {}) {
+  const token = getAccessToken();
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      headers: { Accept: 'application/pdf, text/plain', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      signal, cache: 'no-store',
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') throw error;
+    throw new ApiError('Không thể tải tệp. Vui lòng kiểm tra kết nối và thử lại.');
+  }
+  if (token && response.status === 401 && getAccessToken() === token) clearSession('expired');
+  if (!response.ok) {
+    let result;
+    try { result = await response.json(); } catch { /* A non-JSON error must not become a document. */ }
+    throw new ApiError(result?.error?.message || 'Chưa thể tải tệp tài liệu. Vui lòng thử lại.', response.status, result?.error?.code || 'FILE_UNAVAILABLE');
+  }
+  try {
+    return { blob: await response.blob(), contentType: response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() };
+  } catch (error) {
+    if (error.name === 'AbortError') throw error;
+    throw new ApiError('Quá trình tải tệp bị gián đoạn. Vui lòng thử lại.');
+  }
+}
+
 export async function api(path, { method = 'GET', body, auth = true, signal } = {}) {
   const token = auth ? getAccessToken() : '';
   const headers = { Accept: 'application/json' };

@@ -60,6 +60,7 @@ Các mục trên chỉ xác nhận phần UI hoặc client behavior; task nghi�
 | TK-083 | Nhãn cảnh báo nội dung AI | Có phần UI |
 | TK-090 | Responsive giao diện chat | Hoàn thành phạm vi FE cho đăng nhập, danh mục và chat live/preview: sửa tràn/cắt nội dung dài, thu gọn lịch sử mobile, bố trí nút AI, composer/modal ở viewport thấp, giữ draft và vị trí đọc khi có phản hồi. Browser test Edge headless dùng API mock PASS ở 360/390/768/1440px; hồi quy gợi ý và validation PASS. Chưa kiểm chứng thiết bị thật, bàn phím mobile, Safari/iOS hoặc backend thật. |
 | TK-091 | Responsive quiz/dashboard/admin | Một phần; có CSS/ảnh/test mới nhưng các trang vẫn dùng dữ liệu mẫu |
+| Chưa có mã | Giao diện xem tài liệu học tập | Hoàn thành FE: danh sách theo môn/chủ đề qua GET /api/documents, metadata và file qua /api/documents/{id} và /file; PDF tải có Bearer token/Blob, TXT UTF-8 thuần văn bản, loading/trống/lỗi/retry, chat đúng topic, kiểm tra lại khi quay tab và mỗi 60 giây, dọn nội dung/Blob khi mất quyền. Preview không gọi API. Test API mock, hồi quy responsive và lỗi AI PASS; PDF đã xem ảnh render thực tế trên Edge. Chưa kiểm chứng backend/MySQL thật, thiết bị thật hoặc Safari/iOS. |
 
 ## Việc cần ưu tiên sau diff
 
