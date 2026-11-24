@@ -134,6 +134,8 @@ body:has(.chat-view) #app-modal { max-height: calc(100dvh - 24px); overflow-y: a
 .learning-documents-layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
 .learning-documents-layout > *, .learning-document-link > * { min-width: 0; }
 .learning-document-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.learning-document-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
+.learning-document-pagination[hidden] { display: none; }
 .learning-document-link { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: var(--ink); }
 .learning-document-link:hover { background: var(--bg); }
 .learning-document-link[aria-current="page"] { border-color: var(--primary); background: var(--pale); }

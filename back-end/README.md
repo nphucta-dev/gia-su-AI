@@ -79,6 +79,20 @@ back-end/
 
 ## API
 
+### Danh sách tài liệu học tập (TK-097)
+
+Tài khoản active đã đăng nhập dùng `GET /api/documents?topicId=1&limit=20&offset=0`
+hoặc `GET /api/catalog/topics/1/documents?limit=20&offset=0`. API đầu tiên còn hỗ trợ
+`subjectId`, `gradeLevel`, `q` như trước. Chỉ trả nguồn ready/active thuộc danh mục active.
+
+- `limit`: mặc định 20, từ 1 đến 100; `offset`: mặc định 0, từ 0 đến 100000.
+- Phản hồi gồm `documents`, `limit`, `offset`, `hasMore`; API theo chủ đề có thêm `topicId`.
+- Lọc trước phân trang, mới nhất trước (`created_at DESC, id DESC`). `hasMore=true`
+  thì trang tiếp theo dùng `offset + limit`; vượt dữ liệu trả danh sách trống.
+
+Chi tiết và tệp gốc vẫn dùng `GET /api/documents/{id}` và
+`GET /api/documents/{id}/file`. Xem [mô tả chức năng](../docs/LEARNER_DOCUMENT_TASKS.md).
+
 ### `GET /api/health`
 
 `200 {"status": "ok"}`

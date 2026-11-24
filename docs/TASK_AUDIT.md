@@ -2,6 +2,13 @@
 
 Ngày rà soát: **24/11/2026**.
 
+Cập nhật sau merge **ce26e4e**: nhánh `frontend/learning-document-viewer`
+(PR #34, commit `2127d32`) và `back-end/api-xem-tai-lieu-hoc-tap`
+(PR #33, commit `9b27895`) đều nằm trong lịch sử `main`.
+Đã kiểm tra trực tiếp remote: `main` trên GitHub cùng commit `ce26e4e`.
+TK-096/TK-097 đã có triển khai; kết luận chưa có hai chức năng này ở bản trước
+merge không còn áp dụng. TK-095 là seed dữ liệu demo, không phải giao diện xem tài liệu.
+
 Phạm vi gồm **95 task gốc** trong [task-details.json](reference/task-details.json)
 và **2 task bổ sung** trong [task-additions.json](reference/task-additions.json).
 Chỉ đối chiếu tên task, mô tả công việc, yêu cầu nghiệp vụ và code hiện tại.
@@ -10,7 +17,7 @@ Không dùng cột phân công, lịch, điểm, trạng thái hoặc tiêu chí
 **Có triển khai** nghĩa là đã tìm thấy code thực hiện công việc và đường tích hợp liên quan,
 không đồng nghĩa đã nghiệm thu trên môi trường triển khai hoặc với mọi model.
 Các tệp test là bằng chứng phạm vi đã được kiểm tra; sự tồn tại của tệp không tự chứng minh test vừa chạy.
-Báo cáo không thay đổi logic ứng dụng, chạy migration hay triển khai các task còn thiếu.
+Báo cáo ghi nhận code hiện có; chỉ triển khai task khi người dùng giao trực tiếp.
 
 ## Kết quả cần làm tiếp
 
@@ -18,14 +25,28 @@ Báo cáo không thay đổi logic ứng dụng, chạy migration hay triển kh
 | --- | --- |
 | TK-093 — Triển khai demo | Chưa thấy cấu hình/bằng chứng triển khai public và HTTPS; server frontend hiện bind 127.0.0.1. Trước đó người dùng mới hỏi cách chia sẻ để test, chưa giao triển khai. |
 | TK-094 — Kịch bản demo ứng dụng | Chưa tìm thấy tài liệu kịch bản thao tác từ đăng nhập tới quiz trong repository. README khởi động và test tự động chưa thay thế kịch bản trình bày. |
-| TK-096 — Giao diện xem tài liệu học tập | Đã thêm mô tả task, chưa có UI người học xem danh sách và đọc toàn bộ PDF/TXT. |
-| TK-097 — API xem tài liệu học tập | Đã thêm mô tả task, chưa có API danh sách/chi tiết/nội dung tài liệu cho người học. API quản trị và trích dẫn chat hiện có không thay thế chức năng này. |
 
 | Task | Điểm còn thiếu hoặc khác yêu cầu |
 | --- | --- |
 | TK-046 — Tìm kiếm vector pgvector | Có client embedding thật, kiểm tra vector 768 chiều và cosine/hybrid trên MySQL JSON. Cấu hình embedding hiện chưa đầy đủ nên fallback keyword; chat gọi search mặc định keyword. Tài liệu ready có chunk được trả về sớm khi process, chưa có thao tác tạo lại embedding cho nguồn cũ. Cần hoàn tất cấu hình/dữ liệu và kiểm chứng luồng thực tế. Giữ MySQL theo chỉ đạo người dùng; không yêu cầu chuyển sang PostgreSQL. |
 | TK-080 — Băm và kiểm tra mật khẩu | Hash/verify scrypt đã hoạt động và có test. Mô tả gốc ghi bcrypt/Argon2; đây là khác biệt cần chốt yêu cầu, không phải thiếu băm mật khẩu. Không tự thay thuật toán hay hash đã lưu. |
 | TK-086 / TK-087 — Kiểm thử UI thủ công | Có nhiều test trình duyệt tự động, nhưng chưa tìm thấy biên bản chạy thủ công cho auth/chat và quiz/admin/dashboard/responsive. Cần ghi nhận kết quả thủ công đúng công việc đã mô tả. |
+
+TK-096 đã nối thao tác Xem tài liệu tại môn/chủ đề tới trang danh sách và trình đọc
+PDF/TXT có xác thực, trạng thái tải/trống/lỗi/thử lại và liên kết hỏi gia sư đúng topic.
+Code nằm trong [learning-documents.js](../front-end/src/js/pages/learning-documents.js)
+và [learning_documents.py](../back-end/app/routes/learning_documents.py).
+Sau merge đã chạy đạt **24 test** trong `test_learning_documents_api.py` và
+`test_seed_demo.py`. Khi hoàn tất merge, bộ backend đạt **1317 passed, 88 skipped**,
+bộ frontend hiện hành đạt; luồng admin upload/bật nguồn → learner mở TXT qua UI/API
+cô lập cũng được kiểm tra ở 360/1440px, không ghi vào database dự án.
+
+Theo yêu cầu bổ sung, TK-097 đã hoàn tất phần phân trang sau merge: cả hai API
+danh sách nhận `limit/offset`, trả `hasMore`, giữ lọc và thứ tự ổn định trước khi
+cắt trang. UI có Trang trước/Trang sau và giữ offset khi đọc/tải lại tài liệu.
+Kiểm thử phạm vi này đạt **30 test API** (2 test MySQL tùy chọn được chạy riêng),
+**2 test MySQL thật** trên database ngẫu nhiên do fixture tạo/xóa, và hai bộ UI
+`learning-document-viewer.cjs`, `learning-documents-pagination.cjs` đạt.
 
 TK-092 đã có repository, README, .env.example và hướng dẫn local. Tuy nhiên,
 [front-end/README.md](../front-end/README.md) và
@@ -45,7 +66,7 @@ không xác nhận khả năng trả lời tiếng Việt, chất lượng Socra
   prompt yêu cầu 5 câu, lựa chọn A–D, đáp án đúng và giải thích.
   Payload được kiểm tra trước khi lưu; giao diện luyện tập đã gọi API này.
 
-Nhóm kiểm thử liên quan được chạy trong lần rà soát này: **209 passed**,
+Nhóm kiểm thử AI được chạy ở lần rà soát trước merge: **209 passed**,
 gồm `test_chat_api.py`, `test_ai_chat_complete.py`, `test_ai_quiz_api.py`,
 `test_quiz_validation.py`, `test_llm_task_contracts.py` và
 `test_ai_provider_workflows.py`. Các bài này dùng provider/HTTP giả lập;
@@ -55,8 +76,8 @@ không chạy bài live trong lần kiểm tra này.
 
 ## Ma trận 97 task
 
-Tổng hợp: **89 có triển khai**, **2 còn thiếu/khác yêu cầu**,
-**2 chưa đủ bằng chứng test thủ công**, **4 chưa thấy triển khai**.
+Tổng hợp: **91 có triển khai**, **2 còn thiếu/khác yêu cầu**,
+**2 chưa đủ bằng chứng test thủ công**, **2 chưa thấy triển khai**.
 Hai task bổ sung được lưu riêng để không thay đổi bản trích 95 task gốc.
 
 | Mã tra cứu | Tên task | Kết quả rà soát | Bằng chứng và ghi chú |
@@ -156,6 +177,6 @@ Hai task bổ sung được lưu riêng để không thay đổi bản trích 95
 | TK-093 | Triển khai demo | Chưa thấy triển khai | [serve.cjs](../front-end/serve.cjs), [README.md](../README.md). Chỉ cấu hình chạy local; chưa có bằng chứng deploy public/HTTPS. |
 | TK-094 | Kịch bản demo ứng dụng | Chưa thấy triển khai | [README.md](../README.md). Hướng dẫn khởi động có; chưa tìm thấy kịch bản thao tác demo riêng trong repo. |
 | TK-095 | Seed dữ liệu demo | Có triển khai | [seed.py](../back-end/app/db/seed.py), [manifest.json](../back-end/app/db/demo_documents/manifest.json), [test_seed_demo.py](../back-end/tests/test_seed_demo.py). 2 môn × 5 chủ đề, tài liệu hợp lệ kèm nguồn và tài khoản demo. |
-| TK-096 | Giao diện xem tài liệu học tập | Chưa thấy triển khai | [LEARNER_DOCUMENT_TASKS.md](../docs/LEARNER_DOCUMENT_TASKS.md), [task-additions.json](../docs/reference/task-additions.json). Đã bổ sung mô tả công việc; chưa triển khai UI/API người học đọc toàn bộ tài liệu. |
-| TK-097 | API xem tài liệu học tập | Chưa thấy triển khai | [LEARNER_DOCUMENT_TASKS.md](../docs/LEARNER_DOCUMENT_TASKS.md), [task-additions.json](../docs/reference/task-additions.json). Đã bổ sung mô tả công việc; chưa triển khai UI/API người học đọc toàn bộ tài liệu. |
+| TK-096 | Giao diện xem tài liệu học tập | Có triển khai | [learning-documents.js](../front-end/src/js/pages/learning-documents.js), [learning.js](../front-end/src/js/pages/learning.js), [app.js](../front-end/src/js/app.js). PR #34 đã merge; danh sách, đọc PDF/TXT có xác thực, tải/trống/lỗi/thử lại và hỏi gia sư đúng topic. Luồng đọc TXT với API cô lập đã kiểm tra sau merge. |
+| TK-097 | API xem tài liệu học tập | Có triển khai | [learning_documents.py](../back-end/app/routes/learning_documents.py), [learning_document_service.py](../back-end/app/services/learning_document_service.py), [test_learning_documents_pagination.py](../back-end/tests/test_learning_documents_pagination.py), [learning-documents-pagination.cjs](../front-end/tests/learning-documents-pagination.cjs). Có danh sách/lọc, chi tiết và /file với kiểm tra quyền/nguồn; phân trang limit/offset/hasMore, thứ tự ổn định và UI Trang trước/Trang sau. API, MySQL thật và UI đã kiểm tra. |
 

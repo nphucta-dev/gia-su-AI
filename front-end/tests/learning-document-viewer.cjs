@@ -25,7 +25,7 @@ const docs = [
  const base = `http://127.0.0.1:${server.address().port}`;
  const browser = await chromium.launch({ channel: 'msedge', headless: process.env.DOCUMENTS_HEADED !== '1' });
  const context = await browser.newContext({ viewport: { width: 1440, height: 1050 } });
- const output = path.resolve(__dirname, '../outputs/learning-document-viewer'); fs.mkdirSync(output, { recursive: true });
+ const output = process.env.DOCUMENTS_TEST_OUTPUT_DIR || path.resolve(__dirname, '../outputs/learning-document-viewer'); fs.mkdirSync(output, { recursive: true });
  const errors = [], requests = [], releases = [];
  let listMode = 'ok', detailMode = 'ok', fileMode = 'ok', revoked = false;
  await context.addInitScript(() => {
@@ -47,7 +47,9 @@ const docs = [
   if (endpoint === '/api/documents') {
    if (listMode === 'held') await new Promise(resolve => releases.push(resolve));
    if (listMode === 'fail') return json({ error: { code: 'UNAVAILABLE', message: 'Chưa tải được danh sách tài liệu.' } }, 503);
-   return json({ documents: listMode === 'empty' ? [] : docs.filter(item => (!revoked || item.id !== 21) && (!url.searchParams.has('subjectId') || item.subjectId === Number(url.searchParams.get('subjectId'))) && (!url.searchParams.has('topicId') || item.topicId === Number(url.searchParams.get('topicId')))) });
+   const limit = Number(url.searchParams.get('limit') || 20), offset = Number(url.searchParams.get('offset') || 0);
+   const filtered = listMode === 'empty' ? [] : docs.filter(item => (!revoked || item.id !== 21) && (!url.searchParams.has('subjectId') || item.subjectId === Number(url.searchParams.get('subjectId'))) && (!url.searchParams.has('topicId') || item.topicId === Number(url.searchParams.get('topicId'))));
+   return json({ documents: filtered.slice(offset, offset + limit), limit, offset, hasMore: offset + limit < filtered.length });
   }
   const match = endpoint.match(/^\/api\/documents\/(\d+)(\/file)?$/);
   if (match) {
@@ -106,7 +108,7 @@ const docs = [
   listMode = 'fail'; await page.reload(); await page.getByRole('button', { name: 'Thử lại danh sách', exact: true }).waitFor(); await capture('document-list-error');
   listMode = 'ok'; await page.getByRole('button', { name: 'Thử lại danh sách', exact: true }).press('Enter');
   await page.getByRole('link', { name: /Phương trình bậc hai — PDF/ }).waitFor(); assert.equal(await page.locator('.learning-document-list li').count(), 2);
-  for (const query of ['topic=abc', 'document=-1', 'subject=0', 'topic=10&topic=11']) { await page.goto(`${base}/#documents?${query}`); await page.getByText('Đường dẫn tài liệu không hợp lệ. Vui lòng chọn lại môn hoặc chủ đề.', { exact: true }).waitFor(); }
+  for (const query of ['topic=abc', 'document=-1', 'subject=0', 'topic=10&topic=11', 'offset=-1', 'offset=100001', 'offset=abc', 'offset=0&offset=20']) { await page.goto(`${base}/#documents?${query}`); await page.getByText('Đường dẫn tài liệu không hợp lệ. Vui lòng chọn lại môn hoặc chủ đề.', { exact: true }).waitFor(); }
   await page.goto(`${base}/#documents?topic=10&document=22`); await page.getByText('Tài liệu không còn truy cập được hoặc không thuộc môn/chủ đề đã chọn.', { exact: true }).waitFor(); assert.equal(await page.locator('pre, iframe').count(), 0);
   await page.goto(`${base}/#documents?document=23`); await page.getByText('Định dạng tài liệu này chưa được hỗ trợ. Vui lòng chọn PDF hoặc TXT.', { exact: true }).waitFor();
   for (const bad of ['fail', 'missing', 'wrongType', 'badPdf']) {
@@ -164,7 +166,8 @@ const docs = [
   const preview = await previewContext.newPage(), previewRequests = [];
   preview.on('pageerror', error => errors.push(error.message));
   await preview.route('**/api/**', route => { previewRequests.push(route.request().url()); return route.abort(); });
-  await preview.goto(`${base}/#documents?document=21`); await preview.getByText('Chế độ xem thử không tải tài liệu tài khoản.', { exact: false }).waitFor();
+  await preview.goto(`${base}/#documents?document=21`); await preview.waitForURL(/#login/);
+  assert.equal(await preview.locator('.learning-documents-page').count(), 0);
   assert.deepEqual(previewRequests, []); await previewContext.close();
   assert.deepEqual(errors, []);
   console.log('PASS learning documents: subject/topic links, list/filter/loading/empty/retry, URL/history, authenticated PDF fetch, UTF-8/BOM/plain text, invalid files, retry/dedupe, stale switch, chat topic, revalidation/visibility/timer lifecycle, revoke/401/403/logout, preview/no AI, responsive and no pageerror. PDF pixel render requires visual inspection of document-pdf.png.');

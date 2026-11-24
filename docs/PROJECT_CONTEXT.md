@@ -120,7 +120,9 @@ phụ huynh/giáo viên/lớp học; golden set tự động/so sánh nhiều m�
 
 95 task gốc **TK-001–TK-095** được lưu tại [task-details.json](reference/task-details.json).
 Hai task **TK-096–TK-097** về giao diện/API xem tài liệu cho người học được ghi riêng
-tại [task-additions.json](reference/task-additions.json); mới bổ sung mô tả, chưa triển khai.
+tại [task-additions.json](reference/task-additions.json). UI/API đã được ghép vào `main`
+qua PR #34/#33 và merge `ce26e4e`. TK-097 đã bổ sung phân trang `limit/offset`,
+phản hồi `hasMore` và điều hướng trang trước/sau trên giao diện.
 Chỉ dùng hai nội dung: `title` từ cột **Tên task** và `description` từ cột **Công việc cụ thể**.
 `id` chỉ là nhãn để tìm đúng dòng, không đặt thêm điều kiện triển khai.
 Các thông tin phân công, chuyên môn, lịch/tuần, giờ/điểm, trạng thái, MoSCoW,

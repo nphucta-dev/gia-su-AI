@@ -153,6 +153,9 @@ class DocumentRepository(Protocol):
         topic_id: int | None = None,
         subject_id: int | None = None,
         grade_level: str | None = None,
+        query: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
     ) -> list[LearningDocumentRecord]: ...
 
     async def find_learning_document(self, document_id: int) -> LearningDocumentDetailRecord | None: ...
@@ -340,7 +343,11 @@ class InMemoryDocumentRepository:
         topic_id: int | None = None,
         subject_id: int | None = None,
         grade_level: str | None = None,
+        query: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
     ) -> list[LearningDocumentRecord]:
+        cleaned_query = fold_text(query) if query else ""
         items: list[LearningDocumentRecord] = []
         for doc in self._documents.values():
             record = self._to_learning_record(doc)
@@ -352,8 +359,13 @@ class InMemoryDocumentRepository:
                 continue
             if grade_level is not None and record.grade_level != grade_level:
                 continue
+            if cleaned_query and cleaned_query not in fold_text(
+                f"{record.title} {record.topic_name} {record.chapter_name} {record.subject_name}"
+            ):
+                continue
             items.append(record)
-        return sorted(items, key=lambda item: (item.created_at, item.id), reverse=True)
+        items.sort(key=lambda item: (item.created_at, item.id), reverse=True)
+        return items[offset:offset + limit]
 
     async def find_learning_document(self, document_id: int) -> LearningDocumentDetailRecord | None:
         doc = self._documents.get(document_id)
@@ -436,12 +448,18 @@ class SqlAlchemyDocumentRepository:
         topic_id: int | None = None,
         subject_id: int | None = None,
         grade_level: str | None = None,
+        query: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
     ) -> list[LearningDocumentRecord]:
         return await asyncio.to_thread(
             self._list_learning_documents,
             topic_id=topic_id,
             subject_id=subject_id,
             grade_level=grade_level,
+            query=query,
+            limit=limit,
+            offset=offset,
         )
 
     async def find_learning_document(self, document_id: int) -> LearningDocumentDetailRecord | None:
@@ -645,6 +663,9 @@ class SqlAlchemyDocumentRepository:
         topic_id: int | None = None,
         subject_id: int | None = None,
         grade_level: str | None = None,
+        query: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
     ) -> list[LearningDocumentRecord]:
         stmt = self._learning_document_query()
         if topic_id is not None:
@@ -655,6 +676,33 @@ class SqlAlchemyDocumentRepository:
             stmt = stmt.where(SubjectModel.grade_level == grade_level)
         stmt = stmt.order_by(DocumentModel.created_at.desc(), DocumentModel.id.desc())
         with self._sessions() as db:
+            cleaned_query = fold_text(query) if query else ""
+            if cleaned_query:
+                # Giữ tìm kiếm tiếng Việt không dấu như trước. Chỉ quét metadata
+                # theo lô; tải đủ bản ghi/số chunk cho trang đã lọc, không stat mọi file.
+                candidates = db.execute(stmt.with_only_columns(
+                    DocumentModel.id, DocumentModel.title, TopicModel.name,
+                    TopicModel.chapter_name, SubjectModel.name,
+                ).execution_options(yield_per=200))
+                page_ids = []
+                skipped = 0
+                try:
+                    for document_id, title, topic, chapter, subject in candidates:
+                        if cleaned_query not in fold_text(f"{title} {topic} {chapter} {subject}"):
+                            continue
+                        if skipped < offset:
+                            skipped += 1
+                            continue
+                        page_ids.append(document_id)
+                        if len(page_ids) >= limit:
+                            break
+                finally:
+                    candidates.close()
+                if not page_ids:
+                    return []
+                stmt = stmt.where(DocumentModel.id.in_(page_ids))
+            else:
+                stmt = stmt.limit(limit).offset(offset)
             rows = db.execute(stmt)
             return [
                 self._to_learning_record(document, topic, subject, count)

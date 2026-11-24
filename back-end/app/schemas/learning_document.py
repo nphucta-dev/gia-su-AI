@@ -36,11 +36,13 @@ class LearningDocumentDetail(LearningDocumentItem):
 
 class LearningDocumentListResponse(BaseModel):
     documents: list[LearningDocumentItem]
+    limit: int
+    offset: int
+    has_more: bool = Field(serialization_alias="hasMore")
 
 
-class TopicDocumentListResponse(BaseModel):
+class TopicDocumentListResponse(LearningDocumentListResponse):
     topic_id: int = Field(serialization_alias="topicId")
-    documents: list[LearningDocumentItem]
 
 
 class LearningDocumentDetailResponse(BaseModel):

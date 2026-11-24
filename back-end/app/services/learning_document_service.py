@@ -19,10 +19,11 @@ from app.schemas.learning_document import (
     LearningDocumentChunkItem,
     LearningDocumentDetail,
     LearningDocumentItem,
+    LearningDocumentListResponse,
+    TopicDocumentListResponse,
 )
 from app.services.document_service import database_unavailable
 from app.utils.errors import AppError
-from app.utils.keywords import fold_text
 
 _FILE_TYPES: dict[str, tuple[Literal["pdf", "txt"], str]] = {
     ".pdf": ("pdf", "application/pdf"),
@@ -49,7 +50,11 @@ class LearningDocumentService:
         subject_id: int | None = None,
         grade_level: str | None = None,
         query: str | None = None,
-    ) -> list[LearningDocumentItem]:
+        limit: int = 20,
+        offset: int = 0,
+    ) -> LearningDocumentListResponse:
+        if type(limit) is not int or not 1 <= limit <= 100 or type(offset) is not int or not 0 <= offset <= 100000:
+            raise AppError(422, "VALIDATION_ERROR", "Phân trang tài liệu không hợp lệ.")
         cleaned_grade = grade_level.strip() if grade_level is not None else None
         if cleaned_grade == "":
             cleaned_grade = None
@@ -62,24 +67,21 @@ class LearningDocumentService:
                 topic_id=topic_id,
                 subject_id=subject_id,
                 grade_level=cleaned_grade,
+                query=query,
+                limit=limit + 1,
+                offset=offset,
             )
         except SQLAlchemyError:
             raise database_unavailable() from None
 
-        cleaned_query = fold_text(query) if query else ""
-        if cleaned_query:
-            records = [
-                record
-                for record in records
-                if cleaned_query in fold_text(
-                    f"{record.title} {record.topic_name} {record.chapter_name} {record.subject_name}"
-                )
-            ]
+        documents = await asyncio.to_thread(lambda: [self._to_item(record) for record in records[:limit]])
+        return LearningDocumentListResponse(
+            documents=documents, limit=limit, offset=offset, has_more=len(records) > limit,
+        )
 
-        return await asyncio.to_thread(lambda: [self._to_item(record) for record in records])
-
-    async def list_topic_documents(self, topic_id: int) -> list[LearningDocumentItem]:
-        return await self.list_documents(topic_id=topic_id)
+    async def list_topic_documents(self, topic_id: int, *, limit: int = 20, offset: int = 0) -> TopicDocumentListResponse:
+        page = await self.list_documents(topic_id=topic_id, limit=limit, offset=offset)
+        return TopicDocumentListResponse(topic_id=topic_id, **page.model_dump())
 
     async def get_document(self, document_id: int) -> LearningDocumentDetail:
         detail = await self._load_detail(document_id)

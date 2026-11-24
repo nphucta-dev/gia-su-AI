@@ -3,6 +3,8 @@ import { getSession, getAccessToken } from '../session.js';
 import { el, heading, link, button, notice } from '../components/ui.js';
 
 let activeController;
+const PAGE_SIZE = 20;
+const MAX_OFFSET = 100000;
 function positiveId(value) {
  const text = String(value ?? ''), number = Number(text);
  return /^[1-9]\d*$/.test(text) && Number.isSafeInteger(number) && number <= 2147483647 ? number : null;
@@ -24,13 +26,22 @@ export function renderLearningDocuments() {
  const owner = getSession().user?.id, token = getAccessToken();
  const params = new URLSearchParams(location.hash.split('?')[1]);
  const ids = Object.fromEntries(['subject', 'topic', 'document'].map(key => [key, params.has(key) ? positiveId(params.get(key)) : null]));
- const invalid = ['subject', 'topic', 'document'].some(key => params.has(key) && (!ids[key] || params.getAll(key).length !== 1));
+ const offsetText = params.get('offset') ?? '0';
+ const offset = /^(0|[1-9]\d*)$/.test(offsetText) ? Number(offsetText) : NaN;
+ const invalid = ['subject', 'topic', 'document'].some(key => params.has(key) && (!ids[key] || params.getAll(key).length !== 1))
+  || !Number.isSafeInteger(offset) || offset > MAX_OFFSET || params.getAll('offset').length > 1;
  const filters = new URLSearchParams();
  if (ids.subject) filters.set('subject', ids.subject);
  if (ids.topic) filters.set('topic', ids.topic);
- const href = id => { const query = new URLSearchParams(filters); if (id) query.set('document', id); return `#documents${query.size ? `?${query}` : ''}`; };
+ const href = (id, pageOffset = offset) => {
+  const query = new URLSearchParams(filters);
+  if (id) query.set('document', id);
+  if (pageOffset) query.set('offset', pageOffset);
+  return `#documents${query.size ? `?${query}` : ''}`;
+ };
  const listStatus = el('div', { role: 'status' });
  const list = el('ul', { className: 'learning-document-list' });
+ const pagination = el('nav', { className: 'learning-document-pagination', 'aria-label': 'Phân trang tài liệu', hidden: true });
  const readerHeader = el('div');
  const readerStatus = el('div', { role: 'status', 'aria-live': 'polite' });
  const content = el('div', { className: 'learning-document-content' });
@@ -39,7 +50,7 @@ export function renderLearningDocuments() {
   heading('Tài liệu học tập', 'Chọn tài liệu đã phát hành để đọc và hỏi gia sư theo chủ đề.'),
   el('div', { className: 'page-actions' }, link('Về danh mục môn học', '#home', 'button ghost small'), ids.document ? link('Về danh sách tài liệu', href(), 'button ghost small') : null),
   el('div', { className: 'learning-documents-layout' },
-   el('section', { className: 'panel learning-document-catalog', 'aria-label': 'Danh sách tài liệu' }, el('h2', {}, 'Danh sách tài liệu'), listStatus, list), reader));
+   el('section', { className: 'panel learning-document-catalog', 'aria-label': 'Danh sách tài liệu' }, el('h2', {}, 'Danh sách tài liệu'), listStatus, list, pagination), reader));
  let listPending = false, readerPending = false, blobUrl = null, signature = null, timer, revoked = false;
  const current = () => root.isConnected && !controller.signal.aborted && getSession().status === 'authenticated'
   && getSession().user?.id === owner && getSession().reason !== 'preview' && getAccessToken() === token;
@@ -66,21 +77,34 @@ export function renderLearningDocuments() {
  async function loadList() {
   if (listPending || !current()) return;
   listPending = true; list.replaceChildren();
+  pagination.hidden = true; pagination.replaceChildren();
   list.setAttribute('aria-busy', 'true'); listStatus.replaceChildren(el('p', {}, 'Đang tải danh sách tài liệu…'));
   const query = new URLSearchParams();
   if (ids.subject) query.set('subjectId', ids.subject);
   if (ids.topic) query.set('topicId', ids.topic);
+  query.set('limit', PAGE_SIZE);
+  query.set('offset', offset);
   try {
    const result = await api(`/documents${query.size ? `?${query}` : ''}`, { signal: controller.signal });
    if (!current()) return;
-   if (!Array.isArray(result?.documents)) throw new ApiError('Danh sách tài liệu từ máy chủ chưa hợp lệ.');
+   if (!Array.isArray(result?.documents) || result.limit !== PAGE_SIZE || result.offset !== offset
+    || typeof result.hasMore !== 'boolean' || result.documents.length > PAGE_SIZE) {
+    throw new ApiError('Danh sách tài liệu từ máy chủ chưa hợp lệ.');
+   }
    const documents = result.documents.map(metadata);
    if (documents.some(item => !matches(item)) || new Set(documents.map(item => item.id)).size !== documents.length) throw new ApiError('Danh sách tài liệu không khớp môn hoặc chủ đề đã chọn.');
-   listStatus.replaceChildren(...(documents.length ? [] : [notice('Chưa có tài liệu được phát hành cho lựa chọn này.')]));
+   listStatus.replaceChildren(...(documents.length ? [] : [notice(offset
+    ? 'Trang này không còn tài liệu. Hãy quay về trang trước.'
+    : 'Chưa có tài liệu được phát hành cho lựa chọn này.')]));
    list.replaceChildren(...documents.map(item => el('li', {},
     el('a', { href: href(item.id), className: 'learning-document-link', 'aria-current': item.id === ids.document ? 'page' : null },
      el('strong', {}, item.title), el('span', { className: 'helper' }, `${item.subjectName} · ${item.chapterName} · ${item.topicName}`),
      el('span', { className: 'badge neutral' }, item.fileType === 'unknown' ? 'Chưa hỗ trợ' : item.fileType.toUpperCase())))));
+   pagination.replaceChildren(
+    offset > 0 ? link('Trang trước', href(null, Math.max(0, offset - PAGE_SIZE)), 'button secondary small') : null,
+    documents.length ? el('span', { className: 'helper' }, `Tài liệu ${offset + 1}–${offset + documents.length}`) : null,
+    result.hasMore && offset + PAGE_SIZE <= MAX_OFFSET ? link('Trang sau', href(null, offset + PAGE_SIZE), 'button secondary small') : null);
+   pagination.hidden = offset === 0 && !result.hasMore;
   } catch (error) {
    if (error.name !== 'AbortError' && current()) listStatus.replaceChildren(notice(error.message, 'error'), button('Thử lại danh sách', loadList, 'secondary small'));
   } finally { listPending = false; if (current()) list.removeAttribute('aria-busy'); }

@@ -35,6 +35,8 @@ topic_documents_router = APIRouter(
 
 DocumentId = Annotated[int, Path(ge=1, le=2**31 - 1)]
 TopicIdPath = Annotated[int, Path(ge=1, le=2**31 - 1)]
+PageLimit = Annotated[int, Query(ge=1, le=100)]
+PageOffset = Annotated[int, Query(ge=0, le=100000)]
 
 
 def get_learning_document_service(request: Request) -> LearningDocumentService:
@@ -66,14 +68,17 @@ async def list_learning_documents(
     subject_id: Annotated[int | None, Query(alias="subjectId", ge=1, le=2**31 - 1)] = None,
     grade_level: Annotated[str | None, Query(alias="gradeLevel", max_length=50)] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
+    limit: PageLimit = 20,
+    offset: PageOffset = 0,
 ) -> LearningDocumentListResponse:
-    documents = await service.list_documents(
+    return await service.list_documents(
         topic_id=topic_id,
         subject_id=subject_id,
         grade_level=grade_level,
         query=q,
+        limit=limit,
+        offset=offset,
     )
-    return LearningDocumentListResponse(documents=documents)
 
 
 @router.get(
@@ -121,6 +126,7 @@ async def get_learning_document_file(
 async def list_topic_documents(
     topic_id: TopicIdPath,
     service: Service,
+    limit: PageLimit = 20,
+    offset: PageOffset = 0,
 ) -> TopicDocumentListResponse:
-    documents = await service.list_topic_documents(topic_id)
-    return TopicDocumentListResponse(topic_id=topic_id, documents=documents)
+    return await service.list_topic_documents(topic_id, limit=limit, offset=offset)
