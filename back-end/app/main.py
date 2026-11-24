@@ -44,6 +44,10 @@ from app.routes.me import router as me_router
 from app.routes.profile import router as profile_router
 from app.routes.documents import router as documents_router
 from app.routes.document_search import router as document_search_router
+from app.routes.learning_documents import (
+    router as learning_documents_router,
+    topic_documents_router,
+)
 from app.routes.ai_quota import router as ai_quota_router
 from app.services.auth_service import AuthService, UserRepository
 from app.services.ai_quota import AiQuotaService
@@ -195,6 +199,8 @@ def create_app(
     app.include_router(profile_router)
     app.include_router(documents_router)
     app.include_router(document_search_router)
+    app.include_router(learning_documents_router)
+    app.include_router(topic_documents_router)
     app.include_router(ai_quota_router)
     app.include_router(quota_router)
 

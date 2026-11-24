@@ -14,7 +14,7 @@ export function renderHome() {
  const current = () => subjects.find(s => s.id === selectedId) || subjects[0];
  const topicRow = t => el('article', { className: 'topic-row' },
   el('div', {}, el('h3', {}, t.name), el('p', {}, t.description || 'Chưa có mô tả.')),
-  el('div', { className: 'topic-actions' }, link('Hỏi gia sư', `#chat?topic=${t.id}`, 'button primary small'), link('Luyện tập', `#practice?topic=${t.id}`, 'button ghost small')));
+  el('div', { className: 'topic-actions' }, link('Hỏi gia sư', `#chat?topic=${t.id}`, 'button primary small'), link('Luyện tập', `#practice?topic=${t.id}`, 'button ghost small'), link('Xem tài liệu', `#documents?topic=${t.id}`, 'button ghost small')));
 
  function drawAside() {
   const subject = current();
@@ -24,6 +24,7 @@ export function renderHome() {
    el('h2', {}, subject.name), el('p', {}, `${subject.gradeLevel} · ${count} chủ đề`),
    el('div', { className: 'spacer' }), badge('Đang mở', 'success'),
    el('p', { className: 'subject-note' }, 'Học bằng gợi ý, tự tìm lời giải và luyện tập theo chủ đề.'),
+   link('Xem tài liệu', `#documents?subject=${subject.id}`, 'button ghost small'),
    subjects.length > 1 ? el('div', { className: 'stack' }, ...subjects.map(s => button(`${s.name} · ${s.gradeLevel}`, () => { selectedId = s.id; draw(); }, s.id === subject.id ? 'primary small' : 'ghost small'))) : null);
  }
  function drawBody() {

@@ -1,7 +1,7 @@
 import { api, ApiError } from '../api.js';
 import { loadCatalog, flattenTopics } from '../catalog.js';
 import { el, button, heading, notice, confirmDialog, link } from '../components/ui.js';
-import { validateChatQuestion } from '../chat-question.js';
+import { createChatQuestionField } from '../components/chat-question-field.js';
 import { renderAiError } from '../components/ai-error.js';
 import { createMessageFeedback } from '../components/message-feedback.js';
 import { chatSidebar } from '../components/chat-sidebar.js';
@@ -41,7 +41,7 @@ export function renderLiveChat() {
  const quotaStatus = el('p', { className: 'helper', role: 'status', 'aria-label': 'Hạn mức AI' });
  const actionStatus = el('div', { className: 'chat-hint-status', role: 'status', 'aria-live': 'polite' });
  const messages = el('div', { className: 'messages chat-history-messages', 'aria-label': 'Nội dung phiên chat', 'aria-live': 'polite' });
- const input = el('textarea', { className: 'textarea', maxlength: 4000, placeholder: 'Nhập câu hỏi của bạn…', 'aria-label': 'Câu hỏi cho gia sư' });
+ const { field, input, readQuestion, clearQuestionError, bindEnter } = createChatQuestionField();
  const send = el('button', { type: 'submit', className: 'button primary' }, 'Gửi câu hỏi');
  const pendingRetry = button('Thử lại', () => runAction('retry', '', true), 'secondary small');
  const hint = button('Hãy gửi câu hỏi trước', () => runAction('hints'), 'secondary');
@@ -57,11 +57,12 @@ export function renderLiveChat() {
  const quotaRefresh = button('Kiểm tra lại hạn mức', () => loadQuota(), 'ghost small');
  const quotaTools = el('div', { className: 'quota-access-tools' }, quotaReadNotice, quotaRefresh);
  const form = el('form', { className: 'chat-composer', novalidate: true },
-  el('div', { className: 'composer-row' }, input, send),
+  el('div', { className: 'composer-row' }, field, send),
   el('p', { className: 'chat-footer' }, 'Câu trả lời do AI tạo, hãy đối chiếu với tài liệu học tập.'));
  const newSession = button('+ Phiên mới', () => {
   if (busy || confirming) return;
   selectedSession = null; selectedMessages = []; input.value = ''; unresolvedSend = false; failedContent = ''; actionStatus.replaceChildren();
+  clearQuestionError();
   history.replaceState(null, '', topicId ? `#chat?topic=${topicId}` : '#chat');
   drawSession();
  });
@@ -304,12 +305,11 @@ export function renderLiveChat() {
  }
  form.addEventListener('submit', event => {
   event.preventDefault();
-  const validation = validateChatQuestion(input.value);
-  if (!validation.valid) {
-   actionStatus.replaceChildren(notice(validation.error, 'error')); input.focus(); return;
-  }
-  runAction('send', validation.text);
+  const question = readQuestion();
+  if (question === null) return;
+  runAction('send', question);
  });
+ bindEnter(form, send);
  topic.addEventListener('change', () => { location.hash = `chat?topic=${topic.value}`; });
  function showHistoryReadError() {
   const retry = button('Thử tải lại hội thoại', async () => {

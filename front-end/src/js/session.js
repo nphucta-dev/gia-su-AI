@@ -67,7 +67,7 @@ export function takeLoginHint() { const hint = loginHint; loginHint = null; retu
 export function loginDestination() {
   const fallback = isAdmin() ? 'admin?tab=subjects' : 'home';
   const next = new URLSearchParams(location.hash.split('?')[1]).get('next') || fallback;
-  return /^(home|chat|practice|results|dashboard|profile|history|admin)(\?[^#]*)?$/.test(next) ? next : fallback;
+  return /^(home|chat|practice|results|dashboard|profile|history|admin|documents)(\?[^#]*)?$/.test(next) ? next : fallback;
 }
 export const subscribeSession = fn => { listeners.add(fn); return () => listeners.delete(fn); };
 export const onSessionCleared = fn => { resetters.add(fn); return () => resetters.delete(fn); };
