@@ -200,10 +200,7 @@ async function run() {
     const previewApiRequests = [];
     preview.on('pageerror', error => previewErrors.push(error.message));
     preview.on('request', request => { if (request.url().includes('/api/')) previewApiRequests.push(request.url()); });
-    await preview.goto(`${baseUrl}/#chat`);
-    await preview.getByText('Dữ liệu minh họa — chưa kết nối tài khoản thật.', { exact: true }).waitFor();
-    await preview.getByRole('button', { name: 'Gợi ý tiếp (1/3)', exact: true }).click();
-    assert.equal(await preview.getByText(/gợi ý mức 1/).count(), 1);
+    await require('./preview-disabled.cjs').assertPreviewDisabled(preview, baseUrl);
     assert.deepEqual(previewApiRequests, []);
     assert.deepEqual(previewErrors, []);
 

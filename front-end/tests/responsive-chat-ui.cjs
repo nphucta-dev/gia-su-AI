@@ -233,16 +233,8 @@ const stored = [
   const preview = await newPage(false);
   await preview.context().addInitScript(() => sessionStorage.setItem('gia-su-ai.preview-role', 'LEARNER'));
   const previewRequests = []; preview.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) previewRequests.push(request.url()); });
-  await preview.goto(`${base}/#chat`); await preview.getByText('Dữ liệu minh họa — chưa kết nối tài khoản thật.', { exact: true }).waitFor();
+  await require('./preview-disabled.cjs').assertPreviewDisabled(preview, base);
   for (const width of widths) { await preview.setViewportSize({ width, height: 800 }); await fits(preview, `preview ${width}`); }
-  await preview.setViewportSize({ width: 360, height: 800 });
-  await preview.getByRole('button', { name: 'Mở lịch sử phiên', exact: true }).click();
-  await preview.getByRole('button', { name: 'Thu gọn lịch sử phiên', exact: true }).click();
-  await preview.getByRole('button', { name: 'Gợi ý tiếp (1/3)', exact: true }).click();
-  const previewInput = preview.getByRole('textbox', { name: 'Câu hỏi cho gia sư' }); await previewInput.fill('Câu hỏi minh họa.'); await previewInput.press('Enter');
-  await preview.getByText('Câu hỏi minh họa.', { exact: true }).waitFor();
-  await preview.getByText('Xem trước trạng thái giao diện', { exact: true }).click();
-  for (const state of ['loading', 'error', 'quota']) { await preview.getByLabel('Xem trạng thái giao diện').selectOption(state); await fits(preview, `preview ${state}`); }
   assert.deepEqual(previewRequests, []);
   assert.deepEqual(errors, []);
   console.log('PASS TK-090: login/catalog/live chat/preview at 360, 390, 768, 1440px; long content and control containment; sidebar keyboard/pagination/session navigation; draft; loading/error/retry/quota/empty; feedback/hints/solution; reader scroll preservation and follow-latest; short viewport; preview isolation; no pageerror. Edge headless/API mock only, no physical keyboard or iOS testing.');

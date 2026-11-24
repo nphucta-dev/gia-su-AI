@@ -229,30 +229,19 @@ async function runProfileUploadChecks({ browser, baseUrl }) {
   const previewRequests = [];
   preview.on('request', req => { if (new URL(req.url()).pathname.startsWith('/api/')) previewRequests.push(req.url()); });
   try {
-    await preview.goto(`${baseUrl}/#login`);
-    await preview.getByRole('button', { name: 'Vào thử tài khoản quản trị', exact: true }).click();
-    await preview.waitForURL('**/#admin?tab=subjects');
-    await preview.goto(`${baseUrl}/#admin?tab=documents`);
-    await preview.locator('.upload-document-button').click();
-    const upload = preview.locator('.upload-form');
-    await upload.getByLabel('Môn học', { exact: true }).selectOption('Toán học');
-    await upload.getByLabel('Chủ đề', { exact: true }).selectOption('Phương trình bậc hai');
-    await upload.getByLabel('Tiêu đề tài liệu', { exact: true }).fill('Tài liệu xem trước');
-    await upload.locator('input[type=file]').setInputFiles({ name: 'preview-upload.txt', mimeType: 'text/plain', buffer: Buffer.from('Preview upload') });
-    const originalForm = await upload.elementHandle();
+    await require('./preview-disabled.cjs').assertPreviewDisabled(preview, baseUrl, 'admin?tab=documents', 'ADMIN');
+    const email = preview.getByLabel('Email', { exact: true });
+    await email.fill('draft@example.com');
+    const originalForm = await email.elementHandle();
     for (const [eventName, resumePage] of [['visibilitychange', returnToVisibleTab], ['pageshow.persisted', restorePersistedPage], ['focus', returnWindowFocus]]) {
       await resumePage(preview);
-      assert.equal(await originalForm.evaluate(form => form.isConnected), true, `Preview ${eventName} must preserve the upload form`);
-      assert.equal(await upload.getByLabel('Môn học', { exact: true }).inputValue(), 'Toán học');
-      assert.equal(await upload.getByLabel('Chủ đề', { exact: true }).inputValue(), 'Phương trình bậc hai');
-      assert.equal(await upload.getByLabel('Tiêu đề tài liệu', { exact: true }).inputValue(), 'Tài liệu xem trước');
-      assert.equal(await upload.locator('input[type=file]').evaluate(input => input.files[0]?.name), 'preview-upload.txt');
+      assert.equal(await originalForm.evaluate(form => form.isConnected), true, `Unauthenticated ${eventName} must preserve the login form`);
+      assert.equal(await email.inputValue(), 'draft@example.com');
+      assert.equal(await preview.locator('.upload-form').count(), 0);
     }
     await originalForm.dispose();
-    await upload.getByRole('button', { name: 'Tải lên', exact: true }).click();
-    await preview.locator('.document-row').filter({ hasText: 'Tài liệu xem trước.txt' }).waitFor();
     assert.deepEqual(previewRequests, []);
-    console.log('PASS: preview upload survives visibility/pageshow resume without API requests.');
+    console.log('PASS: stale preview ADMIN flag and tab resume cannot open uploads or authenticate.');
   } finally {
     await previewContext.close();
   }

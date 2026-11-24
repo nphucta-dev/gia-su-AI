@@ -222,8 +222,7 @@ def test_api_chunk_search_supports_vector_and_hybrid_modes(tmp_path: Path) -> No
     async def _seed() -> str:
         user = await users.create(
             email="learner@example.com",
-            full_name="Người Học",
-            birth_year=2002,
+            name="Người Học",
             password_hash=hash_password("MatKhau123!"),
             role="LEARNER",
         )
@@ -234,7 +233,7 @@ def test_api_chunk_search_supports_vector_and_hybrid_modes(tmp_path: Path) -> No
             embeddings=[_unit_vector(0)],
         )
         await docs.set_document_active(doc.id, True)
-        return tokens.create_access_token(user_id=user.id, email=user.email, role=user.role).access_token
+        return tokens.create_access_token(user.id).access_token
 
     access_token = asyncio.run(_seed())
     client = TestClient(app)

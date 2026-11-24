@@ -2,7 +2,8 @@
 
 Các luồng chat Socratic, gợi ý 3 mức, giải thích đơn giản/ví dụ, lời giải có xác
 nhận và sinh quiz dùng chung một client model ở backend. Frontend của tài khoản
-đăng nhập gọi API thật; chế độ xem thử trên localhost vẫn dùng dữ liệu minh họa.
+đăng nhập gọi API thật. Chế độ đăng nhập xem thử đã tắt; dữ liệu cá nhân, lịch sử
+và số liệu học tập luôn lấy từ API theo tài khoản đang đăng nhập.
 
 ## Chỉ cần cấu hình khi đã có API
 
@@ -50,6 +51,11 @@ tương thích. API riêng, model chỉ embedding/ảnh/âm thanh, yêu cầu Az
 đặc thù hay giao thức streaming riêng cần adapter bổ sung. Không có cách chỉ nhập
 một tên model bất kỳ mà bỏ qua khả năng, quyền truy cập và giao thức của dịch vụ.
 
+Nếu provider hỗ trợ `GET /models`, dùng đúng ID model có trong danh mục của tài
+khoản. Một tên model tồn tại ở dịch vụ khác không bảo đảm hoạt động với URL/key
+đang dùng. Khi nhận `LLM_ERROR`, cần kiểm tra cả quyền dùng model và số dư provider;
+backend giữ thông báo cố định, không chuyển lỗi thô hay thông tin thanh toán ra UI.
+
 ## Luồng sử dụng
 
 1. Chạy MySQL/schema hiện có, backend và frontend theo README của dự án.
@@ -72,6 +78,12 @@ Không có model: tạo phiên/đọc lịch sử vẫn được, gửi tin tr�
 `503 LLM_NOT_CONFIGURED` và giữ câu hỏi; thử lại qua `/retry` không nhân đôi câu
 hỏi. Sinh quiz thất bại không tạo đề mẫu. JSON không đủ 5 câu/đáp án/giải thích
 không được lưu. Điểm quiz do code backend tính, không dùng model chấm trắc nghiệm.
+
+Phản hồi bị cắt do giới hạn token, chưa kết thúc hoặc yêu cầu tool không được lưu
+như một kết quả thành công. Các adapter kiểm tra metadata kết thúc khi provider
+có cung cấp; trả `502 LLM_INVALID_RESPONSE` nếu trạng thái không hoàn tất.
+Chat/quiz phải có nội dung nhìn thấy được. Quiz được kiểm tra đủ 5 câu và các lựa
+chọn khác nhau trước và sau khi lọc thông tin cá nhân.
 
 ## Quota, lưu trữ và quyền
 
@@ -99,13 +111,37 @@ provider không trả cho trình duyệt. Không đổi MySQL, ID số tự tăn
 
 Kiểm thử HTTP MockTransport bao phủ 5 giao thức và luồng API thật chat → nguồn →
 sinh quiz → chấm → kết quả → quota. Kiểm thử trình duyệt dùng provider giả lập
-riêng; kiểm thử MySQL dùng database tạm ngẫu nhiên. Không có key/model thật nên
-chưa kiểm chứng chất lượng Socratic, tính đúng kiến thức hoặc quyền truy cập của
-một tài khoản provider cụ thể. Khi có API, cần thử một cuộc hội thoại và một quiz
-thật, đối chiếu với tài liệu học tập.
+riêng; kiểm thử MySQL dùng database tạm ngẫu nhiên. Bộ kiểm thử mặc định không gọi
+provider thật. Kiểm tra TK-020/TK-051, trạng thái hoàn tất, nội dung vô hình và
+quota/retry bằng:
+
+```powershell
+cd D:\gia-su-AI\back-end
+.\venv\Scripts\python.exe -m pytest -q tests/test_llm_task_contracts.py tests/test_ai_provider_workflows.py
+```
+
+Khi URL/key/model và tài khoản provider sẵn sàng, kiểm tra trực tiếp hai API bằng
+hai lần gọi model thật với dữ liệu học tập giả lập, không ghi MySQL:
+
+```powershell
+$env:RUN_LIVE_LLM_TESTS = '1'
+try {
+    .\venv\Scripts\python.exe -m pytest -q tests/test_llm_live.py
+} finally {
+    Remove-Item Env:RUN_LIVE_LLM_TESTS -ErrorAction SilentlyContinue
+}
+```
+
+Bài kiểm tra này xác nhận chat có nội dung tiếng Việt, quiz đủ 5 câu A–D, lưu đáp
+án/giải thích phía server và không lộ đáp án trước nộp. Vẫn cần người học đối chiếu
+chất lượng gợi mở và kiến thức với tài liệu. Nếu provider từ chối vì model/quyền
+hoặc hết số dư, chưa thể kết luận chất lượng phản hồi thật.
 
 Định dạng adapter đối chiếu tài liệu chính thức:
+[OpenAI Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create),
 [OpenAI Responses](https://developers.openai.com/api/reference/resources/responses/methods/create),
 [Gemini GenerateContent](https://aistudio.google.com/api-reference/generate-content),
 [Anthropic Messages](https://platform.claude.com/docs/en/api/messages/create?version=2023-06-01),
+[Anthropic stop reasons](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons),
+[Ollama Chat](https://docs.ollama.com/api/chat),
 [Ollama OpenAI compatibility](https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx).

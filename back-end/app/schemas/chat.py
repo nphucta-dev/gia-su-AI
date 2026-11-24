@@ -103,6 +103,7 @@ class ChatSourceRefItem(BaseModel):
     title: str
     chunk_index: int | None = Field(default=None, serialization_alias="chunkIndex")
     source_url: str | None = Field(default=None, serialization_alias="sourceUrl")
+    available: bool = True
 
 class ChatMessageSourcesResponse(BaseModel):
     message_id: int = Field(serialization_alias="messageId")

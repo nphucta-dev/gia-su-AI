@@ -7,6 +7,8 @@
 - [Frontend](front-end/README.md)
 - [Cấu hình API key, URL và model AI](docs/AI_SETUP.md)
 - [Ngữ cảnh dự án, tài liệu và mô tả task](docs/PROJECT_CONTEXT.md)
+- [Đối chiếu task với code hiện tại](docs/TASK_AUDIT.md)
+- [Hai task bổ sung: giao diện và API xem tài liệu học tập](docs/LEARNER_DOCUMENT_TASKS.md)
 
 Database dùng MySQL 8.0.16 trở lên, gồm 11 bảng theo tài liệu thiết kế. Cấu hình kết nối MySQL trên máy trong `back-end/.env`, sau đó thực hiện các lệnh khởi tạo trong hướng dẫn database. Có thể dùng `docker compose up -d db` nếu muốn chạy MySQL bằng Docker.
 

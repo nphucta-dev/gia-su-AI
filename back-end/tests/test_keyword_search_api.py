@@ -47,7 +47,8 @@ async def test_authored_search_route_returns_ranked_source_content_without_priva
         assert body["topicId"] == 1 and body["query"] == "HAM SO" and body["limit"] == 1
         assert len(body["chunks"]) == 1
         chunk = body["chunks"][0]
-        assert set(chunk) == {"id", "documentId", "documentTitle", "topicId", "chunkIndex", "content", "score"}
+        assert set(chunk) == {"id", "documentId", "documentTitle", "topicId", "chunkIndex", "content", "score", "similarity"}
+        assert chunk["similarity"] is None and body["searchMode"] == "keyword"
         assert chunk["documentTitle"] == "Tài liệu đúng" and chunk["score"] == 2
         assert chunk["content"] == "Hàm số có đạo hàm."
         for private in ("file_path", "filePath", "private-server-path", "password", state.user.email):
@@ -58,7 +59,7 @@ async def test_no_matching_keyword_returns_an_empty_success_response():
     async with api() as state:
         response = await state.client.get(ROOT, params={"q": "khongtonTai"})
         assert response.status_code == 200
-        assert response.json() == {"topicId": 1, "query": "khongtonTai", "limit": 5, "chunks": []}
+        assert response.json() == {"topicId": 1, "query": "khongtonTai", "limit": 5, "searchMode": "keyword", "chunks": []}
 
 
 @pytest.mark.parametrize("access,status", [("missing", 401), ("invalid", 401), ("inactive", 403), ("deleted", 401)])

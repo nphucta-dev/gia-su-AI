@@ -43,6 +43,7 @@ export function renderLiveChat() {
  const messages = el('div', { className: 'messages chat-history-messages', 'aria-label': 'Nội dung phiên chat', 'aria-live': 'polite' });
  const input = el('textarea', { className: 'textarea', maxlength: 4000, placeholder: 'Nhập câu hỏi của bạn…', 'aria-label': 'Câu hỏi cho gia sư' });
  const send = el('button', { type: 'submit', className: 'button primary' }, 'Gửi câu hỏi');
+ const pendingRetry = button('Thử lại', () => runAction('retry', '', true), 'secondary small');
  const hint = button('Hãy gửi câu hỏi trước', () => runAction('hints'), 'secondary');
  const solution = button('Xem lời giải', requestSolution, 'ghost');
  const simplify = button('Giải thích đơn giản', () => runAction('simplify'), 'ghost small');
@@ -90,8 +91,9 @@ export function renderLiveChat() {
   topic.disabled = busy || confirming || !topics.length;
   newSession.disabled = busy || confirming;
   hint.textContent = hintLevel() >= 3 ? 'Đã nhận đủ 3 mức gợi ý' : hasQuestion() ? `Gợi ý tiếp · Mức ${hintLevel() + 1}` : 'Hãy gửi câu hỏi trước';
-  hint.disabled = blocked || !hasQuestion() || hintLevel() >= 3;
-  for (const control of [solution, simplify, example]) control.disabled = blocked || !hasQuestion();
+  hint.disabled = blocked || unresolvedSend || !hasQuestion() || hintLevel() >= 3;
+  for (const control of [solution, simplify, example]) control.disabled = blocked || unresolvedSend || !hasQuestion();
+  pendingRetry.disabled = blocked || !unresolvedSend;
   form.setAttribute('aria-busy', String(busy));
   quotaReadNotice.hidden = !quotaExhausted;
   quotaRefresh.disabled = quotaPending;
@@ -191,6 +193,11 @@ export function renderLiveChat() {
    if (!current()) return;
    selectedSession = session; topicId = session.topicId;
    selectedMessages = [...new Map(stored.map(item => [item.id, item])).values()];
+   const pending = selectedMessages.at(-1);
+   unresolvedSend = pending?.role === 'user';
+   failedContent = unresolvedSend ? pending.content : '';
+   if (unresolvedSend && !busy) actionStatus.replaceChildren(
+    notice('Câu hỏi cuối đã được lưu nhưng chưa có phản hồi. Hãy thử lại để tiếp tục câu hỏi này.'), pendingRetry);
    drawSession();
   } finally { if (current()) messages.setAttribute('aria-busy', 'false'); }
  }
@@ -221,7 +228,7 @@ export function renderLiveChat() {
  }
  async function runAction(kind, content = '', retrying = false) {
   if (busy || confirming || !loaded || !openTopic() || quotaExhausted) return;
-  if (kind === 'send' && unresolvedSend) return;
+  if (kind !== 'retry' && unresolvedSend) return;
   const restoreFocus = actionStatus.contains(document.activeElement);
   busy = true; actionStatus.replaceChildren(el('p', {}, retrying ? 'Đang thử lại…' : 'Đang chuẩn bị phản hồi…')); drawControls();
   let retryKind = kind;

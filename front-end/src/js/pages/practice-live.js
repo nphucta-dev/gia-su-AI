@@ -4,6 +4,7 @@ import { loadCatalog, flattenTopics } from '../catalog.js';
 import { questions as demoQuestions, topics as demoTopics } from '../data.js';
 import { submitQuizAnswers } from '../quiz-submission.js';
 import { quizGenerationError } from '../quiz-generation-error.js';
+import { loadQuizDraft, saveQuizDraft, clearQuizDraft } from '../quiz-drafts.js';
 import { el, button, link, heading, panel, field, badge, confirmDialog, notice } from '../components/ui.js';
 
 const difficulties = { easy: 'Dễ', medium: 'Vừa', hard: 'Khó' };
@@ -32,6 +33,7 @@ function safeQuiz(quiz, expected) {
 
 export function renderPractice() {
  const preview = getSession().reason === 'preview';
+ const ownerId = getSession().user?.id;
  const params = new URLSearchParams(location.hash.split('?')[1]);
  const requestedQuiz = validId(params.get('quiz'));
  const requestedTopic = params.get('topic');
@@ -109,9 +111,9 @@ export function renderPractice() {
  });
 
  function openQuiz(quiz) {
-  if (quiz.status === 'completed' && !preview) { location.hash = `results?quiz=${quiz.id}`; return; }
+  if (quiz.status === 'completed' && !preview) { clearQuizDraft(ownerId, quiz.id); location.hash = `results?quiz=${quiz.id}`; return; }
   const selectedTopic = topics.find(item => String(item.id) === String(quiz.topicId));
-  const answers = new Map();
+  const answers = preview ? new Map() : loadQuizDraft(ownerId, quiz);
   let index = 0, confirming = false, submitting = false, submitted = false;
   const questionArea = el('div', {});
   const navigation = el('div', { className: 'question-nav', 'aria-label': 'Chuyển câu hỏi' });
@@ -149,7 +151,9 @@ export function renderPractice() {
      const radio = el('input', { type: 'radio', name: `answer-${question.id}`, value: key, checked: answers.get(question.id) === key, disabled: submitting || confirming || submitted });
      radio.addEventListener('change', () => {
       if (submitting || confirming || submitted || !radio.checked) return;
-      answers.set(question.id, key); status.replaceChildren(); drawNav();
+      answers.set(question.id, key);
+      if (!preview) saveQuizDraft(ownerId, quiz, answers);
+      status.replaceChildren(); drawNav();
      });
      return el('label', { className: 'answer-option' }, radio, `${key}. ${value}`);
     }))), el('div', { className: 'page-actions section-gap' }, button('Câu trước', () => { index = Math.max(0, index - 1); draw(); }, 'ghost'), button('Câu tiếp', () => { index = Math.min(4, index + 1); draw(); }, 'secondary')));
@@ -173,6 +177,7 @@ export function renderPractice() {
     } else {
      const result = await submitQuizAnswers(quiz.id, quiz.questions, answers, { signal: controller.signal });
      if (result.quizStatus !== 'completed') throw new ApiError('Máy chủ chưa xác nhận bài đã được chấm. Hãy tải lại bài để kiểm tra.');
+     clearQuizDraft(ownerId, quiz.id);
     }
     if (!current()) return;
     submitted = true; lastQuizId = quiz.id; location.hash = `results?quiz=${quiz.id}`;
@@ -181,12 +186,12 @@ export function renderPractice() {
     if (!preview && error.status === 409) {
      try {
       const latest = await api(`/quizzes/${quiz.id}`, { signal: controller.signal });
-      if (latest.quiz?.status === 'completed') { location.hash = `results?quiz=${quiz.id}`; return; }
+      if (latest.quiz?.status === 'completed') { clearQuizDraft(ownerId, quiz.id); location.hash = `results?quiz=${quiz.id}`; return; }
      } catch { /* Giữ lựa chọn và hiển thị lỗi gốc khi chưa đọc được trạng thái. */ }
      status.replaceChildren(notice(error.message, 'error'), button('Chấm đáp án đã lưu', async () => {
       if (submitting) return;
       submitting = true; controls();
-      try { await api(`/quizzes/${quiz.id}/grade`, { method: 'POST', signal: controller.signal }); if (current()) location.hash = `results?quiz=${quiz.id}`; }
+      try { await api(`/quizzes/${quiz.id}/grade`, { method: 'POST', signal: controller.signal }); clearQuizDraft(ownerId, quiz.id); if (current()) location.hash = `results?quiz=${quiz.id}`; }
       catch (failure) { if (current()) status.replaceChildren(notice(failure.message, 'error')); }
       finally { submitting = false; if (current()) controls(); }
      }, 'secondary'));

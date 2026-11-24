@@ -21,6 +21,11 @@ Các file gốc được người dùng cung cấp tại `D:\Download`:
 [sources.json](reference/sources.json) lưu tên, đường dẫn, SHA-256 và ngày đọc để nhận diện đúng phiên bản nguồn.
 Các bản TXT giữ số dòng trích xuất; bảng trong DOCX được biểu diễn bằng các ô ngăn bằng `|`.
 `task-details.json` giữ tên task và công việc cụ thể, kèm mã TK để tra cứu.
+Hai task xem tài liệu bổ sung theo yêu cầu người dùng được lưu riêng tại
+[task-additions.json](reference/task-additions.json), mô tả tại
+[LEARNER_DOCUMENT_TASKS.md](LEARNER_DOCUMENT_TASKS.md); không sửa bản trích 95 task gốc.
+Kết quả đối chiếu code ngày 24/11/2026 nằm trong [TASK_AUDIT.md](TASK_AUDIT.md),
+phân biệt phần có triển khai với phần còn thiếu và bằng chứng nghiệm thu chưa có.
 `task-assignments.json` giữ nguyên bản trích đầy đủ để lưu nguồn, không dùng các trường khác
 trong bản lưu này làm yêu cầu thực hiện task.
 Không ghi dữ liệu `.env`, khóa dịch vụ hay thông tin tài khoản MySQL vào các bản ghi này.
@@ -38,7 +43,7 @@ chạy lệnh, deploy, thay database hoặc thực hiện các task chưa đư�
 | PK/FK | UUID | Người dùng yêu cầu **INT AUTO_INCREMENT** cho PK, INT cho FK. |
 | Migration | Tạo 11 bảng theo thiết kế gốc | `0001_create_learning_schema` là lịch sử UUID; `0002_integer_ids` là revision chuyển sang số. Không sửa lịch sử migration đã áp dụng. |
 | Thời gian / JSON | TIMESTAMPTZ, JSONB | MySQL DATETIME(6) UTC, JSON; API trả thời gian có múi giờ. |
-| Vector | VECTOR(768), pgvector | Model hiện lưu embedding JSON nullable, chưa có vector search; keyword retrieval là Must, vector chỉ Could. |
+| Vector | VECTOR(768), pgvector | MySQL lưu embedding JSON; có client embedding và tìm kiếm cosine/vector/hybrid. Cần cấu hình provider và dữ liệu embedding để dùng; chat hiện gọi retrieval mặc định keyword. Vector chỉ Could. |
 | Mật khẩu | bcrypt hoặc Argon2 | Backend hiện dùng **scrypt**. Đây là chênh lệch chưa đồng bộ, không phải đã đổi yêu cầu SRS. Không tự thay hash đã lưu. |
 
 Các khác biệt trên cần được giữ rõ khi đối chiếu, không tự sửa tài liệu gốc hoặc đổi nghiệp vụ.
@@ -113,7 +118,9 @@ phụ huynh/giáo viên/lớp học; golden set tự động/so sánh nhiều m�
 
 ## Mô tả task và công việc cụ thể
 
-95 task **TK-001–TK-095** được lưu tại [task-details.json](reference/task-details.json).
+95 task gốc **TK-001–TK-095** được lưu tại [task-details.json](reference/task-details.json).
+Hai task **TK-096–TK-097** về giao diện/API xem tài liệu cho người học được ghi riêng
+tại [task-additions.json](reference/task-additions.json); mới bổ sung mô tả, chưa triển khai.
 Chỉ dùng hai nội dung: `title` từ cột **Tên task** và `description` từ cột **Công việc cụ thể**.
 `id` chỉ là nhãn để tìm đúng dòng, không đặt thêm điều kiện triển khai.
 Các thông tin phân công, chuyên môn, lịch/tuần, giờ/điểm, trạng thái, MoSCoW,
@@ -210,8 +217,8 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   ADMIN có `POST /api/admin/documents/{id}/process` để xử lý pending cũ hoặc thử lại lỗi; UI có nút tương ứng.
   Chunks và trạng thái được ghi cùng transaction, xử lý ready không tạo đoạn trùng. Nguồn mới vẫn inactive;
   yêu cầu tích hợp AI bổ sung đã có PATCH bật/tắt nguồn ready và retrieval từ khóa.
-  Frontend chat/quiz đăng nhập dùng API thật; dashboard và một số lịch sử học tập
-  còn minh họa. Chế độ xem thử localhost tiếp tục dùng dữ liệu mẫu.
+  Frontend chat/quiz, dashboard, lịch sử và hoạt động hồ sơ dùng API của tài khoản
+  đăng nhập; đã tắt chế độ xem thử tạo số liệu/tài khoản giả trên localhost.
   Cần kiểm tra từng phần trước khi đánh dấu TK xong.
 - Venv mặc định ở `back-end/venv`; các lệnh chạy ở README hiện hành. Không tự chạy migration,
   seed, sửa database hay gọi LLM chỉ vì đang đọc các bước trong tài liệu.
@@ -270,7 +277,8 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   trung bình bỏ qua score NULL, số phiên gồm cả phiên chưa có tin. MySQL tổng hợp
   một câu SQL, không ghép nhiều dòng quiz với chat, không dùng tổng minh họa hoặc
   learning_progress. API vẫn đọc khi hết quota, không gọi AI, có no-store và lỗi
-  database 503 cố định. Không đổi schema; TK-064 frontend vẫn chưa nối API này.
+  database 503 cố định. Dashboard frontend đã nối API này, dùng progress/review và
+  lịch sử thật; tài khoản mới hiển thị số 0/danh sách trống, lỗi API không thay bằng mẫu.
 - TK-071 “Phân quyền API ADMIN” thống nhất `require_admin`/`AdminUser` trong
   `app/dependencies/auth.py`, dùng cho danh mục, tài liệu và `/api/admin/access`.
   Toàn bộ 12 thao tác quản trị chặn LEARNER bằng 403; token thiếu/sai/hết hạn hoặc
@@ -305,4 +313,25 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   ID INT AUTO_INCREMENT theo yêu cầu sử dụng. Test bổ sung đối chiếu schema.sql,
   models và Alembic head; test MySQL dùng database tạm, không migration database
   dự án chỉ để kiểm thử. Hướng dẫn seed/migration tại `database/README.md`.
+- Theo yêu cầu sửa lỗi audit và dùng dữ liệu chuẩn từng tài khoản: GET `/api/quizzes`
+  bổ sung listing riêng user lấy từ token, phân trang limit/offset, metadata môn/chủ đề
+  gồm nội dung đã tắt nhưng không có đáp án/giải thích. Dashboard đọc `/api/dashboard`,
+  tiến độ/chủ đề ôn đọc progress, lịch sử/hồ sơ hợp nhất quiz + chat thực tế, mở đúng ID.
+  Request cũ không được cập nhật UI sau chuyển tài khoản; không có fallback số liệu mẫu.
+- Chat mở lại câu hỏi đang chờ phản hồi phục hồi nút retry, không gửi thêm tin user.
+  Ngữ cảnh lấy bounded history kèm câu hỏi mới nhất và mức hint cao nhất từ database,
+  nên nhiều lần giải thích không làm mất câu hỏi hoặc reset mức hint. API nguồn trả
+  available/notice theo nguồn còn bật; thông báo thiếu nguồn đã sửa đúng tiếng Việt.
+- Validator đăng ký chặn Unicode không encode UTF-8 được trước hash/ghi DB; bộ lọc
+  secret che trọn giá trị nhiều từ có nhãn tới dấu phân cách hoặc trong dấu nháy.
+  Giữ scrypt. Nháp quiz lưu lựa chọn theo tài khoản/quiz trong sessionStorage, đối chiếu
+  câu hỏi server khi phục hồi và dọn sau nộp/đăng xuất; điểm/kết quả luôn lấy từ API.
+- Khi kiểm tra TK-020 “API hỏi đáp LLM” và TK-051 “AI sinh quiz JSON”, giữ luồng
+  API/frontend đã tích hợp, bổ sung kiểm tra trạng thái hoàn tất của provider.
+  Phản hồi bị cắt/chưa hoàn tất không tạo assistant/quiz hoặc tiêu quota; chat giữ
+  câu hỏi để retry. Nội dung AI phải có ký tự nhìn thấy được; bộ kiểm tra quiz chung
+  chặn câu/lựa chọn trùng trước và sau lọc PII, kể cả khi gọi service lưu trực tiếp.
+  `tests/test_llm_task_contracts.py` kiểm tra hồi quy bằng HTTP giả lập;
+  `tests/test_llm_live.py` chỉ gọi provider thật khi bật `RUN_LIVE_LLM_TESTS=1`,
+  dùng dữ liệu học tập giả lập và repository bộ nhớ. Xem `docs/AI_SETUP.md`.
 

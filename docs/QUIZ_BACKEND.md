@@ -1,4 +1,4 @@
-# Kiểm tra và lưu quiz (TK-052)
+# Sinh JSON, kiểm tra và lưu quiz (TK-051/TK-052)
 
 Backend có `QuizService.save_generated_quiz(user, topic_id, difficulty, generated_payload)`
 để nhận kết quả từ luồng sinh quiz phía server. `app.state.quiz_service` dùng repository
@@ -27,7 +27,10 @@ Ví dụ trên chỉ minh họa một câu; payload hợp lệ phải có **đú
 thuộc A–D và `question_text`/`explanation` không rỗng. Thứ tự 1–5 do server tạo từ
 mảng câu hỏi. Backend chặn trường lạ, sai kiểu, JSON lỗi/trùng khóa và ký tự không
 hợp lệ với MySQL. Nội dung câu hỏi/giải thích tối đa 8000 ký tự, mỗi lựa chọn tối đa
-2000 ký tự. Kiểm tra cấu trúc không chứng minh được đáp án đúng về mặt kiến thức.
+2000 ký tự. Câu hỏi/lựa chọn trùng sau chuẩn hóa Unicode, chữ hoa/thường và khoảng
+trắng bị từ chối trong bộ kiểm tra chung, kể cả khi gọi service lưu trực tiếp.
+Nội dung chỉ gồm ký tự vô hình hoặc dấu kết hợp không được coi là văn bản hợp lệ.
+Kiểm tra cấu trúc không chứng minh được đáp án đúng về mặt kiến thức.
 
 Toàn bộ payload được kiểm tra trước khi gọi repository. Sau đó MySQL kiểm tra lại
 tài khoản active và môn/chủ đề active, lưu `quizzes` cùng 5 `quiz_questions` trong
@@ -47,11 +50,34 @@ nguồn phù hợp đã bật nếu có, lọc thông tin cá nhân; không tạ
 Phản hồi 201 là `{"quiz":...}` không lộ đáp án/giải thích. Lỗi provider hoặc JSON
 không hợp lệ không tạo quiz và không tiêu thêm quota.
 
+TK-051 dùng prompt tiếng Việt yêu cầu một JSON object chứa đúng 5 câu hỏi,
+bốn lựa chọn khác nhau, đáp án và giải thích, theo chủ đề và độ khó đã chọn.
+Chỉ chấp nhận JSON thuần hoặc một khối Markdown JSON hoàn chỉnh; không lấy JSON
+từ đoạn văn tùy ý. Kết quả được kiểm tra lại sau khi lọc thông tin cá nhân và trước
+transaction lưu. Provider báo chưa hoàn tất/bị cắt trả `LLM_INVALID_RESPONSE`,
+kể cả khi phần nội dung còn lại tình cờ là JSON hợp lệ. Trình duyệt gọi lại
+`POST /api/quizzes` với cùng chủ đề/độ khó để tạo lại sau lỗi.
+
 `GET /api/quizzes/{id}/result` chỉ cho chủ sở hữu đọc quiz `completed`, trả
 `{"result":...}` gồm điểm, số đúng/tổng, thời gian và từng câu với lựa chọn đã nộp,
 đáp án, `isCorrect`, giải thích. Quiz chưa nộp trả 409; ID thiếu/khác chủ cùng 404.
 Frontend đăng nhập đã nối sinh đề, làm bài, nộp và mở kết quả lưu thật qua các API;
-chế độ xem thử vẫn dùng bài mẫu. Cấu hình model và quota tại [AI_SETUP.md](AI_SETUP.md).
+không dùng bài mẫu cho tài khoản người học. Cấu hình model và quota tại [AI_SETUP.md](AI_SETUP.md).
+
+`GET /api/quizzes?limit=20&offset=0` trả `quizzes`, `limit`, `offset`, `hasMore`
+của chính user lấy từ token, bao gồm bài đang làm và completed. Mỗi dòng gồm
+`id`, `topicId`, `topicName`, `subjectName`, `difficulty`, `status`, `createdAt`,
+`completedAt`, `score` (null nếu chưa hoàn tất); không có đề/đáp án/giải thích.
+Giới hạn limit 1–100, offset 0–100000; sắp created_at DESC rồi id DESC. Môn/chủ đề
+đã tắt vẫn có trong lịch sử. ADMIN không đọc được lịch sử của tài khoản khác.
+Lỗi storage trả 503 cố định, toàn bộ dữ liệu riêng tư có `Cache-Control: no-store`.
+
+Frontend lịch sử và hồ sơ lấy listing này cùng các phiên chat thật, mở kết quả
+qua `#results?quiz={id}` hoặc làm tiếp qua `#practice?quiz={id}`. Dashboard đọc
+số tổng/điểm trung bình từ `/api/dashboard`, không tự tạo số hoặc lấy dữ liệu mẫu.
+Lựa chọn chưa nộp được giữ theo user/quiz trong sessionStorage để qua reload/rời
+trang; chỉ phục hồi nếu khớp câu hỏi/lựa chọn từ server, xóa sau nộp/đăng xuất.
+Nháp không chứa điểm/đáp án chuẩn và không thay trạng thái đã nộp từ database.
 
 TK-082 bổ sung `GET /api/quizzes/{quiz_id}` để đọc quiz và câu hỏi của tài khoản
 đang đăng nhập, giữ response không chứa đáp án/giải thích. ID khác chủ và ID thiếu

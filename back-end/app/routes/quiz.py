@@ -1,7 +1,7 @@
 """Quiz reads are private to the authenticated account, including their questions."""
 
 from typing import Annotated
-from fastapi import APIRouter, Depends, Path, Request
+from fastapi import APIRouter, Depends, Path, Query, Request
 from app.dependencies.auth import get_current_user
 from app.repositories.user_repository import User
 from app.routes.auth import require_json
@@ -10,6 +10,7 @@ from app.schemas.quiz import GenerateQuizRequest, QuizResponse, QuizResultRespon
 from app.services.quiz_service import QuizService
 from app.utils.errors import AppError
 from app.schemas.quiz import QuizResponse, QuizResultResponse, QuizSubmissionResponse, SubmitQuizAnswersRequest
+from app.schemas.quiz import QuizListResponse
 
 
 
@@ -24,6 +25,15 @@ QuizId = Annotated[int, Path(ge=1, le=2**31 - 1)]
 
 def get_service(request: Request) -> QuizService:
     return request.app.state.quiz_service
+
+
+@router.get("", response_model=QuizListResponse, summary="Lịch sử bài luyện tập của chính mình")
+async def list_quizzes(
+    user: CurrentUser, service: Annotated[QuizService, Depends(get_service)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0, le=100000)] = 0,
+) -> QuizListResponse:
+    return await service.list_quizzes(user, limit=limit, offset=offset)
 
 
 @router.post(

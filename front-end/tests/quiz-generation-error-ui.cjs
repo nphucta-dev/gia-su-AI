@@ -138,11 +138,7 @@ function quiz(selection) {
   const page = await context.newPage(), requests = [];
   page.on('request', request => { if (request.url().includes('/api/')) requests.push(request.url()); });
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto(`${base}/#practice`);
-  await page.getByLabel('Chủ đề', { exact: true }).selectOption('quadratic');
-  await page.getByLabel('Độ khó', { exact: true }).selectOption('easy');
-  await page.getByRole('button', { name: 'Mở bài xem thử', exact: true }).click();
-  await page.locator('.question-card').waitFor();
+  await require('./preview-disabled.cjs').assertPreviewDisabled(page, base, 'practice');
   assert.deepEqual(requests, []);
   await context.close();
   assert.deepEqual(errors, []);

@@ -38,6 +38,24 @@ class SqlAlchemyChatRepository:
     async def recent_messages(self, user_id: int, session_id: int, *, limit: int = 12) -> list[ChatMessageRecord]:
         return await asyncio.to_thread(self._recent_messages, user_id, session_id, limit=limit)
 
+    async def context_messages(self, user_id: int, session_id: int, *, limit: int = 24) -> list[ChatMessageRecord]:
+        return await asyncio.to_thread(self._context_messages, user_id, session_id, limit=limit)
+
+    def _context_messages(self, user_id: int, session_id: int, *, limit: int) -> list[ChatMessageRecord]:
+        with self._sessions() as db:
+            query = self._message_query(user_id, session_id)
+            recent = list(db.scalars(query.order_by(ChatMessage.id.desc()).limit(limit)))
+            question = db.scalar(query.where(ChatMessage.role == "user").order_by(ChatMessage.id.desc()).limit(1))
+            if question is not None:
+                recent.append(question)
+                hint = db.scalar(query.where(
+                    ChatMessage.id > question.id, ChatMessage.role == "assistant", ChatMessage.hint_level.is_not(None),
+                ).order_by(ChatMessage.hint_level.desc(), ChatMessage.id.desc()).limit(1))
+                if hint is not None:
+                    recent.append(hint)
+            records = {message.id: self._message_record(message) for message in recent}
+            return [records[key] for key in sorted(records)]
+
     async def append_user_message(self, user_id: int, session_id: int, content: str) -> ChatMessageRecord | None:
         return await asyncio.to_thread(self._append_message, user_id, session_id, content, role="user")
 

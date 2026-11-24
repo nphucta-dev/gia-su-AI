@@ -10,7 +10,8 @@ let expiresAt = 0;
 let expiryTimer;
 let loginHint = null;
 const previewKey = 'gia-su-ai.preview-role';
-export const previewAvailable = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+// Private pages always use an authenticated account and its API data.
+export const previewAvailable = false;
 let previewRole = '';
 function savePreview(role) { previewRole = role; try { if(role) sessionStorage.setItem(previewKey,role); else sessionStorage.removeItem(previewKey); } catch { /* Memory-only preview. */ } }
 function readPreview() { if(!previewAvailable) return ''; try { return sessionStorage.getItem(previewKey) || previewRole; } catch { return previewRole; } }

@@ -133,6 +133,11 @@ body:has(.chat-view) #app-modal { max-height: calc(100dvh - 24px); overflow-y: a
 .message-feedback { margin-top: 12px; min-width: 0; white-space: normal; }
 .message-feedback-status:not(:empty) { display: grid; justify-items: start; gap: 8px; margin-top: 8px; font-size: 14px; overflow-wrap: anywhere; }
 
+.activity-record { min-width: 0; max-width: 100%; gap: 16px; overflow-wrap: anywhere; }
+.activity-record > *, .dashboard-page .grid-2 > * { min-width: 0; }
+.activity-record > .button { flex-shrink: 0; white-space: normal; }
+.dashboard-page .progress-row span { min-width: 0; overflow-wrap: anywhere; }
+
 @media (min-width: 768px) {
  .quiz-setup-fields { grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr); }
  .quiz-setup-actions .button { width: auto; }

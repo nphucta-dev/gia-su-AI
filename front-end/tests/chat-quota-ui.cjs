@@ -206,8 +206,7 @@ async function run() {
     const previewErrors = [], previewQuotaRequests = [];
     preview.on('pageerror', error => previewErrors.push(error.message));
     preview.on('request', request => { if (request.url().includes('/api/chat/quota')) previewQuotaRequests.push(request.url()); });
-    await preview.goto(`${baseUrl}/#chat`);
-    await preview.getByText('Dữ liệu minh họa — chưa kết nối tài khoản thật.', { exact: true }).waitFor();
+    await require('./preview-disabled.cjs').assertPreviewDisabled(preview, baseUrl);
     assert.deepEqual(previewQuotaRequests, []);
     assert.deepEqual(previewErrors, []);
 

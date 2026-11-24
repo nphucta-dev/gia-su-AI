@@ -135,7 +135,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const preview = await previewContext.newPage(), previewRequests = [];
   preview.on('pageerror', error => errors.push(error.message));
   preview.on('request', request => { if (request.url().includes('/api/')) previewRequests.push(request.url()); });
-  await preview.goto(`${base}/#chat`); await preview.getByRole('button', { name: 'Hữu ích', exact: true }).click();
+  await require('./preview-disabled.cjs').assertPreviewDisabled(preview, base);
   assert.deepEqual(previewRequests, []); await previewContext.close();
   assert.deepEqual(errors, []);
   console.log('PASS TK-073: per-message 1/-1/null, exact PATCH, pending across redraw, independent controls, duplicate guard, errors/retry/focus, response validation, reload, 401/403/404/409/422, stale response, preview and 360px.');

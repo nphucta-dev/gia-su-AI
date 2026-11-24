@@ -39,6 +39,7 @@ MESSAGES = {
     "name_type": "Họ tên phải là chuỗi ký tự.",
     "name_too_long": f"Họ tên tối đa {NAME_MAX} ký tự.",
     "name_chars": "Họ tên không được chứa ký tự điều khiển.",
+    "name_unicode": "Họ tên chứa ký tự không hợp lệ.",
     "email_required": "Vui lòng nhập email.",
     "email_type": "Email phải là chuỗi ký tự.",
     "email_format": "Email chưa đúng định dạng. Vui lòng kiểm tra lại, ví dụ: ban@example.com.",
@@ -47,6 +48,7 @@ MESSAGES = {
     "password_type": "Mật khẩu phải là chuỗi ký tự.",
     "password_too_short": f"Mật khẩu cần có ít nhất {PASSWORD_MIN} ký tự. Vui lòng bổ sung để tiếp tục.",
     "password_too_long": f"Mật khẩu tối đa {PASSWORD_MAX} ký tự.",
+    "password_unicode": "Mật khẩu chứa ký tự không hợp lệ.",
     "confirm_required": "Vui lòng nhập lại mật khẩu để xác nhận.",
     "confirm_type": "Mật khẩu xác nhận phải là chuỗi ký tự.",
     "confirm_mismatch": "Mật khẩu xác nhận chưa khớp. Vui lòng nhập lại.",
@@ -74,6 +76,16 @@ class RegisterValidation:
     value: RegisterData | None = None
 
 
+def _valid_utf8(value: str) -> bool:
+    # JSON escaping can carry lone surrogates even though HTTP itself is UTF-8.
+    # Reject them before password hashing, SQL binding or response serialization.
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 def _validate_name(raw: Any) -> tuple[str | None, str | None]:
     """Trả về (giá trị đã chuẩn hoá, lỗi)."""
     if raw is None:
@@ -88,6 +100,8 @@ def _validate_name(raw: Any) -> tuple[str | None, str | None]:
         return None, MESSAGES["name_too_long"]
     if _CONTROL_CHARS.search(name):
         return None, MESSAGES["name_chars"]
+    if not _valid_utf8(name):
+        return None, MESSAGES["name_unicode"]
     return name, None
 
 
@@ -101,6 +115,8 @@ def _validate_email(raw: Any) -> tuple[str | None, str | None]:
         return None, MESSAGES["email_required"]
     if len(email) > EMAIL_MAX:
         return None, MESSAGES["email_too_long"]
+    if not _valid_utf8(email):
+        return None, MESSAGES["email_format"]
     if not _EMAIL_PATTERN.match(email) or ".." in email:
         return None, MESSAGES["email_format"]
 
@@ -126,6 +142,8 @@ def _validate_password(raw: Any) -> tuple[str | None, str | None]:
         return None, MESSAGES["password_too_short"]
     if len(raw) > PASSWORD_MAX:
         return None, MESSAGES["password_too_long"]
+    if not _valid_utf8(raw):
+        return None, MESSAGES["password_unicode"]
     return raw, None
 
 

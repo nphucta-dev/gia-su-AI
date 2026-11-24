@@ -1,0 +1,16 @@
+{
+  "source": "Yêu cầu bổ sung của người dùng trong cuộc trao đổi dự án, ghi nhận ngày 2026-11-24.",
+  "usage": "Chỉ dùng title và description để xác định công việc; id là nhãn tra cứu. Hai task bổ sung không nằm trong XLSX gốc có 95 task. Việc ghi nhận task không có nghĩa đã triển khai.",
+  "tasks": [
+    {
+      "id": "TK-096",
+      "title": "Giao diện xem tài liệu học tập",
+      "description": "Người học xem danh sách tài liệu đã phát hành theo môn/chủ đề, mở và đọc trực tiếp PDF/TXT từ API. Hiển thị tên tài liệu, môn, chủ đề, định dạng; xử lý tải/trống/lỗi và thử lại; mở đúng chủ đề khi chọn Hỏi gia sư. Không dùng dữ liệu mẫu và thông báo khi tài liệu bị tắt hoặc không còn truy cập được."
+    },
+    {
+      "id": "TK-097",
+      "title": "API xem tài liệu học tập",
+      "description": "API cho tài khoản active đã đăng nhập lấy danh sách tài liệu theo môn/chủ đề có phân trang, thông tin chi tiết và nội dung PDF/TXT. Metadata lấy từ MySQL, nội dung đọc đúng file trong kho riêng. Chỉ cho đọc nguồn ready/is_active thuộc môn/chủ đề active; kiểm tra quyền khi gọi trực tiếp bằng ID, không lộ file_path hoặc đọc ngoài kho. Tài liệu dùng chung theo danh mục; thao tác đọc không gọi AI và không trừ quota."
+    }
+  ]
+}

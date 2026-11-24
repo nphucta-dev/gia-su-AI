@@ -14,7 +14,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
  try {
   await context.addInitScript(() => { sessionStorage.setItem('gia-su-ai.access-token', 'test'); sessionStorage.setItem('gia-su-ai.token-expires-at', String(Date.now() + 3600000)); });
   const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
-  const sessions = [1, 2].map(id => ({ id, topicId: 10, title: `Phiên học ${id}`, topicName: 'Đại số', subjectName: 'Toán', chapterName: 'Chương 1' }));
+  const sessions = [1, 2].map(id => ({ id, topicId: 10, title: `Phiên học ${id}`, topicName: 'Đại số', subjectName: 'Toán', chapterName: 'Chương 1', createdAt: '2026-11-19T00:00:00Z', updatedAt: `2026-11-${19 + id}T00:00:00Z` }));
+  const quizHistory = [{ id: 7, topicId: 10, topicName: 'Đại số', subjectName: 'Toán', difficulty: 'medium', status: 'completed', score: 60, createdAt: '2026-11-20T00:00:00Z', completedAt: '2026-11-20T01:00:00Z' }];
   const histories = Object.fromEntries(sessions.map(session => [session.id, [
    { id: session.id * 10 + 1, sessionId: session.id, role: 'user', content: `Câu hỏi đã lưu ${session.id}` },
    { id: session.id * 10 + 2, sessionId: session.id, role: 'assistant', content: `Phản hồi đã lưu ${session.id}`, hintLevel: 1, feedback: null },
@@ -27,6 +28,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
    const json = (body, status = 200) => route.fulfill({ status, json: body });
    if (endpoint.endsWith('/auth/me')) return json({ user: { id: 1, name: 'Người học', email: 'test@example.com', role: 'LEARNER' } });
    if (endpoint.endsWith('/catalog/subjects')) return json({ subjects: [{ id: 1, name: 'Toán', gradeLevel: 'THPT', chapters: [{ name: 'Chương 1', topics: [{ id: 10, name: 'Đại số' }] }] }] });
+   if (endpoint === '/api/dashboard') return json({ dashboard: { totalQuizzes: 1, averageScore: 60, totalChatSessions: 2 } });
+   if (endpoint === '/api/progress') return json({ progress: [{ id: 1, topicId: 10, totalQuizzes: 1, correctCount: 3, totalCount: 5, masteryPercent: 60 }], hasMore: false });
+   if (endpoint === '/api/progress/review-topics') return json({ topics: [], hasMore: false });
+   if (endpoint === '/api/quizzes') return json({ quizzes: quizHistory, hasMore: false });
    if (endpoint === '/api/ai/quota') {
     quotaCalls++;
     const snapshot = remaining, mode = quotaMode;
@@ -77,10 +82,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   await page.screenshot({ path: path.join(output, 'quota-history-desktop.png'), fullPage: true });
   await page.getByRole('link', { name: 'Xem tiến độ', exact: true }).click();
   await page.getByRole('heading', { name: 'Tổng quan học tập', exact: true }).waitFor();
+  await page.getByLabel('Thống kê học tập').waitFor();
+  assert.deepEqual(await page.locator('.stat-value').allTextContents(), ['1', '60%', '2', '1']);
   await page.screenshot({ path: path.join(output, 'dashboard-route-desktop.png'), fullPage: true });
   await page.reload(); await page.getByRole('heading', { name: 'Tổng quan học tập', exact: true }).waitFor();
   assert.ok(await page.evaluate(() => sessionStorage.getItem('gia-su-ai.access-token')));
   await page.goto(`${base}/#history`); await page.reload(); await page.getByRole('heading', { name: 'Lịch sử học tập', exact: true }).waitFor();
+  await page.locator('a[href="#results?quiz=7"]').waitFor();
+  assert.equal(await page.locator('.activity-record').count(), 3);
+  assert.equal(await page.locator('a[href*="result=sample"]').count(), 0);
+  assert.ok(await page.locator('a[href="#chat?session=1"]').count());
   await open(); await exhausted().waitFor();
   await page.setViewportSize({ width: 360, height: 900 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
@@ -133,7 +144,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const preview = await previewContext.newPage(), previewRequests = [];
   preview.on('request', request => { if (request.url().includes('/api/')) previewRequests.push(request.url()); });
   preview.on('pageerror', error => errors.push(error.message));
-  await preview.goto(`${base}/#chat`); await preview.getByText('Dữ liệu minh họa — chưa kết nối tài khoản thật.', { exact: true }).waitFor();
+  await require('./preview-disabled.cjs').assertPreviewDisabled(preview, base);
   assert.deepEqual(previewRequests, []); await previewContext.close();
   assert.deepEqual(errors, []);
   console.log('PASS TK-078: zero-quota history/pagination/retry/feedback, dashboard/history sample routes/reload, draft/focus, quota errors, refresh/dedupe/recovery, mid-request exhaustion, rate-limit distinction, stale response, 401, preview and 360px.');
