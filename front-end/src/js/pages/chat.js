@@ -1,11 +1,10 @@
 import { el, button, heading, notice, confirmDialog, link } from '../components/ui.js';
 import { topics } from '../data.js';
 import { getSession } from '../session.js';
-import { setupValidation, validateFields } from '../components/validation.js';
 import { renderLiveChat } from './chat-live.js';
-import { validateChatQuestion } from '../chat-question.js';
+import { createChatQuestionField } from '../components/chat-question-field.js';
 import { chatSidebar } from '../components/chat-sidebar.js';
-export { validateChatQuestion };
+export { validateChatQuestion } from '../chat-question.js';
 
 function renderPreviewChat() {
  const selectedId = new URLSearchParams(location.hash.split('?')[1]).get('topic');
@@ -57,7 +56,7 @@ function renderPreviewChat() {
   control.setAttribute('aria-pressed', 'false');
   return control;
  }));
- const input = el('textarea', { className: 'textarea', placeholder: 'Nhập câu hỏi của bạn…', 'aria-label': 'Câu hỏi cho gia sư', maxlength: 4000 });
+ const { field, input, readQuestion, bindEnter } = createChatQuestionField();
  const send = el('button', { className: 'button primary', type: 'submit' }, 'Gửi câu hỏi');
  const statusArea = el('div', { role: 'status' });
  const mode = el('select', { className: 'select', 'aria-label': 'Xem trạng thái giao diện' },
@@ -71,26 +70,20 @@ function renderPreviewChat() {
   if (mode.value === 'error') statusArea.append(notice('Chưa thể kết nối gia sư. Nội dung đã nhập vẫn được giữ lại.', 'error'), button('Thử lại', resetStatus, 'secondary small'));
   if (mode.value === 'quota') statusArea.append(notice('Bạn đã dùng hết 30 lượt yêu cầu hôm nay. Bạn vẫn có thể xem lịch sử học tập.', 'warning'));
  });
- const form = el('form', { className: 'chat-composer' }, statusArea,
-  el('div', { className: 'composer-row' }, input, send),
+ const form = el('form', { className: 'chat-composer', novalidate: true }, statusArea,
+  el('div', { className: 'composer-row' }, field, send),
   el('p', { className: 'chat-footer' }, 'Câu trả lời do AI tạo, hãy đối chiếu với tài liệu học tập.'),
   el('details', { className: 'state-picker' }, el('summary', {}, 'Xem trước trạng thái giao diện'), mode));
- setupValidation(form, [input]);
  form.addEventListener('submit', event => {
   event.preventDefault();
-  const check = validateChatQuestion(input.value);
-  if (!validateFields([[input, check.error]])) return;
+  const question = readQuestion();
+  if (question === null) return;
   statusArea.replaceChildren();
-  add(check.text, 'user');
+  add(question, 'user');
   input.value = '';
   input.focus();
  });
- input.addEventListener('keydown', event => {
-  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
-   event.preventDefault();
-   form.requestSubmit();
-  }
- });
+ bindEnter(form, send);
  const sources = el('details', {}, el('summary', {}, 'Nguồn tham khảo minh hoạ'),
   el('p', { className: 'helper' }, 'Ví dụ cách hiển thị: Tài liệu Đại số · phần Phương trình bậc hai. Chưa có tài liệu thực được truy xuất.'));
  return el('div', { className: 'chat-view' },
