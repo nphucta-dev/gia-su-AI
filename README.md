@@ -27,3 +27,31 @@ node serve.cjs
 ```
 
 Mở http://127.0.0.1:4173 để đăng ký, đăng nhập và vào trang học. Frontend chuyển các request `/api/*` tới backend cổng 8000. Xem Swagger tại http://127.0.0.1:8000/docs và kiểm tra kết nối MySQL tại http://127.0.0.1:8000/api/database.
+
+## Cho các thiết bị cùng Wi-Fi/LAN truy cập
+
+Chạy hai lệnh ở trên trên một máy. `node serve.cjs` mặc định nghe tại `0.0.0.0:4173`
+và in các địa chỉ `Cung Wi-Fi/LAN: http://<IP-may-chay>:4173` trong terminal.
+Thiết bị khác cùng mạng mở địa chỉ đó; máy chạy dự án vẫn dùng được localhost.
+Khi IP Wi-Fi thay đổi, dùng địa chỉ mới được in khi khởi động server.
+
+Frontend gọi `/api` cùng địa chỉ web rồi chuyển tiếp tới backend trên máy chủ.
+Uvicorn vẫn có thể nghe tại `127.0.0.1:8000`; không cần đổi CORS hay địa chỉ API
+trong HTML trên từng thiết bị. Các thiết bị dùng chung database của backend và
+đăng nhập bằng tài khoản riêng; máy chủ phải giữ cả hai server chạy.
+
+Nếu Windows chưa cho phép kết nối tới cổng frontend, mở PowerShell
+**Run as administrator**, chạy một lần (đường dẫn dưới đây giả sử dự án ở `D:\gia-su-AI`):
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File D:\gia-su-AI\front-end\enable-lan.ps1
+```
+
+Script tạo quyền TCP 4173 cho Node.js từ `LocalSubnet`, không tắt tường lửa,
+không sửa các quy tắc khác hoặc đổi loại mạng Windows.
+Đổi cổng thì truyền `-Port`, đồng thời đặt `PORT` cho server. Có thể xem trước
+thay đổi tường lửa bằng cách thêm `-WhatIf` vào lệnh trên.
+
+Nếu chỉ muốn nghe trên máy chạy, đặt `$env:HOST='127.0.0.1'` trước khi chạy Node;
+mặc định để trống `HOST` sẽ cho phép LAN. Router cần cho phép các thiết bị liên lạc
+với nhau; Wi-Fi khách có bật client isolation sẽ chặn truy cập giữa thiết bị.

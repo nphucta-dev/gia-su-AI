@@ -8,6 +8,13 @@ Chạy backend bằng Uvicorn trên cổng 8000 theo README gốc của dự án
 
 Server frontend chuyển tiếp `/api` tới `http://127.0.0.1:8000`. Có thể đặt `PORT` để đổi cổng frontend hoặc `BACKEND_URL` để đổi địa chỉ backend. Backend cần kết nối MySQL và đã tạo schema để các chức năng lưu dữ liệu hoạt động.
 
+Server mặc định nghe tại `0.0.0.0`, in địa chỉ IP để thiết bị cùng Wi-Fi/LAN mở
+`http://<IP-máy-chạy>:4173`. Đặt `HOST=127.0.0.1` nếu chỉ muốn truy cập trên máy đó.
+API vẫn dùng `/api` cùng origin qua proxy; không đặt localhost làm API URL trên
+thiết bị khác. Cách cấp quyền tường lửa Windows tại [README gốc](../README.md#cho-các-thiết-bị-cùng-wi-filan-truy-cập).
+`npm run test:lan` kiểm tra truy cập qua IP LAN và đăng nhập trên backend cô lập;
+cần máy đang kết nối Wi-Fi/LAN.
+
 ## Tài khoản và phân quyền
 
 - src/js/session.js quản lý trạng thái checking, anonymous, authenticated và error.

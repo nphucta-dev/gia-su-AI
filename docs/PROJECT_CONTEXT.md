@@ -213,6 +213,11 @@ Các quy tắc service không được thay thế bằng giả định schema đ
   SQLAlchemy/Alembic quản lý schema MySQL 11 bảng; seed có danh mục và tài khoản mẫu.
 - Frontend HTML/CSS/JS, Node `serve.cjs` cổng 4173 proxy `/api` tới Uvicorn cổng 8000;
   đăng ký/đăng nhập/phiên đã nối backend.
+  Theo yêu cầu cho nhóm truy cập cùng mạng, CLI frontend mặc định bind `0.0.0.0`,
+  in URL IP LAN; `HOST=127.0.0.1` cho phép giới hạn về máy chạy. Backend vẫn dùng
+  loopback qua proxy, không cần mở CORS cho mọi origin. `front-end/enable-lan.ps1`
+  cấu hình ngoại lệ tường lửa TCP theo cổng cho LocalSubnet trên Windows.
+  Truy cập LAN không đồng nghĩa đã triển khai demo public/HTTPS của TK-093.
 - Danh sách và quản lý môn/chủ đề, hồ sơ, upload/danh sách tài liệu đã nối API thật. TK-042/043 đã nối
   trích văn bản PDF/TXT và lưu `document_chunks` theo thứ tự, không gọi AI/OCR. Upload xử lý đồng bộ;
   thành công `ready`, lỗi `error`, cập nhật `processed_at` và trả `chunkCount`/`processedAt`.

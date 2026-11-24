@@ -2,6 +2,7 @@ const http = require('node:http');
 const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const root = __dirname;
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png' };
 
@@ -75,5 +76,23 @@ function createServer({ backendUrl = process.env.BACKEND_URL || 'http://127.0.0.
 module.exports = { createServer };
 if (require.main === module) {
   const port = Number(process.env.PORT) || 4173;
-  createServer().listen(port, '127.0.0.1', () => console.log(`Gia Su AI: http://127.0.0.1:${port}`));
+  const host = process.env.HOST?.trim() || '0.0.0.0';
+  const server = createServer();
+  server.once('error', error => {
+    console.error(error.code === 'EADDRINUSE'
+      ? `Cong ${port} dang duoc su dung. Dung server frontend cu truoc khi chay lai, hoac doi PORT.`
+      : `Khong the chay frontend: ${error.message}`);
+    process.exitCode = 1;
+  });
+  server.listen(port, host, () => {
+    const allInterfaces = host === '0.0.0.0' || host === '::';
+    const localHost = allInterfaces ? '127.0.0.1' : host.includes(':') ? `[${host}]` : host;
+    console.log(`Gia Su AI: http://${localHost}:${port}`);
+    if (allInterfaces) {
+      const addresses = new Set(Object.values(os.networkInterfaces()).flat()
+        .filter(item => item && !item.internal && (item.family === 'IPv4' || item.family === 4))
+        .map(item => item.address));
+      for (const address of addresses) console.log(`Cung Wi-Fi/LAN: http://${address}:${port}`);
+    }
+  });
 }

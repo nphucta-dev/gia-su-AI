@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "start": "node serve.cjs",
+    "test:lan": "node tests/lan.cjs",
     "test": "node tests/browser.cjs && node tests/account-data-live.cjs && node tests/account-data-ui.cjs && node tests/recovery-drafts-ui.cjs && node tests/preview.cjs && npm run test:documents",
     "test:documents": "node tests/learning-document-viewer.cjs && node tests/learning-documents-pagination.cjs",
     "test:login": "node tests/login.cjs"
