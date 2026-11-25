@@ -1,0 +1,751 @@
+/* ==========================================================================
+   GIA SƯ AI — MOTION SYSTEM (60fps GPU-only: transform & opacity)
+   Centralized timing via var(--dur-*) & var(--ease-natural) from tokens.css
+   ========================================================================== */
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes staggerFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes numRollIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes stepSwap {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes msgSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes thinkingPulse {
+  0%, 80%, 100% {
+    opacity: 0.30;
+    transform: translateY(0) scale(0.86);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1);
+  }
+}
+
+@keyframes shimmerSweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes btnRippleExpand {
+  from {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.8);
+  }
+}
+
+@keyframes heroPulseRing {
+  0% {
+    opacity: 0.44;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(1.09, 1.24);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.09, 1.24);
+  }
+}
+
+@keyframes btnSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes checkPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.45) rotate(-12deg);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.14) rotate(0deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes wrongShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes backdropFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dropdownEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toastSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+
+@keyframes confettiBurst {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.6);
+  }
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--dx, 0px), var(--dy, -120px), 0) rotate(var(--rot, 240deg)) scale(1);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   1. BUTTON MOTION SYSTEM (Primary, Secondary, Ghost, Icon, Hero CTA)
+   -------------------------------------------------------------------------- */
+.button,
+.primary-button {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transform: translateZ(0);
+  transition:
+    transform var(--dur-fast) var(--ease-natural),
+    background-color var(--dur-fast) var(--ease-natural),
+    border-color var(--dur-fast) var(--ease-natural),
+    color var(--dur-fast) var(--ease-natural),
+    box-shadow var(--dur-normal) var(--ease-natural);
+}
+
+/* Primary Button: Hover Lift (-2px) + Expanded Blue Shadow + Shimmer Sweep + Arrow Slide */
+.button.primary::after,
+.primary-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    var(--c-shimmer-beam) 50%,
+    transparent 80%
+  );
+  transform: translateX(-135%);
+  transition: transform var(--dur-shimmer) var(--ease-natural);
+}
+
+.button.primary:hover:not(:disabled):not([aria-disabled="true"]),
+.primary-button:hover:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(-2px);
+  background-color: var(--c-primary-hover);
+  box-shadow: var(--shadow-cta-hover);
+}
+
+.button.primary:hover:not(:disabled):not([aria-disabled="true"])::after,
+.primary-button:hover:not(:disabled):not([aria-disabled="true"])::after {
+  transform: translateX(135%);
+}
+
+/* Trailing arrow / icon slides gently right on hover */
+.button .btn-arrow,
+.button .ui-icon--trail,
+.primary-button .btn-arrow {
+  transition: transform var(--dur-normal) var(--ease-natural);
+}
+
+.button:hover:not(:disabled) .btn-arrow,
+.button:hover:not(:disabled) .ui-icon--trail,
+.primary-button:hover:not(:disabled) .btn-arrow {
+  transform: translateX(3px);
+}
+
+/* Secondary / Ghost / Icon Buttons: Subtle icon bounce or rotation on hover */
+.button.secondary:hover:not(:disabled) .ui-icon:not(.ui-icon--trail),
+.button.ghost:hover:not(:disabled) .ui-icon:not(.ui-icon--trail) {
+  transform: translateY(-1.5px) scale(1.06);
+}
+.button.icon:hover:not(:disabled) .ui-icon {
+  transform: rotate(-8deg) scale(1.08);
+}
+.button .ui-icon {
+  transition: transform var(--dur-normal) var(--ease-spring);
+}
+
+/* Press / Active: Scale 0.97 + Click Ripple */
+.button:active:not(:disabled):not([aria-disabled="true"]),
+.primary-button:active:not(:disabled):not([aria-disabled="true"]),
+.theme-toggle:active:not(:disabled),
+.question-dot:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-ripple {
+  position: absolute;
+  left: var(--rx, 50%);
+  top: var(--ry, 50%);
+  width: var(--rsize, 120px);
+  height: var(--rsize, 120px);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  background: var(--c-ripple-on-surface);
+  animation: btnRippleExpand var(--dur-ripple) var(--ease-natural) forwards;
+}
+
+.button.primary .btn-ripple,
+.primary-button .btn-ripple {
+  background: var(--c-ripple-on-primary);
+}
+
+/* Hero Primary CTA: Periodic Subtle Pulse Glow (Pauses on Hover/Focus) */
+.btn-hero-pulse {
+  overflow: visible;
+}
+.btn-hero-pulse::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: var(--r-pill);
+  border: 2px solid var(--c-primary);
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0;
+  animation: heroPulseRing var(--dur-pulse) var(--ease-natural) infinite;
+}
+.btn-hero-pulse:hover::before,
+.btn-hero-pulse:focus-visible::before {
+  animation-play-state: paused;
+  opacity: 0;
+}
+
+/* Button Loading (Preserves Dimensions) & Animated Success Tick */
+.button.is-loading,
+.primary-button.is-loading {
+  cursor: wait;
+}
+.button.is-loading-replace,
+.primary-button.is-loading-replace {
+  color: transparent !important;
+}
+.button.is-loading-replace > *:not(.btn-state-overlay):not(.btn-ripple),
+.primary-button.is-loading-replace > *:not(.btn-state-overlay):not(.btn-ripple) {
+  opacity: 0;
+}
+
+.btn-state-overlay {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: currentColor;
+}
+.button.primary.is-loading-replace .btn-state-overlay,
+.primary-button.is-loading-replace .btn-state-overlay {
+  color: var(--c-primary-on);
+}
+
+.btn-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2.2px solid currentColor;
+  border-right-color: transparent;
+  display: inline-block;
+  flex-shrink: 0;
+  animation: btnSpin 680ms linear infinite;
+}
+
+.btn-check-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  animation: checkPop var(--dur-slow) var(--ease-spring) both;
+}
+
+.button.is-success,
+.primary-button.is-success {
+  background-color: var(--c-success) !important;
+  border-color: var(--c-success) !important;
+  color: #FFFFFF !important;
+}
+
+/* Theme Toggle: Moon <-> Sun Smooth Cross-Rotate */
+.theme-toggle {
+  position: relative;
+  overflow: hidden;
+}
+.theme-toggle-stage {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  pointer-events: none;
+}
+.theme-icon {
+  grid-area: 1 / 1;
+  transition:
+    transform var(--dur-slow) var(--ease-natural),
+    opacity var(--dur-normal) var(--ease-natural);
+}
+.theme-icon--sun {
+  opacity: 0;
+  transform: rotate(75deg) scale(0.5);
+}
+.theme-icon--moon {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+:root[data-theme="dark"] .theme-icon--sun {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+:root[data-theme="dark"] .theme-icon--moon {
+  opacity: 0;
+  transform: rotate(-75deg) scale(0.5);
+}
+.theme-toggle:hover .theme-icon--moon {
+  transform: rotate(-14deg) scale(1.08);
+}
+:root[data-theme="dark"] .theme-toggle:hover .theme-icon--sun {
+  transform: rotate(22deg) scale(1.08);
+}
+
+/* --------------------------------------------------------------------------
+   2. CARDS, INPUTS, SLIDING TABS, MODAL / DROPDOWN / TOAST
+   -------------------------------------------------------------------------- */
+.card-interactive,
+.topic-row,
+.stat,
+.learning-document-link {
+  transition:
+    transform var(--dur-normal) var(--ease-natural),
+    box-shadow var(--dur-normal) var(--ease-natural),
+    border-color var(--dur-normal) var(--ease-natural),
+    background-color var(--dur-fast) var(--ease-natural);
+}
+.card-interactive:hover,
+.topic-row:hover,
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--c-border-brand);
+}
+
+/* Input: Focus Ring + Elevated Label */
+.field label,
+.form-field label {
+  display: inline-block;
+  transition:
+    color var(--dur-fast) var(--ease-natural),
+    transform var(--dur-fast) var(--ease-natural);
+}
+.field:focus-within > label,
+.form-field:focus-within > label {
+  color: var(--c-primary-ink);
+  transform: translateY(-1px);
+}
+
+/* Tabs: Smooth Sliding Pill / Underline Indicator */
+.ui-tabs,
+.tabs.has-glider,
+.auth-tabs.has-glider {
+  position: relative;
+  isolation: isolate;
+}
+.tabs-glider {
+  position: absolute;
+  left: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    transform var(--dur-normal) var(--ease-natural),
+    width var(--dur-normal) var(--ease-natural);
+}
+.auth-tabs.has-glider .tabs-glider,
+.ui-tabs--pill .tabs-glider {
+  top: 4px;
+  bottom: 4px;
+  border-radius: var(--r-pill);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-subtle);
+  border: 1px solid var(--c-border);
+}
+.tabs.has-glider .tabs-glider,
+.ui-tabs--line .tabs-glider {
+  bottom: -1px;
+  height: 2.5px;
+  border-radius: var(--r-pill);
+  background: var(--c-primary);
+}
+.ui-tabs > *,
+.tabs.has-glider > .tab,
+.auth-tabs.has-glider > .auth-tab {
+  position: relative;
+  z-index: 1;
+}
+
+/* Modal, Dropdown & Toast Enter/Exit */
+.modal {
+  transition:
+    opacity var(--dur-fast) var(--ease-natural),
+    transform var(--dur-fast) var(--ease-natural),
+    overlay var(--dur-fast) allow-discrete,
+    display var(--dur-fast) allow-discrete;
+  opacity: 0;
+  transform: translateY(8px) scale(0.97);
+}
+.modal[open] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  animation: modalEnter var(--dur-normal) var(--ease-natural) both;
+}
+@starting-style {
+  .modal[open] {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+.modal[open]::backdrop {
+  animation: backdropFade var(--dur-fast) var(--ease-natural) both;
+}
+
+.account-menu[open] nav,
+.ui-dropdown[open] .ui-dropdown-menu {
+  transform-origin: top right;
+  animation: dropdownEnter var(--dur-fast) var(--ease-natural) both;
+}
+
+.toast-enter {
+  animation: toastSlideIn var(--dur-normal) var(--ease-natural) both;
+}
+.toast-exit {
+  animation: toastSlideOut var(--dur-fast) var(--ease-natural) forwards;
+}
+
+/* --------------------------------------------------------------------------
+   3. PAGE, CHAT, QUIZ, SOCRATIC CARD & PROGRESS ANIMATIONS
+   -------------------------------------------------------------------------- */
+.page-enter {
+  animation: pageEnter var(--dur-normal) var(--ease-natural) both;
+}
+
+.stagger-item {
+  animation: staggerFadeUp var(--dur-normal) var(--ease-natural) both;
+  animation-delay: calc(min(var(--stagger-i, 0), 6) * 45ms);
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity var(--dur-slow) var(--ease-natural),
+    transform var(--dur-slow) var(--ease-natural);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.num-enter {
+  animation: numRollIn var(--dur-slow) var(--ease-natural) both;
+}
+
+.step-swap {
+  animation: stepSwap var(--dur-normal) var(--ease-natural) both;
+}
+
+.msg-enter {
+  animation: msgSlideIn var(--dur-normal) var(--ease-natural) both;
+  animation-delay: calc(min(var(--msg-i, 0), 4) * 55ms);
+}
+
+/* AI Thinking 3-Dot Indicator */
+.thinking-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: var(--r-pill);
+  background: var(--c-primary-soft);
+  border: 1px solid var(--c-border-brand);
+  color: var(--c-primary-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.thinking-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.thinking-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-primary);
+  animation: thinkingPulse 1.15s ease-in-out infinite;
+}
+.thinking-dots span:nth-child(2) {
+  animation-delay: 150ms;
+}
+.thinking-dots span:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+/* Quiz Tactile Press, Correct Spring Tick & Wrong Shake */
+.answer-option:active {
+  transform: scale(0.985);
+}
+.result-item.correct .result-badge-icon,
+.quiz-tick-pop {
+  animation: checkPop var(--dur-slow) var(--ease-spring) both;
+}
+.result-item.wrong.shake-enter,
+.is-shake {
+  animation: wrongShake 380ms var(--ease-natural);
+}
+
+/* Socratic Card Stagger & Active Highlight Transition */
+.atelier-dialogue-item {
+  transition:
+    transform var(--dur-normal) var(--ease-natural),
+    background-color var(--dur-normal) var(--ease-natural),
+    border-color var(--dur-normal) var(--ease-natural);
+}
+.atelier-dialogue-item.is-active-step {
+  transform: translateX(3px);
+}
+
+/* Shared Progress Bar Smooth Fill (0 -> target on scroll) */
+.ui-progress-fill,
+.quiz-progress-fill {
+  transform-origin: left center;
+  transform: scaleX(var(--progress-ratio, var(--quiz-progress, 0)));
+  transition: transform var(--dur-slow) var(--ease-natural);
+}
+
+/* GPU Skeleton Shimmer */
+.skeleton-wrap {
+  display: grid;
+  gap: 14px;
+}
+.loading-caption {
+  margin: 0;
+  color: var(--c-sub);
+  font-size: 14px;
+  font-weight: 500;
+}
+.skeleton-grid {
+  display: grid;
+  gap: 14px;
+}
+.skeleton-grid--kpi {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.skeleton-grid--cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.skeleton-box,
+.skeleton-line {
+  position: relative;
+  overflow: hidden;
+  background: var(--c-skeleton-base);
+  border-radius: var(--r-md);
+}
+.skeleton-box {
+  height: 96px;
+  border-radius: var(--r-card);
+}
+.skeleton-grid--kpi .skeleton-box {
+  height: 112px;
+}
+.skeleton-line {
+  height: 16px;
+}
+.skeleton-line.short {
+  width: 58%;
+}
+.skeleton-box::after,
+.skeleton-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, var(--c-skeleton-shine) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: shimmerSweep 1.4s ease-in-out infinite;
+}
+
+@media (max-width: 767px) {
+  .skeleton-grid--kpi,
+  .skeleton-grid--cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Celebration Confetti Burst */
+.celebration-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 80;
+}
+.confetti-bit {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--bit-color, var(--c-primary));
+  animation: confettiBurst 1300ms var(--ease-natural) forwards;
+  animation-delay: var(--bit-delay, 0ms);
+}
+
+/* --------------------------------------------------------------------------
+   4. ACCESSIBILITY: REDUCED MOTION (Disable pulse, shimmer, ripple, confetti)
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .stagger-item,
+  .num-enter,
+  .step-swap,
+  .msg-enter,
+  .toast-enter,
+  .toast-exit,
+  .modal[open],
+  .modal[open]::backdrop,
+  .account-menu[open] nav,
+  .ui-dropdown[open] .ui-dropdown-menu,
+  .result-item.wrong.shake-enter,
+  .is-shake,
+  .btn-check-badge {
+    animation: none !important;
+  }
+  .btn-hero-pulse::before,
+  .button.primary::after,
+  .primary-button::after,
+  .btn-ripple,
+  .celebration-layer,
+  .skeleton-box::after,
+  .skeleton-line::after {
+    display: none !important;
+    animation: none !important;
+  }
+  .thinking-dots span {
+    animation: none !important;
+    opacity: 0.75;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .button:hover,
+  .primary-button:hover,
+  .card-interactive:hover,
+  .topic-row:hover,
+  .stat:hover {
+    transform: none !important;
+  }
+}

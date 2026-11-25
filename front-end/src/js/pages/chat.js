@@ -4,6 +4,7 @@ import { getSession } from '../session.js';
 import { renderLiveChat } from './chat-live.js';
 import { createChatQuestionField } from '../components/chat-question-field.js';
 import { chatSidebar } from '../components/chat-sidebar.js';
+import { thinkingStatus } from '../components/motion.js';
 export { validateChatQuestion } from '../chat-question.js';
 
 function renderPreviewChat() {
@@ -12,7 +13,7 @@ function renderPreviewChat() {
  const messages = el('div', { className: 'messages', 'aria-live': 'polite', 'aria-label': 'Nội dung hội thoại minh họa' });
  let hintLevel = 0;
  const add = (text, role = 'assistant') => {
-  const message = el('div', { className: `message ${role}` }, el('p', {}, text));
+  const message = el('div', { className: `message ${role} msg-enter` }, el('p', { className: 'message-meta' }, role === 'user' ? 'Bạn' : 'Gia sư AI'), el('p', {}, text));
   messages.append(message);
   message.scrollIntoView({ block: 'nearest' });
   return message;
@@ -66,7 +67,7 @@ function renderPreviewChat() {
  mode.addEventListener('change', () => {
   statusArea.replaceChildren();
   input.disabled = send.disabled = mode.value === 'loading' || mode.value === 'quota';
-  if (mode.value === 'loading') statusArea.append(notice('Đang chuẩn bị phản hồi… Bạn có thể tiếp tục xem lịch sử.'));
+  if (mode.value === 'loading') statusArea.append(thinkingStatus('Đang chuẩn bị phản hồi… Bạn có thể tiếp tục xem lịch sử.'));
   if (mode.value === 'error') statusArea.append(notice('Chưa thể kết nối gia sư. Nội dung đã nhập vẫn được giữ lại.', 'error'), button('Thử lại', resetStatus, 'secondary small'));
   if (mode.value === 'quota') statusArea.append(notice('Bạn đã dùng hết 30 lượt yêu cầu hôm nay. Bạn vẫn có thể xem lịch sử học tập.', 'warning'));
  });

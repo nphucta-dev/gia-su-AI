@@ -2,7 +2,9 @@
   "name": "gia-su-ai-frontend",
   "private": true,
   "scripts": {
+    "dev": "node serve.cjs",
     "start": "node serve.cjs",
+    "build": "node scripts/check-build.cjs",
     "test": "node tests/browser.cjs",
     "test:login": "node tests/login.cjs"
   },

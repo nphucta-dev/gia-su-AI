@@ -1,10 +1,11 @@
 import { api, ApiError } from '../api.js';
 import { loadCatalog, flattenTopics } from '../catalog.js';
-import { el, button, heading, notice, confirmDialog, link } from '../components/ui.js';
+import { el, button, heading, notice, confirmDialog, link, setButtonState } from '../components/ui.js';
 import { createChatQuestionField } from '../components/chat-question-field.js';
 import { renderAiError } from '../components/ai-error.js';
 import { createMessageFeedback } from '../components/message-feedback.js';
 import { chatSidebar } from '../components/chat-sidebar.js';
+import { thinkingStatus } from '../components/motion.js';
 
 let activeController;
 
@@ -29,7 +30,7 @@ export function renderLiveChat() {
  const requestedTopic = positiveId(params.get('topic'));
  let topics = [], sessions = [], selectedSession = null, selectedMessages = [];
  let topicId = requestedTopic, nextOffset = 0, hasMore = false, listPending = false;
- let busy = false, confirming = false, loaded = false;
+ let busy = false, confirming = false, loaded = false, animateAfterId = Number.MAX_SAFE_INTEGER;
  let unresolvedSend = false, failedContent = '';
  let quotaPending = false, quotaExhausted = false, quotaVersion = 0;
  const topic = el('select', { className: 'select', 'aria-label': 'Chủ đề học', disabled: true });
@@ -72,7 +73,7 @@ export function renderLiveChat() {
     el('div', { className: 'chat-sidebar-header' }, el('h2', {}, 'Lịch sử phiên'), newSession, link('Chọn chủ đề mới', '#home', 'button ghost small')),
     topic, sidebarStatus, sessionList, pagination),
    el('section', { className: 'chat-main' }, el('div', { className: 'chat-header chat-session-header' },
-    el('div', {}, title, description, quotaStatus), controls, actionStatus, quotaTools), messages, form)));
+    el('div', { className: 'chat-session-copy' }, title, description, quotaStatus), controls, actionStatus, quotaTools), messages, form)));
 
  function current() { return !controller.signal.aborted && root.isConnected; }
  const renderFeedback = createMessageFeedback({ signal: controller.signal, isCurrent: sessionId => current() && selectedSession?.id === sessionId });
@@ -86,8 +87,12 @@ export function renderLiveChat() {
  function drawControls() {
   const blocked = busy || confirming || !loaded || !openTopic() || quotaExhausted;
   input.disabled = busy || confirming || !loaded || !openTopic();
-  send.disabled = blocked || unresolvedSend;
-  send.textContent = busy ? 'Đang xử lý…' : 'Gửi câu hỏi';
+  if (busy) {
+   setButtonState(send, 'loading', { label: 'Đang xử lý…' });
+  } else {
+   setButtonState(send, 'idle', { label: 'Gửi câu hỏi' });
+   send.disabled = blocked || unresolvedSend;
+  }
   topic.disabled = busy || confirming || !topics.length;
   newSession.disabled = busy || confirming;
   hint.textContent = hintLevel() >= 3 ? 'Đã nhận đủ 3 mức gợi ý' : hasQuestion() ? `Gợi ý tiếp · Mức ${hintLevel() + 1}` : 'Hãy gửi câu hỏi trước';
@@ -117,11 +122,13 @@ export function renderLiveChat() {
    if (error.name !== 'AbortError' && current() && version === quotaVersion) quotaStatus.textContent = 'Chưa kiểm tra được hạn mức. Bạn vẫn có thể đọc lịch sử và xem tiến độ.';
   } finally { quotaPending = false; if (current()) drawControls(); }
  }
- function renderMessage(message) {
+ function renderMessage(message, msgIndex = 0) {
   if (!message || !['user', 'assistant'].includes(message.role) || typeof message.content !== 'string') throw new ApiError('Tin nhắn từ máy chủ chưa hợp lệ.');
-  const node = el('article', { className: `message ${message.role}`, 'data-message-id': message.id, 'data-hint-level': message.hintLevel },
+  const isNew = Number(message.id) > animateAfterId;
+  const node = el('article', { className: `message ${message.role}${isNew ? ' msg-enter' : ''}`, 'data-message-id': message.id, 'data-hint-level': message.hintLevel },
    el('p', { className: 'message-meta' }, [message.role === 'user' ? 'Bạn' : 'Gia sư AI', timeFor(message.createdAt), message.isFullSolution ? 'Lời giải đầy đủ' : message.hintLevel ? `Gợi ý mức ${message.hintLevel}` : ''].filter(Boolean).join(' · ')),
    el('p', {}, message.content));
+  if (isNew) node.style.setProperty('--msg-i', String(Math.min(msgIndex, 3)));
   if (message.role === 'assistant') {
    const refs = Array.isArray(message.sourceRefs) ? message.sourceRefs : [];
    node.append(refs.length ? el('details', { className: 'message-sources' }, el('summary', {}, 'Nguồn tham khảo'),
@@ -133,7 +140,8 @@ export function renderLiveChat() {
  }
  function drawMessages(followLatest = true) {
   const previousTop = messages.scrollTop;
-  messages.replaceChildren(...selectedMessages.map(renderMessage));
+  let animCounter = 0;
+  messages.replaceChildren(...selectedMessages.map(item => renderMessage(item, Number(item.id) > animateAfterId ? animCounter++ : 0)));
   if (!selectedMessages.length) messages.append(el('div', { className: 'empty-state' }, selectedSession ? 'Phiên này chưa có tin nhắn.' : 'Nhập câu hỏi để bắt đầu phiên học mới.'));
   requestAnimationFrame(() => { if (current()) messages.scrollTop = followLatest ? messages.scrollHeight : previousTop; });
  }
@@ -212,6 +220,7 @@ export function renderLiveChat() {
    || !assistant.content.trim() || (assistant.hintLevel != null && ![1, 2, 3].includes(assistant.hintLevel))
    || (kind === 'solution' && assistant.isFullSolution !== true)) throw new ApiError('Phản hồi từ gia sư chưa hợp lệ.');
   selectedSession = result.session;
+  animateAfterId = selectedMessages.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0);
   for (const message of [result.userMessage, result.assistantMessage].filter(Boolean)) {
    if (!selectedMessages.some(item => item.id === message.id)) selectedMessages.push(message);
   }
@@ -224,7 +233,7 @@ export function renderLiveChat() {
   if (busy || confirming || !loaded || !openTopic() || quotaExhausted) return;
   if (kind === 'send' && unresolvedSend) return;
   const restoreFocus = actionStatus.contains(document.activeElement);
-  busy = true; actionStatus.replaceChildren(el('p', {}, retrying ? 'Đang thử lại…' : 'Đang chuẩn bị phản hồi…')); drawControls();
+  busy = true; actionStatus.replaceChildren(thinkingStatus(retrying ? 'Đang thử lại…' : 'Đang chuẩn bị phản hồi…')); drawControls();
   let retryKind = kind;
   try {
    await ensureSession();

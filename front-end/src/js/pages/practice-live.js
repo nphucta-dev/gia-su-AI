@@ -4,7 +4,9 @@ import { loadCatalog, flattenTopics } from '../catalog.js';
 import { questions as demoQuestions, topics as demoTopics } from '../data.js';
 import { submitQuizAnswers } from '../quiz-submission.js';
 import { quizGenerationError } from '../quiz-generation-error.js';
-import { el, button, link, heading, panel, field, badge, confirmDialog, notice } from '../components/ui.js';
+import { el, button, link, heading, panel, field, badge, confirmDialog, notice, setButtonState } from '../components/ui.js';
+import { icon } from '../components/icons.js';
+import { thinkingStatus, launchCelebration } from '../components/motion.js';
 
 const difficulties = { easy: 'Dễ', medium: 'Vừa', hard: 'Khó' };
 let lastSelection = null, previewResult = null, lastQuizId = null;
@@ -42,6 +44,7 @@ export function renderPractice() {
  const setupStatus = el('div', { role: 'status', 'aria-live': 'polite' });
  const setupForm = el('form', { className: 'quiz-setup-form', novalidate: true }, el('div', { className: 'quiz-setup-fields' }, field('Chủ đề', topic), field('Độ khó', difficulty)), setupStatus, el('div', { className: 'quiz-setup-actions' }, startButton));
  const setup = panel('Tạo bài luyện tập', el('p', {}, preview ? 'Dữ liệu minh họa, không gọi model hoặc lưu bài.' : 'AI tạo 5 câu hỏi theo chủ đề và độ khó bạn chọn.'), setupForm);
+ setup.classList.add('quiz-setup', 'panel-cool');
  const root = el('div', { className: 'practice-page' }, heading('Luyện tập kiến thức', 'Chọn chủ đề, làm bài và xem kết quả được chấm trên máy chủ.'), setup);
  let topics = [], generating = false, failure = null, retrying = false;
  function current() { return root.isConnected && !controller.signal.aborted; }
@@ -51,14 +54,18 @@ export function renderPractice() {
  }
  function setupControls() {
   topic.disabled = generating || !topics.length; difficulty.disabled = generating || !topics.length;
-  startButton.disabled = generating || !selection() || (failure && !failure.retryable);
-  startButton.textContent = generating ? retrying ? 'Đang tạo lại bài…' : 'Đang tạo 5 câu hỏi…' : preview ? 'Mở bài xem thử' : 'Tạo bài luyện tập';
+  if (generating) {
+   setButtonState(startButton, 'loading', { label: retrying ? 'Đang tạo lại bài…' : 'Đang tạo 5 câu hỏi…' });
+  } else {
+   setButtonState(startButton, 'idle', { label: preview ? 'Mở bài xem thử' : 'Tạo bài luyện tập' });
+   startButton.disabled = !selection() || (failure && !failure.retryable);
+  }
   setupForm.setAttribute('aria-busy', String(generating));
  }
  topic.addEventListener('change', () => { failure = null; setupStatus.replaceChildren(); setupControls(); });
  difficulty.addEventListener('change', () => { failure = null; setupStatus.replaceChildren(); setupControls(); });
  async function loadTopics(force = false) {
-  setupStatus.replaceChildren(el('p', {}, 'Đang tải danh sách chủ đề…'));
+  setupStatus.replaceChildren(thinkingStatus('Đang tải danh sách chủ đề…'));
   try {
    topics = preview ? demoTopics.map(item => ({ ...item, subjectName: 'Toán học', chapterName: item.chapter })) : flattenTopics(await loadCatalog({ force }));
    if (!current()) return;
@@ -85,7 +92,7 @@ export function renderPractice() {
   const restoreFocus = setupStatus.contains(document.activeElement);
   generating = true; retrying = isRetry; lastSelection = { ...chosen }; setupControls();
   setupStatus.querySelectorAll('button').forEach(control => { control.disabled = true; });
-  setupStatus.replaceChildren(notice(isRetry ? 'Đang tạo lại bài…' : 'Đang chuẩn bị bài luyện tập…'));
+  setupStatus.replaceChildren(thinkingStatus(isRetry ? 'Đang tạo lại bài…' : 'Đang chuẩn bị bài luyện tập…'));
   try {
    const result = preview ? { quiz: previewQuiz(chosen.topicId, chosen.difficulty) }
     : await api('/quizzes', { method: 'POST', body: chosen, signal: controller.signal });
@@ -122,14 +129,24 @@ export function renderPractice() {
    if (submitting || confirming) return;
    layout.replaceWith(setup); history.replaceState(null, '', '#practice'); setupControls();
   }, 'ghost');
+  const progressFill = el('div', { className: 'quiz-progress-fill' });
+  const progressBar = el('div', { className: 'quiz-progress-track', 'aria-hidden': 'true' }, progressFill);
   const layout = el('div', {}, preview ? notice('Dữ liệu minh họa — không gọi API hoặc lưu kết quả.', 'warning') : null,
-   el('div', { className: 'quiz-layout' }, el('section', { className: 'question-card' }, questionArea), panel('Tiến độ bài', navigation, count, status, submit, change)));
+   el('div', { className: 'quiz-layout' }, el('section', { className: 'question-card' }, progressBar, questionArea), panel('Tiến độ bài', navigation, count, status, submit, change)));
   setup.replaceWith(layout);
   function controls() {
    const locked = submitting || confirming || submitted;
    layout.querySelectorAll('input[type="radio"]').forEach(input => { input.disabled = locked; });
-   submit.disabled = locked; change.disabled = locked;
-   submit.textContent = submitted ? 'Đã nộp đáp án' : submitting ? 'Đang nộp bài…' : confirming ? 'Đang chờ xác nhận…' : 'Nộp đáp án';
+   change.disabled = locked;
+   if (submitting) {
+    setButtonState(submit, 'loading', { label: 'Đang nộp bài…' });
+   } else if (submitted) {
+    setButtonState(submit, 'success', { label: 'Đã nộp đáp án' });
+    submit.disabled = true;
+   } else {
+    setButtonState(submit, 'idle', { label: confirming ? 'Đang chờ xác nhận…' : 'Nộp đáp án' });
+    submit.disabled = locked;
+   }
    layout.setAttribute('aria-busy', String(submitting));
   }
   function drawNav() {
@@ -140,6 +157,7 @@ export function renderPractice() {
     return control;
    }));
    count.textContent = `Đã trả lời ${answers.size}/5 câu`;
+   progressFill.style.setProperty('--quiz-progress', String(answers.size / 5));
   }
   function draw() {
    const question = quiz.questions[index];
@@ -212,10 +230,13 @@ export function renderPractice() {
 
 function resultView(result, preview) {
  return el('div', {}, heading('Kết quả luyện tập', 'Đối chiếu cách làm và ôn lại những điểm chưa rõ.'), preview ? notice('Kết quả minh họa, không lưu vào hệ thống.', 'warning') : null,
-  el('div', { className: 'grid-2' }, panel('', el('div', { className: 'result-score' }, el('strong', {}, String(result.score)), el('span', {}, `${result.correctCount}/${result.totalCount} câu đúng · điểm`))),
-   panel('Bước tiếp theo', el('p', {}, 'Ôn lại những câu chưa đúng hoặc hỏi gia sư để hiểu rõ hơn.'), el('div', { className: 'page-actions' }, link('Luyện tập lại', `#practice?topic=${result.topicId}`, 'button primary'), link('Hỏi gia sư', `#chat?topic=${result.topicId}`, 'button ghost')))),
+  el('div', { className: 'grid-2' }, panel('', el('div', { className: 'result-score' }, el('strong', { className: 'num-enter' }, String(result.score)), el('span', {}, `${result.correctCount}/${result.totalCount} câu đúng · điểm`))),
+   panel('Bước tiếp theo', el('p', {}, 'Ôn lại những câu chưa đúng hoặc hỏi gia sư để hiểu rõ hơn.'), el('div', { className: 'page-actions' }, link('Luyện tập lại', `#practice?topic=${result.topicId}`, 'button primary', { trailingIcon: 'arrowRight' }), link('Hỏi gia sư', `#chat?topic=${result.topicId}`, 'button ghost')))),
   el('h2', { className: 'section-title' }, 'Đáp án và giải thích'), el('div', { className: 'result-list' }, ...result.questions.map((question, index) =>
-   el('article', { className: `result-item ${question.isCorrect ? 'correct' : 'wrong'}` }, badge(question.isCorrect ? 'Đúng' : 'Cần ôn lại', question.isCorrect ? 'success' : 'warning'),
+   el('article', { className: `result-item ${question.isCorrect ? 'correct' : 'wrong shake-enter'}` },
+    el('div', { className: 'page-actions' },
+     question.isCorrect ? icon('check', { size: 18, className: 'quiz-tick-pop' }) : icon('xCircle', { size: 18 }),
+     badge(question.isCorrect ? 'Đúng' : 'Cần ôn lại', question.isCorrect ? 'success' : 'warning')),
     el('h3', {}, `Câu ${index + 1}. ${question.questionText}`), el('p', {}, `Bạn chọn: ${question.userAnswer} · Đáp án: ${question.correctAnswer}`), el('p', {}, question.explanation)))));
 }
 
@@ -223,18 +244,22 @@ export function renderResults() {
  const preview = getSession().reason === 'preview';
  const requested = new URLSearchParams(location.hash.split('?')[1]).get('quiz');
  const id = validId(requested) || (requested === null ? lastQuizId : null);
- if (preview && previewResult) return resultView(previewResult, true);
+ if (preview && previewResult) {
+  if (previewResult.score >= 60) queueMicrotask(launchCelebration);
+  return resultView(previewResult, true);
+ }
  const root = el('div', {}, heading('Kết quả luyện tập', 'Kết quả được lưu và chấm trên máy chủ.'));
  if (!id || preview) { root.append(el('div', { className: 'empty-state' }, 'Chưa có bài đã nộp.', link('Mở bài luyện tập', '#practice', 'button primary'))); return root; }
  const status = el('div', { role: 'status' }); root.append(status);
  async function load() {
-  status.replaceChildren(el('p', {}, 'Đang tải kết quả…'));
+  status.replaceChildren(thinkingStatus('Đang tải kết quả…'));
   try {
    const response = await api(`/quizzes/${id}/result`);
    if (!root.isConnected) return;
    const result = response?.result;
    if (!result || result.quizId !== id || result.status !== 'completed' || !Array.isArray(result.questions) || result.questions.length !== 5) throw new ApiError('Kết quả từ máy chủ chưa hợp lệ.');
    root.replaceChildren(resultView(result, false));
+   if (result.score >= 60) launchCelebration();
   } catch (error) { if (root.isConnected) status.replaceChildren(notice(error.message, 'error'), button('Thử lại', load, 'secondary')); }
  }
  queueMicrotask(load);
