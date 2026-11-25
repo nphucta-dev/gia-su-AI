@@ -79,6 +79,20 @@ back-end/
 
 ## API
 
+### Danh sách tài liệu học tập (TK-097)
+
+Tài khoản active đã đăng nhập dùng `GET /api/documents?topicId=1&limit=20&offset=0`
+hoặc `GET /api/catalog/topics/1/documents?limit=20&offset=0`. API đầu tiên còn hỗ trợ
+`subjectId`, `gradeLevel`, `q` như trước. Chỉ trả nguồn ready/active thuộc danh mục active.
+
+- `limit`: mặc định 20, từ 1 đến 100; `offset`: mặc định 0, từ 0 đến 100000.
+- Phản hồi gồm `documents`, `limit`, `offset`, `hasMore`; API theo chủ đề có thêm `topicId`.
+- Lọc trước phân trang, mới nhất trước (`created_at DESC, id DESC`). `hasMore=true`
+  thì trang tiếp theo dùng `offset + limit`; vượt dữ liệu trả danh sách trống.
+
+Chi tiết và tệp gốc vẫn dùng `GET /api/documents/{id}` và
+`GET /api/documents/{id}/file`. Xem [mô tả chức năng](../docs/LEARNER_DOCUMENT_TASKS.md).
+
 ### `GET /api/health`
 
 `200 {"status": "ok"}`
@@ -409,7 +423,7 @@ Thiếu/sai token trả 401, tài khoản bị tắt trả 403, lỗi database t
 `DASHBOARD_UNAVAILABLE` với thông báo cố định.
 
 Đối chiếu mô tả TK-065, SRS FR-07.4/FR-10.1 và backlog SF-07.2.3. Task này bổ sung
-API backend; trang dashboard frontend hiện vẫn dùng dữ liệu minh họa (TK-064).
+API backend; dashboard frontend đã dùng API này cùng tiến độ và lịch sử thật.
 Không cần migration mới. Kiểm thử: `tests/test_dashboard_api.py` và
 `tests/test_dashboard_database_integration.py` (MySQL dùng database thử nghiệm ngẫu nhiên).
 
@@ -418,4 +432,4 @@ Không cần migration mới. Kiểm thử: `tests/test_dashboard_api.py` và
 - Các API ghi danh mục, chat và quiz sử dụng model trong `app/models/` và session transaction của `app/db/database.py`; kiểm tra chủ sở hữu và quy tắc nghiệp vụ theo tài liệu SRS trước khi lưu dữ liệu.
 - Chưa có refresh token và đăng xuất thu hồi token: token đã phát hành vẫn dùng được đến khi hết hạn. Nếu cần thu hồi ngay, thêm danh sách token bị thu hồi hoặc số phiên bản token theo người dùng.
 - Giới hạn số lần gọi theo IP cho `/api/auth/register` (mỗi lần băm tốn CPU và 32 MiB bộ nhớ).
-- Danh mục, hồ sơ, upload/xử lý/bật nguồn, chat và quiz đã nối API thật. Dashboard và một số trang lịch sử học tập còn dữ liệu minh họa; chất lượng phản hồi model cần kiểm chứng khi có key/model thật. Xem phạm vi hỗ trợ tại [AI_SETUP.md](../docs/AI_SETUP.md).
+- Danh mục, hồ sơ, upload/xử lý/bật nguồn, chat, quiz, dashboard và lịch sử đã nối API thật theo tài khoản. Không có số liệu mẫu thay thế khi lỗi API hoặc chưa có hoạt động. Chất lượng phản hồi model vẫn cần kiểm chứng với model thực tế. Xem phạm vi hỗ trợ tại [AI_SETUP.md](../docs/AI_SETUP.md).

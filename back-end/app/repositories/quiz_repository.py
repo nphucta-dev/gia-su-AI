@@ -35,6 +35,19 @@ class QuizRecord:
 
 
 @dataclass(frozen=True)
+class QuizSummaryRecord:
+    id: int
+    topic_id: int
+    topic_name: str
+    subject_name: str
+    difficulty: str
+    status: str
+    created_at: str
+    score: Decimal | None = None
+    completed_at: str | None = None
+
+
+@dataclass(frozen=True)
 class QuizAnswerRecord:
     id: int
     question_id: int
@@ -74,6 +87,8 @@ def mastery_percent(correct_count: int, total_count: int) -> Decimal:
 
 
 class QuizRepository(Protocol):
+    async def list_quizzes(self, user_id: int, *, limit: int, offset: int) -> list[QuizSummaryRecord]: ...
+
     async def create_quiz(self, user_id: int, topic_id: int, difficulty: QuizDifficulty, generated: GeneratedQuiz) -> QuizRecord | None: ...
 
     async def find_quiz(self, user_id: int, quiz_id: int) -> QuizRecord | None: ...
@@ -98,6 +113,23 @@ class InMemoryQuizRepository:
         self._next_question_id = 1
         self._next_answer_id = 1
         self.progress_repository = progress_repository if progress_repository is not None else InMemoryProgressRepository()
+
+    async def list_quizzes(self, user_id: int, *, limit: int, offset: int) -> list[QuizSummaryRecord]:
+        records = sorted(
+            (record for record in self._quizzes.values() if record.user_id == user_id),
+            key=lambda record: (record.created_at, record.id), reverse=True,
+        )[offset:offset + limit]
+        summaries = []
+        for record in records:
+            topic = self._catalog._topics.get(record.topic_id, {})
+            subject = self._catalog._subjects.get(topic.get("subject_id"), {})
+            summaries.append(QuizSummaryRecord(
+                id=record.id, topic_id=record.topic_id, topic_name=topic.get("name", ""),
+                subject_name=subject.get("name", ""), difficulty=record.difficulty, status=record.status,
+                created_at=record.created_at, score=record.score if record.status == "completed" else None,
+                completed_at=record.completed_at,
+            ))
+        return summaries
 
     async def find_quiz(self, user_id: int, quiz_id: int) -> QuizRecord | None:
         record = self._quizzes.get(quiz_id)

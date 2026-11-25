@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 import asyncio
+from dataclasses import asdict
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 import re
-import unicodedata
 from typing import Protocol
 from sqlalchemy.exc import SQLAlchemyError
 from app.config import Settings
@@ -27,6 +27,7 @@ from app.utils.errors import AppError
 from app.utils.async_tasks import finish_pending_task
 from app.utils.keywords import text_terms
 from app.validators.quiz import invalid_quiz_response, validate_generated_quiz
+from app.schemas.quiz import QuizListResponse, QuizSummaryItem
 from app.repositories.quiz_repository import (
     QuizAlreadySubmittedError, QuizInvalidAnswersError,
     QuizOwnerUnavailableError, QuizRecord, QuizRepository,
@@ -74,6 +75,20 @@ class QuizService:
         except ValueError:
             raise AppError(422, "INVALID_QUIZ_CONTEXT", "Nội dung chủ đề hoặc tài liệu chưa hợp lệ.") from None
 
+    async def list_quizzes(self, user: User, *, limit: int = 20, offset: int = 0) -> QuizListResponse:
+        if not user.is_active or parse_user_id(user.id) is None:
+            raise AppError(401, "ACCOUNT_INACTIVE", "Tài khoản không còn hoạt động.")
+        if type(limit) is not int or not 1 <= limit <= 100 or type(offset) is not int or not 0 <= offset <= 100000:
+            raise AppError(422, "VALIDATION_ERROR", "Phân trang bài luyện tập không hợp lệ.")
+        try:
+            records = await self._repository.list_quizzes(user.id, limit=limit + 1, offset=offset)
+        except SQLAlchemyError:
+            raise AppError(503, "QUIZ_UNAVAILABLE", "Chưa thể tải lịch sử luyện tập. Vui lòng thử lại.") from None
+        return QuizListResponse(
+            quizzes=[QuizSummaryItem(**asdict(record)) for record in records[:limit]],
+            limit=limit, offset=offset, has_more=len(records) > limit,
+        )
+
     async def generate_quiz(self, user: User, topic_id: int, difficulty: str) -> QuizResponse:
         if not user.is_active or parse_user_id(user.id) is None:
             raise AppError(401, "ACCOUNT_INACTIVE", "Tài khoản không còn hoạt động.")
@@ -113,18 +128,8 @@ class QuizService:
                 question["question_text"] = self._redact(question["question_text"], user)
                 question["explanation"] = self._redact(question["explanation"], user)
                 question["options"] = {letter: self._redact(value, user) for letter, value in question["options"].items()}
-                options = {
-                    " ".join(unicodedata.normalize("NFKC", value).casefold().split())
-                    for value in question["options"].values()
-                }
-                if len(options) != 4:
-                    raise invalid_quiz_response()
-            unique_questions = {
-                " ".join(unicodedata.normalize("NFKC", question["question_text"]).casefold().split())
-                for question in payload["questions"]
-            }
-            if len(unique_questions) != 5:
-                raise invalid_quiz_response()
+            # save_generated_quiz revalidates the redacted copy with the same
+            # complete-quiz contract before opening a write transaction.
             # The SQL repository may still be committing in a worker thread when
             # the request is cancelled. Keep admission locked until that write ends.
             pending = asyncio.create_task(self.save_generated_quiz(user, topic_id, difficulty, payload))

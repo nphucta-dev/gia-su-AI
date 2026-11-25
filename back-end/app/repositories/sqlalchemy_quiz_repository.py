@@ -14,7 +14,7 @@ from app.models.user import User
 from app.repositories.chat_repository import utc_timestamp
 from app.repositories.quiz_repository import (
     QuizAlreadySubmittedError, QuizAnswerRecord, QuizAnswersRequiredError, QuizInvalidAnswersError,
-    QuizOwnerUnavailableError, QuizQuestionRecord, QuizRecord, QuizGradeRecord, mastery_percent,
+    QuizOwnerUnavailableError, QuizQuestionRecord, QuizRecord, QuizGradeRecord, QuizSummaryRecord, mastery_percent,
 )
 from app.schemas.quiz import GeneratedQuiz, QuizDifficulty
 from app.repositories.quiz_repository import (
@@ -28,6 +28,24 @@ from app.repositories.quiz_repository import (
 class SqlAlchemyQuizRepository:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._sessions = session_factory
+
+    async def list_quizzes(self, user_id: int, *, limit: int, offset: int) -> list[QuizSummaryRecord]:
+        return await asyncio.to_thread(self._list_quizzes, user_id, limit=limit, offset=offset)
+
+    def _list_quizzes(self, user_id: int, *, limit: int, offset: int) -> list[QuizSummaryRecord]:
+        with self._sessions() as db:
+            rows = db.execute(
+                select(Quiz, Topic.name, Subject.name)
+                .join(Topic, Topic.id == Quiz.topic_id).join(Subject, Subject.id == Topic.subject_id)
+                .where(Quiz.user_id == user_id)
+                .order_by(Quiz.created_at.desc(), Quiz.id.desc()).limit(limit).offset(offset)
+            )
+            return [QuizSummaryRecord(
+                id=quiz.id, topic_id=quiz.topic_id, topic_name=topic_name, subject_name=subject_name,
+                difficulty=quiz.difficulty, status=quiz.status, created_at=utc_timestamp(quiz.created_at),
+                score=quiz.score if quiz.status == "completed" else None,
+                completed_at=utc_timestamp(quiz.completed_at) if quiz.completed_at else None,
+            ) for quiz, topic_name, subject_name in rows]
 
     async def create_quiz(self, user_id: int, topic_id: int, difficulty: QuizDifficulty, generated: GeneratedQuiz) -> QuizRecord | None:
         return await asyncio.to_thread(self._create_quiz, user_id, topic_id, difficulty, generated)

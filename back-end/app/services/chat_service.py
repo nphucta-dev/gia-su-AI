@@ -25,6 +25,7 @@ from app.services.llm_client import LLMClient
 from app.utils.errors import AppError
 from app.utils.async_tasks import finish_pending_task
 from app.utils.keywords import text_terms
+from app.utils.text import has_visible_text
 from collections.abc import Sequence
 from app.repositories.chat_repository import (
     ChatChangedError, ChatMessageRecord, ChatRepository, ChatSessionRecord, FeedbackTargetError,
@@ -100,7 +101,7 @@ def validate_message_content(content: str) -> str:
             {"content": "Nội dung tin nhắn không hợp lệ."},
         )
     cleaned = content.strip()
-    if not cleaned or not any(not char.isspace() and unicodedata.category(char)[0] not in {"C", "M", "Z"} for char in cleaned):
+    if not has_visible_text(cleaned):
         raise AppError(
             422, "VALIDATION_ERROR", "Vui lòng nhập câu hỏi trước khi gửi.",
             {"content": "Vui lòng nhập câu hỏi trước khi gửi."},
@@ -154,7 +155,7 @@ def resolve_next_hint_level(history: Sequence[ChatMessageRecord]) -> int:
 
 RETRYABLE_LLM_CODES = frozenset({"LLM_TIMEOUT", "LLM_RATE_LIMITED", "LLM_UNAVAILABLE", "LLM_INVALID_RESPONSE"})
 
-NO_SOURCE_NOTICE = "Ch?a c? t?i li?u ngu?n ph? h?p cho ph?n h?i n?y."
+NO_SOURCE_NOTICE = "Chưa có tài liệu nguồn phù hợp cho phản hồi này."
 RETRYABLE_LLM_CODES = frozenset({"LLM_TIMEOUT", "LLM_RATE_LIMITED", "LLM_UNAVAILABLE", "LLM_INVALID_RESPONSE"})
 
 class ChatService:
@@ -252,7 +253,7 @@ class ChatService:
         session = await self._find(user.id, session_id)
         self._require_open(session)
         async with self._operation(user.id, session_id):
-            history = await self._repository.recent_messages(user.id, session_id, limit=24)
+            history = await self._repository.context_messages(user.id, session_id, limit=24)
             level = resolve_next_hint_level(history)
             return await self._reply(user, session, expected_last_id=history[-1].id, hint_level=level, history=history)
 
@@ -267,7 +268,7 @@ class ChatService:
                 {"confirmed": "Bạn cần xác nhận trước khi xem lời giải đầy đủ."},
             )
         async with self._operation(user.id, session_id):
-            history = await self._repository.recent_messages(user.id, session_id, limit=24)
+            history = await self._repository.context_messages(user.id, session_id, limit=24)
             question = next((item for item in reversed(history) if item.role == "user"), None)
             if question is None:
                 raise AppError(409, "CHAT_QUESTION_REQUIRED", "Hãy gửi một câu hỏi trước khi xem lời giải.")
@@ -280,7 +281,7 @@ class ChatService:
         session = await self._find(user.id, session_id)
         self._require_open(session)
         async with self._operation(user.id, session_id):
-            history = await self._repository.recent_messages(user.id, session_id, limit=24)
+            history = await self._repository.context_messages(user.id, session_id, limit=24)
             if not history or not any(item.role == "user" for item in history):
                 raise AppError(409, "CHAT_QUESTION_REQUIRED", "Hãy gửi một câu hỏi trước khi thử lại.")
             if history[-1].role != "user":
@@ -294,7 +295,7 @@ class ChatService:
             session = await self._find(user.id, session_id)
             self._require_open(session)
             async with self._operation(user.id, session_id):
-                history = await self._repository.recent_messages(user.id, session_id, limit=24)
+                history = await self._repository.context_messages(user.id, session_id, limit=24)
                 if not history or not any(item.role == "user" for item in history):
                     raise AppError(409, "CHAT_QUESTION_REQUIRED", "Hãy gửi một câu hỏi trước khi xin giải thích.")
                 return await self._reply(user, session, expected_last_id=history[-1].id, explanation=mode, history=history)
@@ -349,7 +350,7 @@ class ChatService:
         history: list[ChatMessageRecord] | None = None,
     ) -> ChatReplyResponse:
         if history is None:
-            history = await self._repository.recent_messages(user.id, session.id, limit=24)
+            history = await self._repository.context_messages(user.id, session.id, limit=24)
         if not history or history[-1].id != expected_last_id:
             raise changed_session()
         topic = SocraticTopic(
@@ -377,7 +378,7 @@ class ChatService:
             content = redact_sensitive_text(reply.content, **self._privacy(user))
         except ValueError:
             raise AppError(502, "LLM_INVALID_RESPONSE", "Gia sư chưa trả về nội dung hợp lệ. Câu hỏi của bạn đã được lưu.") from None
-        if not content.strip() or len(content) > 8000:
+        if not has_visible_text(content) or len(content) > 8000:
             raise AppError(502, "LLM_INVALID_RESPONSE", "Gia sư chưa trả về nội dung hợp lệ. Câu hỏi của bạn đã được lưu.")
         try:
             saved = await _commit_message(self._repository.append_assistant_message(
@@ -396,15 +397,32 @@ class ChatService:
 
     async def get_message_sources(self, user: User, message_id: int) -> ChatMessageSourcesResponse:
         """TK-049: Trả về danh sách source_refs hợp lệ và ghi rõ khi không có chunk phù hợp."""
-        record = await self._repository.find_message(user.id, message_id)
+        try:
+            record = await self._repository.find_message(user.id, message_id)
+        except SQLAlchemyError:
+            raise AppError(503, "SOURCES_UNAVAILABLE", "Chưa thể tải nguồn tham khảo. Vui lòng thử lại.") from None
         if record is None:
             raise AppError(404, "CHAT_MESSAGE_NOT_FOUND", "Không tìm thấy tin nhắn của bạn.")
         refs = sanitize_source_refs(record.source_refs) if record.role == "assistant" else []
+        available = set()
+        if refs and self._retrieval is not None:
+            session = await self._find(user.id, record.session_id)
+            try:
+                available = {(chunk.document_id, chunk.id) for chunk in await self._retrieval.list_eligible_chunks(session.topic_id)}
+            except SQLAlchemyError:
+                raise AppError(503, "SOURCES_UNAVAILABLE", "Chưa thể tải nguồn tham khảo. Vui lòng thử lại.") from None
+        for ref in refs:
+            ref.available = (ref.document_id, ref.chunk_id) in available
+        has_sources = any(ref.available for ref in refs)
+        notice = None if refs and all(ref.available for ref in refs) else (
+            "Một số tài liệu nguồn hiện không khả dụng." if has_sources else
+            "Tài liệu nguồn đã tắt hoặc hiện không còn khả dụng." if refs else NO_SOURCE_NOTICE
+        )
         return ChatMessageSourcesResponse(
             message_id=record.id,
-            has_sources=bool(refs),
+            has_sources=has_sources,
             source_refs=refs,
-            notice=None if refs else NO_SOURCE_NOTICE,
+            notice=notice,
         )
 
 
@@ -413,7 +431,7 @@ class ChatService:
         session = await self._find(user.id, session_id)
         self._require_open(session)
         async with self._operation(user.id, session_id):
-            history = await self._repository.recent_messages(user.id, session_id, limit=24)
+            history = await self._repository.context_messages(user.id, session_id, limit=24)
             if not history or history[-1].role != "user":
                 raise AppError(409, "CHAT_RETRY_NOT_NEEDED", "Không có câu hỏi nào đang chờ phản hồi để thử lại.")
             pending_question = history[-1]

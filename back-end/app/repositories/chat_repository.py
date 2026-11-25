@@ -67,6 +67,8 @@ class ChatRepository(Protocol):
 
     async def recent_messages(self, user_id: int, session_id: int, *, limit: int = 12) -> list[ChatMessageRecord]: ...
 
+    async def context_messages(self, user_id: int, session_id: int, *, limit: int = 24) -> list[ChatMessageRecord]: ...
+
     async def append_user_message(self, user_id: int, session_id: int, content: str) -> ChatMessageRecord | None: ...
 
     async def append_assistant_message(
@@ -158,6 +160,16 @@ class InMemoryChatRepository:
         if limit <= 0:
             return []
         return self._owned_messages(user_id, session_id)[-limit:]
+
+    async def context_messages(self, user_id: int, session_id: int, *, limit: int = 24) -> list[ChatMessageRecord]:
+        recent = await self.recent_messages(user_id, session_id, limit=limit)
+        records = self._owned_messages(user_id, session_id)
+        question = next((item for item in reversed(records) if item.role == "user"), None)
+        if question is None:
+            return recent
+        hints = [item for item in records if item.id > question.id and item.role == "assistant" and item.hint_level is not None]
+        anchor = [question, *([max(hints, key=lambda item: (item.hint_level, item.id))] if hints else [])]
+        return sorted({item.id: item for item in [*anchor, *recent]}.values(), key=lambda item: item.id)
 
     def _append(
         self, session: ChatSessionRecord, content: str, *, role: str,

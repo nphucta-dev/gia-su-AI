@@ -72,10 +72,11 @@ async def test_get_message_sources_returns_valid_refs_or_no_source_notice():
         ],
     )
     filled_res = await service.get_message_sources(owner, assistant_id)
-    assert filled_res.has_sources is True
+    assert filled_res.has_sources is False
     assert len(filled_res.source_refs) == 1
     assert filled_res.source_refs[0].document_id == 5
-    assert filled_res.notice is None
+    assert filled_res.source_refs[0].available is False
+    assert filled_res.notice == "Tài liệu nguồn đã tắt hoặc hiện không còn khả dụng."
 
     with pytest.raises(AppError) as err:
         await service.get_message_sources(other, assistant_id)

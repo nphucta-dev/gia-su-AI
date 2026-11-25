@@ -95,38 +95,68 @@ def make_request(endpoint: str, key: str, model: str, messages: list[dict[str, s
     return protocol, str(url.copy_with(path=path)), headers, body
 
 
+def _completed(value: object, field: str, allowed: tuple[str, ...]) -> dict:
+    if not isinstance(value, dict):
+        raise ValueError("Invalid model response")
+    # Some compatible gateways omit metadata. Explicit partial/failed states must
+    # never become a saved answer or quiz, even when their text parses as JSON.
+    if field in value and value[field] not in allowed:
+        raise ValueError("Incomplete model response")
+    return value
+
+
 def extract_text(body: dict, protocol: str) -> tuple[str, object]:
-    if not isinstance(body, dict):
+    if not isinstance(body, dict) or body.get("error"):
         raise ValueError("Invalid model response")
     if protocol == "openai":
-        content = body["choices"][0]["message"]["content"]
+        choice = _completed(body["choices"][0], "finish_reason", ("stop",))
+        message = choice["message"]
+        if not isinstance(message, dict) or message.get("refusal") or message.get("tool_calls") or message.get("function_call"):
+            raise ValueError("Missing final text response")
+        content = message["content"]
         if isinstance(content, list):
             content = "\n".join(item["text"] for item in content if isinstance(item, dict) and item.get("type") == "text")
         usage = body.get("usage") or {}
         count = usage.get("completion_tokens") if isinstance(usage, dict) else None
     elif protocol == "responses":
-        if body.get("status") in {"failed", "incomplete", "cancelled"} or body.get("error"):
+        _completed(body, "status", ("completed",))
+        if body.get("incomplete_details"):
             raise ValueError("Incomplete model response")
-        texts = [part["text"] for item in body.get("output", [])
-                 if isinstance(item, dict) and item.get("type") == "message"
-                 for part in item.get("content", [])
-                 if isinstance(part, dict) and part.get("type") == "output_text"]
+        texts = []
+        for item in body.get("output", []):
+            if not isinstance(item, dict) or item.get("type") != "message":
+                continue
+            _completed(item, "status", ("completed",))
+            for part in item.get("content", []):
+                if not isinstance(part, dict):
+                    continue
+                if part.get("type") == "refusal":
+                    raise ValueError("Missing final text response")
+                if part.get("type") == "output_text":
+                    texts.append(part["text"])
         content = "\n".join(texts)
         usage = body.get("usage") or {}
         count = usage.get("output_tokens") if isinstance(usage, dict) else None
     elif protocol == "gemini":
-        candidate = body["candidates"][0]
+        candidate = _completed(body["candidates"][0], "finishReason", ("STOP",))
         content = "\n".join(part["text"] for part in candidate["content"]["parts"]
                             if isinstance(part, dict) and isinstance(part.get("text"), str) and not part.get("thought"))
         usage = body.get("usageMetadata") or {}
         count = usage.get("candidatesTokenCount") if isinstance(usage, dict) else None
     elif protocol == "anthropic":
+        _completed(body, "stop_reason", ("end_turn", "stop_sequence"))
         content = "\n".join(part["text"] for part in body["content"]
                             if isinstance(part, dict) and part.get("type") == "text")
         usage = body.get("usage") or {}
         count = usage.get("output_tokens") if isinstance(usage, dict) else None
     else:
-        content = body["message"]["content"]
+        _completed(body, "done_reason", ("stop",))
+        if "done" in body and body["done"] is not True:
+            raise ValueError("Incomplete model response")
+        message = body["message"]
+        if not isinstance(message, dict) or message.get("tool_calls"):
+            raise ValueError("Missing final text response")
+        content = message["content"]
         count = body.get("eval_count")
     if not isinstance(content, str) or not content.strip():
         raise ValueError("Missing text response")

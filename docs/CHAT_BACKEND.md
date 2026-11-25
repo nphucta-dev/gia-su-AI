@@ -1,6 +1,7 @@
 # Backend hội thoại và gợi ý
 
-Phạm vi thực hiện: TK-018 tạo phiên, TK-021 ngữ cảnh, TK-023 lưu tin nhắn,
+Phạm vi thực hiện: TK-018 tạo phiên, TK-020 API hỏi đáp LLM tiếng Việt,
+TK-021 ngữ cảnh, TK-023 lưu tin nhắn,
 TK-025 lịch sử, TK-032 điều phối gợi ý, TK-034 giải thích bổ sung,
 TK-081 bảo vệ key và TK-084 lọc PII.
 Dữ liệu dùng các bảng `chat_sessions`/`chat_messages` hiện có trong MySQL, không thêm migration.
@@ -45,6 +46,13 @@ backend, gọi `/retry` để phản hồi câu hỏi gần nhất mà không nh
 
 Các lỗi timeout (504), giới hạn dịch vụ model (429), mất mạng hoặc phản hồi không hợp lệ
 (502) cũng giữ nguyên câu hỏi. Không tạo tin assistant hoặc tăng mức gợi ý khi model thất bại.
+
+Adapter kiểm tra trạng thái kết thúc của provider trước khi lấy nội dung. Phản hồi
+bị cắt do giới hạn token, đang xử lý, gọi tool hoặc bị từ chối trả
+`502 LLM_INVALID_RESPONSE`; nội dung chỉ gồm ký tự vô hình cũng bị từ chối.
+Câu hỏi đã lưu vẫn dùng được cho `/retry`, không tính quota cho lượt lỗi.
+Gateway tương thích được phép bỏ metadata kết thúc; nếu gửi metadata thì phải
+báo đã hoàn tất. Kiểm thử hồi quy: `tests/test_llm_task_contracts.py`.
 
 ## Cấu hình và adapter model
 
@@ -144,4 +152,14 @@ Frontend chat của tài khoản đăng nhập đã nối tạo phiên theo ch�
 sidebar lịch sử, retry đúng thao tác, hints, giải thích, xác nhận lời giải và feedback.
 Nguồn ready/active được tìm theo từ khóa và lưu refs thật trên assistant; đọc lịch
 sử kiểm tra nguồn còn khả dụng. Quota dùng chung với sinh quiz, 30 lượt thành công
-mỗi ngày UTC. Chế độ xem thử vẫn là dữ liệu minh họa riêng. Xem [AI_SETUP.md](AI_SETUP.md).
+mỗi ngày UTC. Trang cá nhân yêu cầu đăng nhập thật, không thay bằng số liệu mẫu.
+Xem [AI_SETUP.md](AI_SETUP.md).
+
+Khi mở lại phiên có tin cuối là user, giao diện phục hồi thao tác thử lại và chặn
+gửi thêm câu hỏi tới khi phản hồi được phục hồi. Ngữ cảnh ở repository giữ cửa sổ
+24 tin gần nhất cộng câu hỏi mới nhất/mức hint cao nhất nếu nằm ngoài cửa sổ đó;
+prompt vẫn tuân theo giới hạn messages/ký tự. Lịch sử dài không làm reset hint.
+
+`GET /api/chat/messages/{id}/sources` kiểm tra quyền sở hữu và khả dụng hiện tại;
+mỗi nguồn có `available`, `hasSources` cho biết còn nguồn khả dụng, `notice` giải
+thích nguồn đã tắt/không còn hoặc thiếu nguồn. Không xóa nội dung hội thoại cũ.

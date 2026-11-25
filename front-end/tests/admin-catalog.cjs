@@ -179,21 +179,13 @@ async function runAdminCatalogChecks({ browser, baseUrl }) {
     await context.close();
   }
 
-  // Bản xem trước vẫn hoạt động độc lập và không ghi lên API.
+  // Old preview flags must no longer grant administrative access.
   const preview = await browser.newContext();
   const previewPage = await preview.newPage();
   const previewWrites = [];
   previewPage.on('request', req => { if (req.url().includes('/api/admin/') && req.method() !== 'GET') previewWrites.push(req.url()); });
   try {
-    await previewPage.goto(`${baseUrl}/#login`);
-    await previewPage.getByRole('button', { name: 'Vào thử tài khoản quản trị', exact: true }).click();
-    await previewPage.waitForURL('**/#admin?tab=subjects');
-    await previewPage.locator('.admin-preview-note').waitFor();
-    await previewPage.getByRole('button', { name: 'Thêm môn học', exact: true }).click();
-    await previewPage.getByLabel('Tên môn học', { exact: true }).fill('Môn chỉ xem trước');
-    await previewPage.getByLabel('Cấp học', { exact: true }).fill('THPT');
-    await previewPage.getByRole('button', { name: 'Thêm nội dung', exact: true }).click();
-    await previewPage.getByRole('heading', { name: 'Môn chỉ xem trước', exact: true }).waitFor();
+    await require('./preview-disabled.cjs').assertPreviewDisabled(previewPage, baseUrl, 'admin?tab=subjects', 'ADMIN');
     assert.deepEqual(previewWrites, []);
   } finally {
     await preview.close();

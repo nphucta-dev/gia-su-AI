@@ -73,17 +73,20 @@ _MASKS = re.compile(r"(\[(?:NAME|EMAIL|SECRET)\])")
 _EMAIL = re.compile(r"(?<![\w.+-])[\w.!#$%&'*+/=?^`{|}~-]+@(?:[\w-]+\.)+[\w-]{2,}(?![\w-])", re.UNICODE)
 _JWT = re.compile(r"(?<![\w-])eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?![\w-])")
 _BEARER = re.compile(r"\bBearer[ \t]+[A-Za-z0-9._~+/-]+=*", re.IGNORECASE)
-_VALUE = r'''(?P<value>"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)'''
+# Passwords may contain spaces. For explicitly labelled, unquoted secrets,
+# conservatively mask the whole value up to a comma, semicolon or line break.
+# Quoted values may also contain those separators or escaped quotation marks.
+_VALUE = r'''(?P<value>"(?:\\.|[^"\\\r\n])*"|'(?:\\.|[^'\\\r\n])*'|[^\r\n,;]+)'''
 _AUTHORIZATION = re.compile(
     r'''(?P<label>["']?\bauthorization\b["']?\s*[:=]\s*)(?P<value>"[^"\r\n]*"|'[^'\r\n]*'|(?:Bearer|Basic)[ \t]+[^\s,;]+|[^\s,;]+)''',
     re.IGNORECASE,
 )
 _SECRET_LABEL = re.compile(
-    r'''(?P<label>["']?\b(?:password|passwd|pwd|mật\s*khẩu|mat\s*khau|api[\s_-]*key|access[\s_-]*token|refresh[\s_-]*token|token|authorization)\b["']?\s*[:=]\s*)'''
+    r'''(?P<label>["']?\b(?:password|passwd|pwd|mật\s*khẩu|mat\s*khau|api[\s_-]*key|access[\s_-]*token|refresh[\s_-]*token|token|authorization)\b["']?[ \t]*[:=][ \t]*)'''
     + _VALUE, re.IGNORECASE,
 )
 _SELF_SECRET = re.compile(
-    r"(?P<label>\b(?:(?:mật\s*khẩu|mat\s*khau)\s+của\s+(?:tôi|em)\s+là|my\s+(?:password|api\s+key|token)\s+is)\s+)"
+    r"(?P<label>\b(?:(?:mật\s*khẩu|mat\s*khau)\s+của\s+(?:tôi|em)\s+là|my\s+(?:password|api\s+key|token)\s+is)[ \t]+)"
     + _VALUE, re.IGNORECASE,
 )
 _NAME_VALUE = r'''(?P<value>"[^"\r\n]*"|'[^'\r\n]*'|[^\n,;.!?]{1,120})'''

@@ -20,6 +20,7 @@ import httpx
 from app.config import Settings
 from app.services.llm_protocols import extract_text, key_is_optional, make_request, protocol_for
 from app.utils.errors import AppError
+from app.utils.text import has_visible_text
 
 MAX_RESPONSE_BYTES = 256 * 1024
 MAX_REPLY_CHARS = 32000
@@ -155,7 +156,7 @@ class ChatCompletionsClient:
             content, token_count = extract_text(body, protocol)
         except (UnicodeError, ValueError, TypeError, KeyError, IndexError, RecursionError):
             raise _invalid_response() from None
-        if not isinstance(content, str) or not content.strip() or len(content) > MAX_REPLY_CHARS:
+        if not isinstance(content, str) or not has_visible_text(content) or len(content) > MAX_REPLY_CHARS:
             raise _invalid_response()
         if any(unicodedata.category(char) in {"Cc", "Cs"} and char not in "\n\r\t" for char in content):
             raise _invalid_response()

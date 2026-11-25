@@ -151,11 +151,7 @@ const messages = {
   preview.on('pageerror', error => previewErrors.push(error.message));
   preview.on('request', request => { if (request.url().includes('/api/')) previewRequests.push(request.url()); });
   await preview.addInitScript(() => sessionStorage.setItem('gia-su-ai.preview-role', 'LEARNER'));
-  await preview.goto(`${base}/#chat`);
-  await preview.getByText('Dữ liệu minh họa — chưa kết nối tài khoản thật.', { exact: true }).waitFor();
-  await preview.getByRole('textbox', { name: 'Câu hỏi cho gia sư', exact: true }).fill('Câu hỏi xem thử');
-  await preview.getByRole('button', { name: 'Gửi câu hỏi', exact: true }).click();
-  await preview.locator('.message.user').filter({ hasText: 'Câu hỏi xem thử' }).waitFor();
+  await require('./preview-disabled.cjs').assertPreviewDisabled(preview, base);
   assert.equal(await preview.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(previewErrors, []);
   assert.deepEqual(previewRequests, []);
