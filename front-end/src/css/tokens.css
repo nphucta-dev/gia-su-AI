@@ -1,0 +1,222 @@
+/* ==========================================================================
+   GIA SƯ AI — DESIGN SYSTEM TOKENS ("Xanh dương nhẹ" / Soft Clean Blue)
+   Single Source of Truth: Colors (Light + Dark), Typography (Be Vietnam Pro),
+   Radii, Spacing, Shadows & Motion Timing
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* 1. Core Surfaces & Text — Light Mode */
+  --c-bg: #F8FAFC;
+  --c-surface: #FFFFFF;
+  --c-surface-soft: #F1F5F9;
+  --c-surface-subtle: #F1F5F9;
+  --c-track: #E2E8F0;
+
+  --c-ink: #0F172A;
+  --c-sub: #526071;
+  --c-sub-light: #64748B;
+
+  /* 2. Brand Primary — Soft Clean Blue */
+  --c-primary: #2563EB;
+  --c-primary-hover: #2D6AEF;
+  --c-primary-active: #1D4ED8;
+  --c-primary-on: #FFFFFF;
+  --c-primary-soft: #E6EEFD;
+  --c-primary-ink: #1D4ED8;
+  --c-link: #2563EB;
+
+  /* Semantic aliases for shared/legacy selectors */
+  --c-main: var(--c-primary);
+  --c-main-dark: var(--c-primary-hover);
+  --c-main-ink: var(--c-primary-ink);
+  --c-main-on: var(--c-primary-on);
+  --c-main-soft: var(--c-primary-soft);
+
+  --c-accent: var(--c-primary);
+  --c-accent-ink: var(--c-primary-ink);
+  --c-accent-soft: var(--c-primary-soft);
+
+  /* 3. Status Colors (Light Mode — WCAG AA verified) */
+  --c-success: #16A34A;
+  --c-success-ink: #15803D;
+  --c-success-soft: #EAF8EF;
+  --c-success-border: rgba(22, 163, 74, 0.28);
+
+  --c-warning: #D97706;
+  --c-warning-ink: #9A5204;
+  --c-warning-soft: #FEF6E7;
+  --c-warning-border: rgba(217, 119, 6, 0.28);
+
+  --c-danger: #DC2626;
+  --c-danger-ink: #B91C1C;
+  --c-danger-soft: #FEECEC;
+  --c-danger-border: rgba(220, 38, 38, 0.28);
+
+  /* 4. Borders & Overlays */
+  --c-border: #E2E8F0;
+  --c-border-subtle: #E8EEF5;
+  --c-border-strong: #CBD5E1;
+  --c-border-brand: rgba(37, 99, 235, 0.32);
+  --c-scrim: rgba(15, 23, 42, 0.42);
+  --c-header-glass: rgba(255, 255, 255, 0.88);
+  --c-shimmer-beam: rgba(255, 255, 255, 0.30);
+  --c-ripple-on-primary: rgba(255, 255, 255, 0.34);
+  --c-ripple-on-surface: rgba(37, 99, 235, 0.14);
+
+  /* Auth & Feature Highlight Panel */
+  --c-atelier-bg: #1E3A8A;
+  --c-atelier-border: rgba(255, 255, 255, 0.16);
+  --c-atelier-ink: #FFFFFF;
+  --c-atelier-sub: rgba(255, 255, 255, 0.84);
+  --c-atelier-card: rgba(255, 255, 255, 0.10);
+
+  /* Skeleton Shimmer */
+  --c-skeleton-base: #E8EEF5;
+  --c-skeleton-shine: rgba(255, 255, 255, 0.72);
+
+  /* Confetti Semantic Palette */
+  --c-confetti-1: #2563EB;
+  --c-confetti-2: #60A5FA;
+  --c-confetti-3: #16A34A;
+  --c-confetti-4: #D97706;
+  --c-confetti-5: #38BDF8;
+
+  /* 5. Typography — ONE family ONLY: Be Vietnam Pro (no serif, no italic, no monospace) */
+  --font-sans: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: var(--font-sans);
+  --font-display: var(--font-sans);
+  --font-mono: var(--font-sans);
+
+  /* 6. Spacing Scale (4/8px rhythm) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 28px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* 7. Border Radius & Control Sizing */
+  --r-sm: 10px;
+  --r-md: 12px;
+  --r-lg: 12px;
+  --r-xl: 20px;
+  --r-card: 20px;
+  --r-pill: 9999px;
+  --control-min-h: 44px;
+
+  /* 8. Shadows & Focus Ring */
+  --shadow-card: 0 8px 28px rgba(15, 23, 42, 0.06);
+  --shadow-card-hover: 0 14px 36px rgba(15, 23, 42, 0.10), 0 2px 8px rgba(37, 99, 235, 0.06);
+  --shadow-cta: 0 8px 20px rgba(37, 99, 235, 0.24);
+  --shadow-cta-hover: 0 12px 28px rgba(37, 99, 235, 0.36), 0 0 0 4px rgba(37, 99, 235, 0.12);
+  --shadow-popover: 0 16px 40px rgba(15, 23, 42, 0.12);
+  --shadow-subtle: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-thumb: 0 1px 3px rgba(15, 23, 42, 0.20);
+  --focus-ring: 0 0 0 4px rgba(37, 99, 235, 0.20);
+
+  /* 9. Centralized Motion Timing & Easing (150ms–500ms, GPU 60fps) */
+  --ease-natural: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: var(--ease-natural);
+  --ease-spring: cubic-bezier(0.34, 1.48, 0.64, 1);
+  --ease-smooth: var(--ease-natural);
+  --dur-fast: 160ms;
+  --dur-normal: 250ms;
+  --dur-slow: 380ms;
+  --dur-shimmer: 480ms;
+  --dur-ripple: 460ms;
+  --dur-pulse: 2800ms;
+
+  /* Legacy Variable Aliases */
+  --primary: var(--c-primary);
+  --hover: var(--c-primary-hover);
+  --pale: var(--c-primary-soft);
+  --teal: var(--c-primary-ink);
+  --mint: var(--c-success-soft);
+  --amber: var(--c-warning);
+  --cream: var(--c-warning-soft);
+  --ink: var(--c-ink);
+  --muted: var(--c-sub);
+  --border: var(--c-border);
+  --bg: var(--c-bg);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --c-bg: #0B1220;
+  --c-surface: #111A2E;
+  --c-surface-soft: #16223B;
+  --c-surface-subtle: #142038;
+  --c-track: #1E2A44;
+
+  --c-ink: #E5E7EB;
+  --c-sub: #9AA7B8;
+  --c-sub-light: #7F8EA3;
+
+  --c-primary: #2563EB;
+  --c-primary-hover: #3B82F6;
+  --c-primary-active: #1D4ED8;
+  --c-primary-on: #FFFFFF;
+  --c-primary-soft: #14284D;
+  --c-primary-ink: #60A5FA;
+  --c-link: #60A5FA;
+
+  --c-success: #16A34A;
+  --c-success-ink: #4ADE80;
+  --c-success-soft: rgba(22, 163, 74, 0.16);
+  --c-success-border: rgba(74, 222, 128, 0.30);
+
+  --c-warning: #D97706;
+  --c-warning-ink: #FBBF24;
+  --c-warning-soft: rgba(217, 119, 6, 0.16);
+  --c-warning-border: rgba(251, 191, 36, 0.30);
+
+  --c-danger: #DC2626;
+  --c-danger-ink: #F87171;
+  --c-danger-soft: rgba(220, 38, 38, 0.16);
+  --c-danger-border: rgba(248, 113, 113, 0.30);
+
+  --c-border: #1E2A44;
+  --c-border-subtle: #19243B;
+  --c-border-strong: #2A3B5E;
+  --c-border-brand: rgba(96, 165, 250, 0.38);
+  --c-scrim: rgba(2, 6, 23, 0.68);
+  --c-header-glass: rgba(17, 26, 46, 0.88);
+  --c-shimmer-beam: rgba(255, 255, 255, 0.26);
+  --c-ripple-on-primary: rgba(255, 255, 255, 0.34);
+  --c-ripple-on-surface: rgba(96, 165, 250, 0.20);
+
+  --c-atelier-bg: #14284D;
+  --c-atelier-border: rgba(96, 165, 250, 0.22);
+  --c-atelier-ink: #E5E7EB;
+  --c-atelier-sub: #9AA7B8;
+  --c-atelier-card: rgba(255, 255, 255, 0.05);
+
+  --c-skeleton-base: #182540;
+  --c-skeleton-shine: rgba(255, 255, 255, 0.08);
+
+  --shadow-card: 0 10px 30px rgba(2, 6, 23, 0.42);
+  --shadow-card-hover: 0 16px 38px rgba(2, 6, 23, 0.56), 0 0 0 1px rgba(96, 165, 250, 0.18);
+  --shadow-cta: 0 8px 22px rgba(37, 99, 235, 0.38);
+  --shadow-cta-hover: 0 12px 30px rgba(37, 99, 235, 0.52), 0 0 0 4px rgba(96, 165, 250, 0.18);
+  --shadow-popover: 0 18px 44px rgba(2, 6, 23, 0.65);
+  --shadow-subtle: 0 1px 4px rgba(2, 6, 23, 0.45);
+  --shadow-thumb: 0 1px 4px rgba(2, 6, 23, 0.55);
+  --focus-ring: 0 0 0 4px rgba(96, 165, 250, 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-normal: 0ms;
+    --dur-slow: 0ms;
+    --dur-shimmer: 0ms;
+    --dur-ripple: 0ms;
+  }
+}

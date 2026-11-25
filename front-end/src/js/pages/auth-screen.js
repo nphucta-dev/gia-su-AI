@@ -1,6 +1,6 @@
 import { getSession, login, previewAvailable, startPreview, setLoginHint, takeLoginHint } from '../session.js';
 import { api } from '../api.js';
-import { el, button } from '../components/ui.js';
+import { el, button, setButtonState } from '../components/ui.js';
 import { authTemplates } from './auth-templates.js';
 
 export function renderAccountScreen(register = false) {
@@ -159,9 +159,8 @@ export function renderAccountScreen(register = false) {
       const register = form.dataset.authForm === 'register';
       const submit = form.querySelector('[type="submit"]');
       const label = submit.textContent;
-      submit.disabled = true;
       form.setAttribute('aria-busy', 'true');
-      submit.textContent = register ? 'Đang tạo tài khoản…' : 'Đang đăng nhập…';
+      setButtonState(submit, 'loading', { label: register ? 'Đang tạo tài khoản…' : 'Đang đăng nhập…' });
       message.classList.remove('is-error');
       message.textContent = register ? 'Đang tạo tài khoản…' : 'Đang xác thực tài khoản…';
       try {
@@ -192,8 +191,7 @@ export function renderAccountScreen(register = false) {
         }
         message.focus({preventScroll:true});
       } finally {
-        submit.disabled = false;
-        submit.textContent = label;
+        setButtonState(submit, 'idle', { label });
         form.removeAttribute('aria-busy');
       }
     });

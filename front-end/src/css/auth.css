@@ -1,121 +1,346 @@
+/* ==========================================================================
+   GIA SƯ AI — AUTHENTICATION SCREEN ("Xanh dương nhẹ" / Soft Clean Blue)
+   100% Token-driven from src/css/tokens.css — zero local hex/rgba or extra fonts
+   ========================================================================== */
 
 .account-screen {
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
-  --color-primary-soft: #eef2ff;
-  --color-canvas: #f8fafc;
-  --color-surface: #ffffff;
-  --color-text: #0f172a;
-  --color-muted: #475569;
-  --color-border: #cbd5e1;
-  --color-border-soft: #e2e8f0;
-  --color-error: #b42318;
-  --color-error-soft: #fff4f2;
-  --color-success: #116149;
-  --color-success-soft: #ecfdf5;
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
-  --radius-sm: 0.625rem;
-  --radius-md: 1rem;
-  --radius-lg: 1.5rem;
-  --shadow-card: 0 24px 70px rgba(30, 41, 59, 0.09);
-  font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  color: var(--color-text);
-  background: var(--color-canvas);
+  position: relative;
+  font-family: var(--font-sans);
+  color: var(--c-ink);
+  background: transparent;
   font-synthesis: none;
 }
+
 .account-screen * { box-sizing: border-box; }
-.account-screen html { min-width: 20rem; }
-.account-screen body { min-height: 100vh; margin: 0; display: flex; flex-direction: column; background: var(--color-canvas); line-height: 1.5; }
+.account-screen [hidden] { display: none !important; }
 .account-screen button, .account-screen input { font: inherit; }
-.account-screen a { color: var(--color-primary-hover); text-underline-offset: 0.2em; }
+.account-screen a { color: var(--c-link); text-underline-offset: 0.2em; }
+.account-screen a:hover { color: var(--c-primary-hover); }
 .account-screen button, .account-screen a, .account-screen input { touch-action: manipulation; }
-.account-screen :focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
-.account-screen ::selection { color: var(--color-text); background: #c7d2fe; }
-.account-screen .skip-link { position: fixed; top: var(--space-3); left: var(--space-3); z-index: 20; padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); color: white; background: var(--color-text); transform: translateY(-180%); }
-.account-screen .skip-link:focus { transform: translateY(0); }
-.account-screen .site-header { border-bottom: 1px solid var(--color-border-soft); background: rgba(255, 255, 255, 0.95); }
-.account-screen .header-inner { width: min(100% - 2rem, 76rem); min-height: 4.5rem; margin-inline: auto; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
-.account-screen .brand { min-height: 2.75rem; display: inline-flex; align-items: center; gap: var(--space-3); color: var(--color-text); font-size: 1.125rem; font-weight: 750; text-decoration: none; }
-.account-screen .brand-mark { width: 2.25rem; height: 2.25rem; display: grid; place-items: center; border-radius: 0.75rem; color: white; background: var(--color-primary); }
-.account-screen .brand-mark svg { width: 1.25rem; height: 1.25rem; fill: currentColor; }
-.account-screen .header-note { display: none; color: var(--color-muted); font-size: 0.875rem; }
-.account-screen .auth-layout { width: min(100% - 2rem, 76rem); margin-inline: auto; padding-block: var(--space-6) var(--space-10); display: grid; gap: var(--space-8); flex: 1; align-items: center; }
-.account-screen .auth-card { min-width: 0; padding: var(--space-6); border: 1px solid var(--color-border-soft); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-card); }
-.account-screen .auth-tabs { display: flex; gap: var(--space-2); margin-bottom: var(--space-6); border-bottom: 1px solid var(--color-border-soft); }
-.account-screen .auth-tab { min-width: 6.5rem; min-height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; padding-inline: var(--space-3); border-bottom: 3px solid transparent; color: var(--color-muted); font-size: 0.9375rem; font-weight: 700; text-decoration: none; }
-.account-screen .auth-tab:hover { color: var(--color-primary-hover); background: var(--color-primary-soft); }
-.account-screen .auth-tab.is-active { color: var(--color-primary-hover); border-bottom-color: var(--color-primary); }
-.account-screen .card-heading { margin-bottom: var(--space-6); }
-.account-screen .eyebrow, .account-screen .intro-label { margin: 0 0 var(--space-2); color: var(--color-primary-hover); font-size: 0.8125rem; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; }
-.account-screen .card-heading h1 { margin: 0 0 var(--space-2); font-size: clamp(1.75rem, 7vw, 2.25rem); line-height: 1.2; letter-spacing: -0.025em; }
-.account-screen .card-heading p:last-child { margin: 0; color: var(--color-muted); }
-.account-screen .auth-form { display: grid; gap: var(--space-5); }
-.account-screen .form-field { min-width: 0; display: grid; gap: var(--space-2); }
-.account-screen .form-field label, .account-screen .consent-field label { color: var(--color-text); font-size: 0.9375rem; font-weight: 700; }
-.account-screen input:not([type="checkbox"]) { width: 100%; min-height: 3rem; padding: 0.6875rem 0.875rem; border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text); background: var(--color-surface); font-size: 1rem; transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease; }
-.account-screen input:not([type="checkbox"]):hover { border-color: #94a3b8; }
-.account-screen input:not([type="checkbox"]):focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14); outline: none; }
-.account-screen input[aria-invalid="true"]:not([type="checkbox"]) { border-color: var(--color-error); background: var(--color-error-soft); }
-.account-screen input::placeholder { color: #64748b; opacity: 1; }
+.account-screen :focus-visible { outline: 3px solid var(--c-link); outline-offset: 3px; }
+.account-screen ::selection { background: var(--c-primary-soft); color: var(--c-ink); }
+
+.account-screen .auth-layout {
+  width: 100%;
+  margin-inline: auto;
+  padding-block: 0 var(--sp-8);
+  display: grid;
+  gap: var(--sp-8);
+  align-items: stretch;
+}
+
+.account-screen .auth-card {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding: var(--sp-6);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-card);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.account-screen .auth-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: var(--sp-6);
+  padding: 5px;
+  border-radius: var(--r-pill);
+  background: var(--c-surface-soft);
+  border: 1px solid var(--c-border);
+}
+
+.account-screen .auth-tab {
+  flex: 1;
+  min-height: var(--control-min-h);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: var(--sp-3);
+  border-radius: var(--r-pill);
+  border-bottom: 0;
+  color: var(--c-sub);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-natural),
+    color var(--dur-fast) var(--ease-natural),
+    box-shadow var(--dur-fast) var(--ease-natural);
+}
+.account-screen .auth-tab:hover { color: var(--c-ink); }
+.account-screen .auth-tab.is-active {
+  color: var(--c-primary-ink);
+  background: var(--c-surface);
+  font-weight: 700;
+  box-shadow: var(--shadow-subtle);
+}
+.account-screen .auth-tabs.has-glider .auth-tab.is-active {
+  background: transparent;
+  box-shadow: none;
+}
+
+.account-screen .card-heading { margin-bottom: var(--sp-6); }
+
+.account-screen .eyebrow,
+.account-screen .intro-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--sp-3);
+  padding: 5px 13px;
+  border-radius: var(--r-pill);
+  background: var(--c-primary-soft);
+  color: var(--c-primary-ink);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.account-screen .intro-label {
+  background: var(--c-atelier-card);
+  border: 1px solid var(--c-atelier-border);
+  color: var(--c-atelier-ink);
+}
+
+.account-screen .card-heading h1 {
+  margin: 0 0 var(--sp-2);
+  font-family: var(--font-sans);
+  font-size: clamp(1.75rem, 5.5vw, 2.15rem);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.025em;
+}
+.account-screen .card-heading p:last-child {
+  margin: 0;
+  color: var(--c-sub);
+  font-size: 0.9375rem;
+}
+
+.account-screen .auth-form { display: grid; gap: var(--sp-5); }
+.account-screen .form-field { min-width: 0; display: grid; gap: var(--sp-2); }
+.account-screen .form-field label,
+.account-screen .consent-field label {
+  color: var(--c-ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.account-screen input:not([type="checkbox"]) {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.6875rem 0.95rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  color: var(--c-ink);
+  background: var(--c-surface);
+  font-size: 1rem;
+  transition:
+    border-color var(--dur-fast) var(--ease-natural),
+    box-shadow var(--dur-fast) var(--ease-natural),
+    background-color var(--dur-fast) var(--ease-natural);
+}
+.account-screen input:not([type="checkbox"]):hover { border-color: var(--c-border-strong); }
+.account-screen input:not([type="checkbox"]):focus {
+  border-color: var(--c-primary);
+  background: var(--c-surface);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+.account-screen input[aria-invalid="true"]:not([type="checkbox"]) {
+  border-color: var(--c-danger);
+  background: var(--c-danger-soft);
+}
+.account-screen input::placeholder { color: var(--c-sub-light); opacity: 1; }
+
 .account-screen .password-field { position: relative; min-width: 0; }
-.account-screen .password-field input { padding-right: 5rem; }
-.account-screen .password-toggle { position: absolute; top: 0.25rem; right: 0.25rem; min-width: 4.25rem; min-height: 2.5rem; padding-inline: var(--space-3); border: 0; border-radius: 0.5rem; color: var(--color-primary-hover); background: transparent; font-size: 0.875rem; font-weight: 750; cursor: pointer; }
-.account-screen .password-toggle:hover { background: var(--color-primary-soft); }
-.account-screen .password-toggle:active { transform: translateY(1px); }
-.account-screen .field-hint, .account-screen .field-error { margin: 0; overflow-wrap: anywhere; font-size: 0.8125rem; }
-.account-screen .field-hint { color: var(--color-muted); }
-.account-screen .field-error { min-height: 0; color: var(--color-error); font-weight: 600; }
+.account-screen .password-field input { padding-right: 5.25rem; }
+.account-screen .password-toggle {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  min-width: 4.25rem;
+  min-height: var(--control-min-h);
+  padding-inline: var(--sp-3);
+  border: 0;
+  border-radius: var(--r-pill);
+  color: var(--c-link);
+  background: transparent;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-natural), color var(--dur-fast) var(--ease-natural);
+}
+.account-screen .password-toggle:hover { background: var(--c-primary-soft); }
+
+.account-screen .field-hint,
+.account-screen .field-error {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
+}
+.account-screen .field-hint { color: var(--c-sub); }
+.account-screen .field-error { color: var(--c-danger-ink); font-weight: 600; }
 .account-screen .field-error:empty { display: none; }
-.account-screen .consent-field { display: grid; grid-template-columns: 1.375rem minmax(0, 1fr); gap: var(--space-3); align-items: start; }
-.account-screen .consent-field input { width: 1.25rem; height: 1.25rem; margin: 0.125rem 0 0; accent-color: var(--color-primary); }
-.account-screen .consent-field:has(input[aria-invalid="true"]) { padding: var(--space-3); border-radius: var(--radius-sm); background: var(--color-error-soft); }
-.account-screen .consent-field .field-error { margin-top: var(--space-1); }
-.account-screen .primary-button { width: 100%; min-height: 3rem; padding: var(--space-3) var(--space-5); border: 1px solid var(--color-primary); border-radius: var(--radius-sm); color: white; background: var(--color-primary); font-weight: 750; cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease; }
-.account-screen .primary-button:hover { border-color: var(--color-primary-hover); background: var(--color-primary-hover); }
-.account-screen .primary-button:active { transform: translateY(1px); }
-.account-screen .primary-button:disabled { cursor: not-allowed; opacity: 0.55; transform: none; }
+
+.account-screen .consent-field {
+  display: grid;
+  grid-template-columns: 1.375rem minmax(0, 1fr);
+  gap: var(--sp-3);
+  align-items: start;
+}
+.account-screen .consent-field input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--c-primary);
+}
+.account-screen .consent-field:has(input[aria-invalid="true"]) {
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--c-danger-soft);
+}
+.account-screen .consent-field .field-error { margin-top: var(--sp-1); }
+
+.account-screen .primary-button {
+  width: 100%;
+  min-height: 3.125rem;
+  padding: var(--sp-3) var(--sp-5);
+  border: 0;
+  border-radius: var(--r-pill);
+  color: var(--c-primary-on);
+  background: var(--c-primary);
+  box-shadow: var(--shadow-cta);
+  font-size: 0.95rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.account-screen .primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+  box-shadow: none;
+}
+
 .account-screen .form-message:empty { display: none; }
-.account-screen .form-message:not(:empty) { padding: var(--space-3) var(--space-4); border: 1px solid #a7f3d0; border-radius: var(--radius-sm); color: var(--color-success); background: var(--color-success-soft); font-size: 0.875rem; font-weight: 650; overflow-wrap: anywhere; }
-.account-screen .form-message.is-error { border-color: #fda29b; color: var(--color-error); background: var(--color-error-soft); }
-.account-screen .account-switch { margin: var(--space-6) 0 0; color: var(--color-muted); font-size: 0.9375rem; text-align: center; }
-.account-screen .account-switch a { font-weight: 750; }
-.account-screen .product-intro { min-width: 0; padding: var(--space-2); }
-.account-screen .product-intro h2 { max-width: 12ch; margin: 0 0 var(--space-5); font-size: clamp(2.25rem, 5vw, 4rem); line-height: 1.08; letter-spacing: -0.045em; }
-.account-screen .product-intro > p:not(.intro-label) { max-width: 34rem; margin: 0; color: var(--color-muted); font-size: 1.0625rem; }
-.account-screen .learning-points { margin: var(--space-8) 0 0; padding: 0; display: grid; gap: var(--space-3); list-style: none; }
-.account-screen .learning-points li { display: flex; align-items: center; gap: var(--space-3); color: var(--color-text); font-weight: 650; }
-.account-screen .learning-points span { width: 2.25rem; height: 2.25rem; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; color: var(--color-primary-hover); background: var(--color-primary-soft); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
-.account-screen .site-footer { width: min(100% - 2rem, 76rem); min-height: 4.5rem; margin-inline: auto; padding-block: var(--space-4); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); border-top: 1px solid var(--color-border-soft); color: var(--color-muted); font-size: 0.8125rem; }
+.account-screen .form-message:not(:empty) {
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--c-success-border);
+  border-radius: var(--r-md);
+  color: var(--c-success-ink);
+  background: var(--c-success-soft);
+  font-size: 0.875rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.account-screen .form-message.is-error {
+  border-color: var(--c-danger-border);
+  color: var(--c-danger-ink);
+  background: var(--c-danger-soft);
+}
+
+.account-screen .account-switch {
+  margin: var(--sp-6) 0 0;
+  color: var(--c-sub);
+  font-size: 0.9375rem;
+  text-align: center;
+}
+.account-screen .account-switch a { font-weight: 700; }
+
+/* Left Socratic Blue Feature Column */
+.account-screen .product-intro {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: var(--sp-8);
+  border-radius: var(--r-card);
+  background: var(--c-atelier-bg);
+  border: 1px solid var(--c-atelier-border);
+  color: var(--c-atelier-ink);
+  box-shadow: var(--shadow-card);
+}
+.account-screen .product-intro h2 {
+  max-width: 13ch;
+  margin: 0 0 var(--sp-4);
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 3.8vw, 3rem);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.028em;
+  color: var(--c-atelier-ink);
+}
+.account-screen .product-intro > p:not(.intro-label) {
+  max-width: 34rem;
+  margin: 0;
+  color: var(--c-atelier-sub);
+  font-size: 1rem;
+}
+
+.account-screen .learning-points {
+  margin: var(--sp-8) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  list-style: none;
+}
+.account-screen .learning-points li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--c-atelier-card);
+  border: 1px solid var(--c-atelier-border);
+  color: var(--c-atelier-ink);
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+.account-screen .learning-points span {
+  width: 2.15rem;
+  height: 2.15rem;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: var(--r-pill);
+  color: var(--c-primary-on);
+  border: 1px solid var(--c-atelier-border);
+  background: var(--c-primary);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.account-screen .preview-login {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--c-border);
+}
+.account-screen .preview-login h2 { font-size: 18px; margin-bottom: 6px; }
+.account-screen .preview-login p { color: var(--c-sub); font-size: 13px; margin-bottom: 14px; }
+.account-screen .preview-login .button { min-height: var(--control-min-h); white-space: normal; }
+
 @media (max-width: 47.99rem) {
-.account-screen .auth-layout { align-items: start; }
-.account-screen .product-intro { padding-top: 0; }
-.account-screen .product-intro .learning-points { display: none; }
-.account-screen .product-intro h2 { max-width: 18ch; font-size: 1.75rem; }
-.account-screen .auth-layout--login .product-intro { display: none; }
+  .account-screen .auth-layout { align-items: start; }
+  .account-screen .product-intro { padding: var(--sp-5); }
+  .account-screen .product-intro .learning-points { display: none; }
+  .account-screen .product-intro h2 { max-width: 18ch; font-size: 1.65rem; }
+  .account-screen .auth-layout--login .product-intro { display: none; }
 }
+
 @media (min-width: 48rem) {
-.account-screen .header-note { display: inline; }
-.account-screen .auth-layout { min-height: calc(100vh - 9rem); padding-block: var(--space-10); grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.88fr); gap: clamp(3rem, 7vw, 7rem); }
-.account-screen .auth-card { grid-column: 2; padding: var(--space-8); }
-.account-screen .product-intro { grid-column: 1; grid-row: 1; }
+  .account-screen .auth-layout {
+    padding-block: var(--sp-4) var(--sp-8);
+    grid-template-columns: minmax(0, 1.02fr) minmax(22rem, 0.95fr);
+    gap: clamp(1.75rem, 4.5vw, 3.5rem);
+  }
+  .account-screen .auth-card { grid-column: 2; padding: var(--sp-8); }
+  .account-screen .product-intro { grid-column: 1; grid-row: 1; }
 }
-@media (min-width: 70rem) {
-.account-screen .auth-layout--register .auth-card { padding: var(--space-8) var(--space-10); }
-}
-@media (prefers-reduced-motion: reduce) {
-.account-screen *, .account-screen *::before, .account-screen *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
-}
-
-.account-screen .auth-layout{width:100%;padding-top:0;min-height:0;}
-.account-screen .auth-layout--login .password-toggle { top: 2px; min-height: 44px; }
-.account-screen [hidden]{display:none!important;}
-
-.account-screen .preview-login{margin-top:24px;padding-top:24px;border-top:1px solid var(--color-border-soft)}.account-screen .preview-login h2{font-size:18px;margin-bottom:8px}.account-screen .preview-login p{color:var(--color-muted);font-size:14px;margin-bottom:16px}.account-screen .preview-login .button{min-height:44px;white-space:normal}

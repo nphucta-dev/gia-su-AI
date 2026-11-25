@@ -1,8 +1,9 @@
 import { getAccessToken, getSession, onSessionCleared } from '../session.js';
 import { api } from '../api.js';
 import { invalidateCatalog } from '../catalog.js';
-import { el, button, heading, panel, field, badge, notice, toast } from '../components/ui.js';
+import { el, button, heading, panel, field, badge, notice, toast, setButtonState } from '../components/ui.js';
 import { setupValidation, validateFields, showServerErrors } from '../components/validation.js';
+import { skeletonState } from '../components/motion.js';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['application/pdf', 'text/plain'];
@@ -74,14 +75,14 @@ export function renderAdmin() {
     }));
     if (active === 'documents') {
       if (!documentsReady) {
-        content.replaceChildren(el('p', {role:'status'}, 'Đang tải tài liệu và chủ đề…'));
+        content.replaceChildren(skeletonState('Đang tải tài liệu và chủ đề…', 'list'));
         return;
       }
       return uploadOpen ? drawUpload() : drawDocuments();
     }
     if (preview) drawCatalog();
     else if (catalogReady) drawLiveCatalog();
-    else content.replaceChildren(el('p', {role:'status'}, 'Đang tải môn học và chủ đề…'));
+    else content.replaceChildren(skeletonState('Đang tải môn học và chủ đề…', 'list'));
   }
 
   function currentPage() {
@@ -489,8 +490,8 @@ export function renderAdmin() {
       data.append('title', title.value.trim());
       uploadPending = true;
       form.setAttribute('aria-busy', 'true');
-      for (const control of [subject,topic,title,file,submit,cancel]) control.disabled = true;
-      submit.textContent = 'Đang tải và xử lý…';
+      for (const control of [subject,topic,title,file,cancel]) control.disabled = true;
+      setButtonState(submit, 'loading', { label: 'Đang tải và xử lý…' });
       message.replaceChildren(el('p', {}, 'Đang lưu tệp, trích xuất văn bản và chia đoạn…'));
       try {
         const result = await api('/admin/documents', {method:'POST', body:data});
@@ -510,8 +511,8 @@ export function renderAdmin() {
       } finally {
         uploadPending = false;
         form.removeAttribute('aria-busy');
-        for (const control of [subject,topic,title,file,submit,cancel]) control.disabled = false;
-        submit.textContent = 'Tải lên';
+        for (const control of [subject,topic,title,file,cancel]) control.disabled = false;
+        setButtonState(submit, 'idle', { label: 'Tải lên' });
       }
     });
     content.replaceChildren(el('div', { className: 'admin-upload-view' }, el('div', { className: 'upload-page-heading' }, button('←  Tài liệu nguồn', closeUpload, 'upload-back'), el('h2', {}, 'Thêm tài liệu nguồn'), el('p', {}, 'PDF có văn bản hoặc TXT, gắn với đúng chủ đề.')), panel('', form), !uploadSubjects.length ? notice('Chưa có môn học và chủ đề đang hoạt động để tải tài liệu.', 'warning') : null, el('p', { className: 'upload-process-note' }, liveDocuments ? 'Tệp được xử lý ngay sau khi lưu. Trạng thái Sẵn sàng và số đoạn văn bản sẽ xuất hiện khi hoàn tất; tệp lỗi có thể xử lý lại.' : 'Bản xem trước chỉ thêm tên tệp và trạng thái chờ minh họa. Không upload hoặc xử lý nội dung tệp.')));

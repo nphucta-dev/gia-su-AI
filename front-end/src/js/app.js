@@ -9,6 +9,7 @@ import { el, heading, link, notice, button } from './components/ui.js';
 import { api } from './api.js';
 import { setCurrentUser, loginDestination } from './session.js';
 import { renderLearningDocuments } from './pages/learning-documents.js';
+import { initThemeToggle, enhancePageMotion } from './components/motion.js';
 
 const routes = { intro: renderIntro, history: renderHistory, home: renderHome, chat: renderChat, practice: renderPractice, results: renderResults, dashboard: renderDashboard, profile: renderProfile, admin: renderAdmin, login: () => renderAuth(false), register: () => renderAuth(true) };
 const titles = { intro: 'Giới thiệu', history: 'Lịch sử học tập', home: 'Trang học', chat: 'Hỏi gia sư', practice: 'Luyện tập', results: 'Kết quả', dashboard: 'Tiến độ', profile: 'Hồ sơ', admin: 'Quản trị', login: 'Đăng nhập', register: 'Đăng ký' };
@@ -17,6 +18,7 @@ titles.documents = 'Tài liệu học tập';
 const protectedRoutes = new Set(['home', 'chat', 'practice', 'results', 'dashboard', 'profile', 'history', 'admin', 'documents']);
 const menu = document.querySelector('.mobile-menu-button');
 const accountMenu = document.querySelector('.account-menu');
+initThemeToggle(document.querySelector('#theme-toggle'));
 let renderVersion = 0;
 accountMenu.addEventListener('click', e => { if(e.target.closest('a, button')) accountMenu.open = false; });
 document.addEventListener('click', e => { if(!accountMenu.contains(e.target)) accountMenu.open = false; });
@@ -177,6 +179,7 @@ async function render() {
  document.querySelector('#toast-region').replaceChildren();
  accountMenu.open = false;
  main.replaceChildren(routes[route] ? routes[route]() : el('div', {}, heading('Không tìm thấy trang', 'Đường dẫn này chưa có trong bản giao diện.'), link('Về trang học', '#home')));
+ enhancePageMotion(main);
  document.title = `${titles[route] || 'Không tìm thấy'} · Gia Sư AI`;
 
  setNavigationOpen(false);
