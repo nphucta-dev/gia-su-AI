@@ -336,3 +336,35 @@ async def test_missing_repository_and_database_errors_return_safe_503(tmp_path):
         detail_resp = await state.client.get(f"{ROOT}/{state.doc_txt.id}")
         assert detail_resp.status_code == 503
         assert "secret:pass" not in detail_resp.text
+
+
+async def test_demo_document_file_falls_back_to_bundled_demo_directory_when_upload_dir_empty(tmp_path):
+    async with api(tmp_path) as state:
+        demo_doc = await seed_document(
+            state.repository,
+            state.storage,
+            topic_id=1,
+            title="Phương trình bậc hai (demo)",
+            filename="demo-toan_phuong_trinh_bac_hai.txt",
+            file_bytes=None,
+            chunks=["Phương trình bậc hai có dạng ax^2 + bx + c = 0."],
+            active=True,
+        )
+        file_resp = await state.client.get(f"{ROOT}/{demo_doc.id}/file")
+        assert file_resp.status_code == 200, file_resp.text
+        assert file_resp.headers["content-type"].startswith("text/plain")
+        assert len(file_resp.text.strip()) > 0
+
+        # Chống path traversal kể cả khi có tiền tố demo-.
+        traversal_doc = await seed_document(
+            state.repository,
+            state.storage,
+            topic_id=1,
+            title="Traversal demo",
+            filename="demo-../seed.py",
+            file_bytes=None,
+            chunks=["Nội dung"],
+            active=True,
+        )
+        blocked = await state.client.get(f"{ROOT}/{traversal_doc.id}/file")
+        assert blocked.status_code == 404

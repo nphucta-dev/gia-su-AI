@@ -29,6 +29,7 @@ _FILE_TYPES: dict[str, tuple[Literal["pdf", "txt"], str]] = {
     ".pdf": ("pdf", "application/pdf"),
     ".txt": ("txt", "text/plain; charset=utf-8"),
 }
+_DEMO_DOCUMENT_DIR = (Path(__file__).resolve().parents[1] / "db" / "demo_documents").resolve()
 
 
 @dataclass(frozen=True)
@@ -106,14 +107,25 @@ class LearningDocumentService:
             return None
         candidate = self.upload_dir / relative
         try:
-            if candidate.is_symlink():
-                return None
-            resolved = candidate.resolve()
-            if resolved.parent != self.upload_dir or not resolved.is_file():
-                return None
-            return resolved
+            if not candidate.is_symlink():
+                resolved = candidate.resolve()
+                if resolved.parent == self.upload_dir and resolved.is_file():
+                    return resolved
         except OSError:
-            return None
+            pass
+        if file_path.startswith("demo-") and relative.suffix.lower() == ".txt":
+            demo_name = file_path.removeprefix("demo-")
+            demo_relative = Path(demo_name)
+            if demo_name and not demo_relative.is_absolute() and demo_relative.name == demo_name:
+                demo_candidate = _DEMO_DOCUMENT_DIR / demo_relative
+                try:
+                    if not demo_candidate.is_symlink():
+                        demo_resolved = demo_candidate.resolve()
+                        if demo_resolved.parent == _DEMO_DOCUMENT_DIR and demo_resolved.is_file():
+                            return demo_resolved
+                except OSError:
+                    return None
+        return None
 
     def _resolve_file(self, record: LearningDocumentRecord) -> ResolvedDocumentFile:
         resolved = self._safe_file_path(record.file_path)

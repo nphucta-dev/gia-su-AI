@@ -1445,6 +1445,8 @@ input[type="radio"] { accent-color: var(--c-primary); width: 18px; height: 18px;
 .learning-documents-layout { display: grid; gap: 22px; grid-template-columns: minmax(0, 1fr); align-items: start; }
 .learning-documents-layout > *, .learning-document-link > * { min-width: 0; }
 .learning-document-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.learning-document-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
+.learning-document-pagination[hidden] { display: none; }
 .learning-document-link {
   display: grid;
   gap: 8px;
