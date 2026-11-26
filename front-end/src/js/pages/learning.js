@@ -1,10 +1,9 @@
 import { el, link, heading, panel, badge, button, notice, field, inputControl, progress as progressBar } from '../components/ui.js';
 import { icon } from '../components/icons.js';
 import { skeletonState } from '../components/motion.js';
-import { topics } from '../data.js';            // Chỉ dùng cho dashboard preview.
 import { loadCatalog } from '../catalog.js';
 import { getSession } from '../session.js';
-import { renderLiveDashboard } from './dashboard.js';
+import { accountView, activityRow, formatScore, loadDashboard } from '../account-data.js';
 
 export function renderHome() {
   const search = inputControl({ type: 'search', placeholder: 'Tìm chủ đề học tập…', 'aria-label': 'Tìm chủ đề' });
@@ -115,40 +114,73 @@ export function renderHome() {
 }
 
 function topicProgress(topic) {
-  return progressBar(topic.progress, 100, { label: topic.name, valueText: `${topic.progress}%`, className: 'progress-row' });
+  const label = topic.subjectName ? `${topic.subjectName} · ${topic.name}` : topic.name;
+  return progressBar(topic.masteryPercent, 100, { label, valueText: `${formatScore(topic.masteryPercent)}%`, className: 'progress-row' });
 }
 
 export function renderDashboard() {
-  if (getSession().reason !== 'preview') return renderLiveDashboard();
-  const preview = renderPreviewDashboard();
-  preview.prepend(notice('Dữ liệu minh họa — chưa kết nối tài khoản thật.', 'warning'));
-  return preview;
-}
+  const content = el('div', { role: 'status', 'aria-live': 'polite' });
+  const root = el('div', { className: 'dashboard-page' }, heading('Tổng quan học tập', 'Kết quả và tiến độ được lưu cho tài khoản của bạn.'), content);
+  const view = accountView(root);
+  let pending = false;
 
-function renderPreviewDashboard() {
-  const cards = [
-    ['08', 'Bài đã hoàn thành', 'check', ''],
-    ['82%', 'Điểm trung bình', 'trophy', 'warm'],
-    ['12', 'Phiên trò chuyện', 'message', 'violet'],
-    ['03', 'Chủ đề đã học', 'book', ''],
-  ];
-  return el(
-    'div',
-    {},
-    heading('Tổng quan học tập', 'Nhìn lại kết quả và chọn kiến thức cần ôn tiếp.'),
-    el('div', { className: 'stats-grid' }, ...cards.map(([n, label, ic, tone]) => el(
-      'div',
-      { className: 'stat' },
-      el('div', { className: `stat-icon-chip ${tone}`.trim() }, icon(ic, { size: 20 })),
-      el('div', { className: 'stat-value' }, n),
-      el('p', {}, label),
-    ))),
-    el(
-      'div',
-      { className: 'grid-2 section-gap' },
-      panel('Tiến độ theo chủ đề', el('div', { className: 'stack' }, ...topics.map(topicProgress))),
-      panel('Chủ đề cần ôn', el('p', { className: 'helper' }, 'Ưu tiên những chủ đề có mức thành thạo dưới 60%.'), ...topics.filter(t => t.progress < 60).map(t => el('div', { className: 'activity-row' }, el('strong', {}, t.name), link('Ôn tập', '#practice', 'button secondary small')))),
-    ),
-    panel('Hoạt động gần đây', el('div', { className: 'activity-list' }, ...[['Phương trình bậc hai', 'Luyện tập · 80 điểm', 'Hôm nay'], ['Hàm số và đồ thị', 'Hội thoại · 6 tin nhắn', 'Hôm qua']].map(([name, desc, date]) => el('div', { className: 'activity-row' }, el('div', {}, el('strong', {}, name), el('p', { className: 'helper' }, desc)), el('span', { className: 'helper' }, date))))),
-  );
+  async function load() {
+    if (pending || !view.current()) return;
+    pending = true; root.setAttribute('aria-busy', 'true');
+    content.replaceChildren(skeletonState('Đang tải số liệu học tập…', 'kpi'));
+    try {
+      const data = await loadDashboard({ signal: view.signal });
+      if (!view.current()) return;
+      const { stats } = data;
+      const cards = [
+        [String(stats.totalQuizzes), 'Bài đã hoàn thành', 'check', ''],
+        [`${formatScore(stats.averageScore)}%`, 'Điểm trung bình', 'trophy', 'warm'],
+        [String(stats.totalChatSessions), 'Phiên trò chuyện', 'message', 'violet'],
+        [String(data.progress.length), 'Chủ đề đã học', 'book', ''],
+      ];
+      const empty = text => el('div', { className: 'empty-state', role: 'status' }, icon('inbox', { size: 24 }), el('p', {}, text));
+      content.replaceChildren(
+        el('section', { className: 'stats-grid', 'aria-label': 'Thống kê học tập' }, ...cards.map(([value, label, ic, tone], idx) => el(
+          'div',
+          { className: 'stat stagger-item', style: `--stagger-i:${idx}` },
+          el('div', { className: `stat-icon-chip ${tone}`.trim() }, icon(ic, { size: 20 })),
+          el('div', { className: 'stat-value num-enter' }, value),
+          el('p', {}, label),
+        ))),
+        el(
+          'div',
+          { className: 'grid-2 section-gap' },
+          panel('Tiến độ theo chủ đề', data.progress.length ? el('div', { className: 'stack' }, ...data.progress.map(topicProgress)) : empty('Bạn chưa có kết quả luyện tập.')),
+          panel('Chủ đề cần ôn', data.review.length ? el('div', { className: 'stack' }, ...data.review.map(topic => el(
+            'div',
+            { className: 'activity-row' },
+            el('div', {}, el('strong', {}, topic.name), el('p', { className: 'helper' }, `${formatScore(topic.masteryPercent)}% thành thạo`)),
+            link('Ôn tập', `#practice?topic=${topic.topicId}`, 'button secondary small'),
+          ))) : empty('Chưa có chủ đề cần ôn.')),
+        ),
+        panel(
+          'Hoạt động gần đây',
+          data.records.length ? el('div', { className: 'activity-list' }, ...data.records.slice(0, 5).map(activityRow)) : empty('Bạn chưa có hoạt động học tập.'),
+          link('Xem toàn bộ lịch sử', '#history', 'button ghost small', { trailingIcon: 'arrowRight' }),
+        ),
+      );
+    } catch (error) {
+      if (error.name !== 'AbortError' && view.current()) {
+        content.replaceChildren(notice(error.message || 'Chưa thể tải số liệu học tập.', 'error'), button('Tải lại số liệu', load, 'primary'));
+      }
+    } finally {
+      pending = false;
+      if (view.current()) root.removeAttribute('aria-busy');
+    }
+  }
+
+  queueMicrotask(() => {
+    if (!view.current()) return;
+    if (getSession().reason === 'preview') {
+      content.replaceChildren(notice('Đăng nhập tài khoản thật để xem số liệu học tập.', 'warning'), link('Đăng nhập', '#login'));
+    } else {
+      load();
+    }
+  });
+  return root;
 }

@@ -89,9 +89,17 @@ def _seed_documents(db: Session, topics: dict, documents: list[dict], upload_dir
             existing = db.scalar(select(Document).where(
                 Document.topic_id == topics[source["key"]], Document.file_path == storage_name,
             ))
-            if existing is not None:
-                continue
             destination = upload_dir / storage_name
+            if existing is not None:
+                if not destination.exists() and not destination.is_symlink():
+                    upload_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    try:
+                        with destination.open("xb") as output:
+                            created_files.append(destination)
+                            output.write(source["payload"])
+                    except FileExistsError:
+                        pass
+                continue
             upload_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
             try:
                 with destination.open("xb") as output:

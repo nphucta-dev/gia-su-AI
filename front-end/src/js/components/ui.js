@@ -111,9 +111,9 @@ export function field(label, input, hintText = '') {
   );
 }
 
-export function inputControl({ kind = 'input', className = '', ...attrs } = {}) {
+export function inputControl({ kind = 'input', className = '', ...attrs } = {}, ...children) {
   const baseClass = kind === 'select' ? 'select' : kind === 'textarea' ? 'textarea' : 'input';
-  return el(kind, { className: `${baseClass} ${className}`.trim(), ...attrs });
+  return el(kind, { className: `${baseClass} ${className}`.trim(), ...attrs }, ...children);
 }
 
 /* 6. Toast (Fade + Scale + Slide Enter & Exit) */

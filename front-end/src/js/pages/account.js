@@ -4,6 +4,7 @@ import { el, button, link, heading, panel, field, badge, notice, toast, avatar, 
 import { setupValidation, validateFields, showServerErrors } from '../components/validation.js';
 import { skeletonState } from '../components/motion.js';
 import { renderAccountScreen } from './auth-screen.js';
+import { accountView, activityRow, loadActivity } from '../account-data.js';
 
 export function renderAuth(register = false) {
   return renderAccountScreen(register);
@@ -18,9 +19,10 @@ export function renderProfile() {
   const root = el('div', { className: admin ? 'admin-profile profile-page' : 'profile-page' });
   const content = el('div', { 'aria-live': 'polite' });
   root.append(heading(admin ? 'Hồ sơ quản trị' : 'Hồ sơ của tôi', 'Thông tin tài khoản và các hoạt động học tập.'), content);
+  const view = accountView(root);
 
   function currentPage() {
-    return root.isConnected && getSession().user?.id === session.user.id && getAccessToken() === token;
+    return view.current() && getSession().user?.id === session.user.id && getAccessToken() === token;
   }
 
   function draw(user) {
@@ -48,7 +50,7 @@ export function renderProfile() {
       setButtonState(submit, 'loading', { label: 'Đang lưu…' });
       form.setAttribute('aria-busy', 'true');
       try {
-        const result = await api('/profile', { method: 'PATCH', body: { name: name.value, birthYear: year.value ? Number(year.value) : null } });
+        const result = await api('/profile', { method: 'PATCH', body: { name: name.value, birthYear: year.value ? Number(year.value) : null }, signal: view.signal });
         if (!currentPage() || !form.isConnected) return;
         if (!result?.user || result.user.id !== user.id) throw new Error('Phản hồi hồ sơ chưa hợp lệ. Vui lòng tải lại trang.');
         setCurrentUser(result.user);
@@ -75,6 +77,7 @@ export function renderProfile() {
         panel('Chỉnh sửa thông tin', form),
       );
     } else {
+      const activity = el('div', { className: 'activity-list', role: 'status' }, skeletonState('Đang tải lịch sử học tập…', 'list'));
       content.replaceChildren(
         el('div', { className: 'grid-2' },
           panel('',
@@ -83,17 +86,34 @@ export function renderProfile() {
             el('p', { className: 'helper' }, user.email),
             el('div', { className: 'page-actions' }, button('Đăng xuất', logout, 'ghost'))),
           panel('Chỉnh sửa thông tin', form)),
-        el('div', { className: 'section-gap' }, panel('Lịch sử học tập',
-          el('div', { className: 'activity-row' }, el('span', {}, 'Phương trình bậc hai'), link('Xem hội thoại', '#chat', 'button ghost small')),
-          el('div', { className: 'activity-row' }, el('span', {}, 'Bài luyện tập trắc nghiệm'), link('Luyện tập', '#practice', 'button ghost small')))),
+        el('div', { className: 'section-gap' }, panel('Lịch sử học tập', activity, link('Xem toàn bộ lịch sử', '#history', 'button ghost small', { trailingIcon: 'arrowRight' }))),
       );
+      if (preview) {
+        activity.replaceChildren(notice('Đăng nhập tài khoản thật để xem hoạt động đã lưu.', 'warning'));
+      } else {
+        loadRecent(activity);
+      }
+    }
+  }
+
+  async function loadRecent(activity) {
+    activity.replaceChildren(skeletonState('Đang tải lịch sử học tập…', 'list'));
+    try {
+      const data = await loadActivity({ signal: view.signal });
+      if (!currentPage() || !activity.isConnected) return;
+      activity.replaceChildren(...data.records.slice(0, 3).map(activityRow));
+      if (!data.records.length) activity.append(el('p', { className: 'helper' }, 'Bạn chưa có hoạt động học tập.'));
+    } catch (error) {
+      if (error.name !== 'AbortError' && currentPage() && activity.isConnected) {
+        activity.replaceChildren(notice(error.message || 'Chưa thể tải hoạt động học tập.', 'error'), button('Tải lại hoạt động', () => loadRecent(activity), 'secondary small'));
+      }
     }
   }
 
   async function load() {
     content.replaceChildren(skeletonState('Đang tải hồ sơ…', 'list'));
     try {
-      const result = await api('/profile');
+      const result = await api('/profile', { signal: view.signal });
       if (!currentPage()) return;
       if (!result?.user || result.user.id !== session.user.id) throw new Error('Phản hồi hồ sơ chưa hợp lệ. Vui lòng thử lại.');
       setCurrentUser(result.user, { notifyChange: false });

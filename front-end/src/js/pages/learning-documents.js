@@ -4,6 +4,8 @@ import { el, heading, link, button, notice, badge } from '../components/ui.js';
 import { skeletonState, thinkingStatus } from '../components/motion.js';
 
 let activeController;
+const PAGE_SIZE = 20;
+const MAX_OFFSET = 100000;
 function positiveId(value) {
   const text = String(value ?? ''), number = Number(text);
   return /^[1-9]\d*$/.test(text) && Number.isSafeInteger(number) && number <= 2147483647 ? number : null;
@@ -25,13 +27,22 @@ export function renderLearningDocuments() {
   const owner = getSession().user?.id, token = getAccessToken();
   const params = new URLSearchParams(location.hash.split('?')[1]);
   const ids = Object.fromEntries(['subject', 'topic', 'document'].map(key => [key, params.has(key) ? positiveId(params.get(key)) : null]));
-  const invalid = ['subject', 'topic', 'document'].some(key => params.has(key) && (!ids[key] || params.getAll(key).length !== 1));
+  const offsetText = params.get('offset') ?? '0';
+  const offset = /^(0|[1-9]\d*)$/.test(offsetText) ? Number(offsetText) : NaN;
+  const invalid = ['subject', 'topic', 'document'].some(key => params.has(key) && (!ids[key] || params.getAll(key).length !== 1))
+    || !Number.isSafeInteger(offset) || offset > MAX_OFFSET || params.getAll('offset').length > 1;
   const filters = new URLSearchParams();
   if (ids.subject) filters.set('subject', ids.subject);
   if (ids.topic) filters.set('topic', ids.topic);
-  const href = id => { const query = new URLSearchParams(filters); if (id) query.set('document', id); return `#documents${query.size ? `?${query}` : ''}`; };
+  const href = (id, pageOffset = offset) => {
+    const query = new URLSearchParams(filters);
+    if (id) query.set('document', id);
+    if (pageOffset) query.set('offset', pageOffset);
+    return `#documents${query.size ? `?${query}` : ''}`;
+  };
   const listStatus = el('div', { role: 'status' });
   const list = el('ul', { className: 'learning-document-list' });
+  const pagination = el('nav', { className: 'learning-document-pagination', 'aria-label': 'Phân trang tài liệu', hidden: true });
   const readerHeader = el('div');
   const readerStatus = el('div', { role: 'status', 'aria-live': 'polite' });
   const content = el('div', { className: 'learning-document-content' });
@@ -40,7 +51,7 @@ export function renderLearningDocuments() {
     heading('Tài liệu học tập', 'Chọn tài liệu đã phát hành để đọc và hỏi gia sư theo chủ đề.'),
     el('div', { className: 'page-actions' }, link('Về danh mục môn học', '#home', 'button ghost small'), ids.document ? link('Về danh sách tài liệu', href(), 'button ghost small') : null),
     el('div', { className: 'learning-documents-layout' },
-      el('section', { className: 'panel panel-cool learning-document-catalog', 'aria-label': 'Danh sách tài liệu' }, el('h2', {}, 'Danh sách tài liệu'), listStatus, list), reader));
+      el('section', { className: 'panel panel-cool learning-document-catalog', 'aria-label': 'Danh sách tài liệu' }, el('h2', {}, 'Danh sách tài liệu'), listStatus, list, pagination), reader));
   let listPending = false, readerPending = false, blobUrl = null, signature = null, timer, revoked = false;
   const current = () => root.isConnected && !controller.signal.aborted && getSession().status === 'authenticated'
     && getSession().user?.id === owner && getSession().reason !== 'preview' && getAccessToken() === token;
@@ -67,21 +78,34 @@ export function renderLearningDocuments() {
   async function loadList() {
     if (listPending || !current()) return;
     listPending = true; list.replaceChildren();
+    pagination.hidden = true; pagination.replaceChildren();
     list.setAttribute('aria-busy', 'true'); listStatus.replaceChildren(skeletonState('Đang tải danh sách tài liệu…', 'list'));
     const query = new URLSearchParams();
     if (ids.subject) query.set('subjectId', ids.subject);
     if (ids.topic) query.set('topicId', ids.topic);
+    query.set('limit', PAGE_SIZE);
+    query.set('offset', offset);
     try {
       const result = await api(`/documents${query.size ? `?${query}` : ''}`, { signal: controller.signal });
       if (!current()) return;
-      if (!Array.isArray(result?.documents)) throw new ApiError('Danh sách tài liệu từ máy chủ chưa hợp lệ.');
+      if (!Array.isArray(result?.documents) || result.limit !== PAGE_SIZE || result.offset !== offset
+        || typeof result.hasMore !== 'boolean' || result.documents.length > PAGE_SIZE) {
+        throw new ApiError('Danh sách tài liệu từ máy chủ chưa hợp lệ.');
+      }
       const documents = result.documents.map(metadata);
       if (documents.some(item => !matches(item)) || new Set(documents.map(item => item.id)).size !== documents.length) throw new ApiError('Danh sách tài liệu không khớp môn hoặc chủ đề đã chọn.');
-      listStatus.replaceChildren(...(documents.length ? [] : [notice('Chưa có tài liệu được phát hành cho lựa chọn này.')]));
+      listStatus.replaceChildren(...(documents.length ? [] : [notice(offset
+        ? 'Trang này không còn tài liệu. Hãy quay về trang trước.'
+        : 'Chưa có tài liệu được phát hành cho lựa chọn này.')]));
       list.replaceChildren(...documents.map(item => el('li', {},
         el('a', { href: href(item.id), className: 'learning-document-link', 'aria-current': item.id === ids.document ? 'page' : null },
           el('strong', {}, item.title), el('span', { className: 'helper' }, `${item.subjectName} · ${item.chapterName} · ${item.topicName}`),
           badge(item.fileType === 'unknown' ? 'Chưa hỗ trợ' : item.fileType.toUpperCase(), item.fileType === 'unknown' ? 'neutral' : 'primary')))));
+      pagination.replaceChildren(
+        offset > 0 ? link('Trang trước', href(null, Math.max(0, offset - PAGE_SIZE)), 'button secondary small') : null,
+        documents.length ? el('span', { className: 'helper' }, `Tài liệu ${offset + 1}–${offset + documents.length}`) : null,
+        result.hasMore && offset + PAGE_SIZE <= MAX_OFFSET ? link('Trang sau', href(null, offset + PAGE_SIZE), 'button secondary small') : null);
+      pagination.hidden = offset === 0 && !result.hasMore;
     } catch (error) {
       if (error.name !== 'AbortError' && current()) listStatus.replaceChildren(notice(error.message, 'error'), button('Thử lại danh sách', loadList, 'secondary small'));
     } finally { listPending = false; if (current()) list.removeAttribute('aria-busy'); }
@@ -101,10 +125,12 @@ export function renderLearningDocuments() {
     if (!verifyOnly) { revoked = false; clearContent(); readerHeader.replaceChildren(); }
     reader.setAttribute('aria-busy', 'true');
     readerStatus.replaceChildren(thinkingStatus(verifyOnly ? 'Đang kiểm tra lại quyền xem tài liệu…' : 'Đang tải tài liệu…'));
+    let loadedItem = null;
     try {
       const result = await api(`/documents/${ids.document}`, { signal: controller.signal });
       if (!current()) return;
       const item = metadata(result?.document);
+      loadedItem = item;
       if (item.id !== ids.document || !matches(item)) throw new ApiError('Tài liệu không khớp môn hoặc chủ đề trên đường dẫn.', 404, 'DOCUMENT_FILTER_MISMATCH');
       if (item.fileType === 'unknown') throw new ApiError('Định dạng tài liệu này chưa được hỗ trợ. Vui lòng chọn PDF hoặc TXT.');
       const nextSignature = JSON.stringify([item.fileName, item.fileType, item.processedAt, item.sizeBytes]);
@@ -134,6 +160,18 @@ export function renderLearningDocuments() {
     } catch (error) {
       if (error.name === 'AbortError' || !current()) return;
       clearContent(); readerHeader.replaceChildren();
+      const extracted = error.code === 'DOCUMENT_FILE_NOT_FOUND'
+        && loadedItem && typeof loadedItem.content === 'string' && loadedItem.content.trim()
+        && Array.isArray(loadedItem.chunks) && loadedItem.chunks.length > 0;
+      if (extracted) {
+        showHeader(loadedItem);
+        readerStatus.replaceChildren(
+          notice('Tệp gốc không còn trên máy chủ; đang hiển thị nội dung văn bản đã trích xuất.', 'warning'),
+          button('Thử lại tài liệu', () => loadDocument(), 'secondary small'),
+        );
+        content.replaceChildren(el('pre', { className: 'learning-document-text', tabindex: '0', 'aria-label': 'Nội dung tài liệu đã trích xuất' }, loadedItem.content));
+        return;
+      }
       revoked = error.status === 404 || error.status === 403;
       const message = error.status === 403 ? 'Bạn không còn quyền truy cập tài liệu này.'
         : error.code === 'DOCUMENT_FILE_NOT_FOUND' ? 'Tệp gốc của tài liệu không còn truy cập được.'
